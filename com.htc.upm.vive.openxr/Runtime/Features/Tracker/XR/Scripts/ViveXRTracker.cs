@@ -37,6 +37,7 @@ namespace VIVE.OpenXR.Tracker
     /// </summary>
 #if UNITY_EDITOR
     [OpenXRFeature(UiName = "VIVE XR Tracker (Beta)",
+        Hidden = true,
         BuildTargetGroups = new[] { BuildTargetGroup.Android, BuildTargetGroup.Standalone },
         Company = "HTC",
         Desc = "Support for enabling the vive xr tracker interaction profile. Will register the controller map for xr tracker if enabled.",
@@ -48,6 +49,7 @@ namespace VIVE.OpenXR.Tracker
 #endif
     public class ViveXRTracker : OpenXRInteractionFeature
     {
+        #region Log
         const string LOG_TAG = "VIVE.OpenXR.Tracker.ViveXRTracker ";
         static StringBuilder m_sb = null;
         static StringBuilder sb {
@@ -56,9 +58,9 @@ namespace VIVE.OpenXR.Tracker
                 return m_sb;
             }
         }
-        static void DEBUG(StringBuilder msg) { Debug.Log(msg); }
-        static void WARNING(StringBuilder msg) { Debug.LogWarning(msg); }
-        static void ERROR(StringBuilder msg) { Debug.LogError(msg); }
+        static void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
+        static void ERROR(StringBuilder msg) { Debug.LogErrorFormat("{0} {1}", LOG_TAG, msg); }
+        #endregion
 
         private static ViveXRTracker m_Instance = null;
 
@@ -70,7 +72,7 @@ namespace VIVE.OpenXR.Tracker
         /// <summary>
         /// The feature id string. This is used to give the feature a well known id for reference.
         /// </summary>
-        public const string featureId = "vive.wave.openxr.feature.xrtracker";
+        public const string featureId = "vive.openxr.feature.xrtracker";
 
         #region Tracker Product Name
         public const string kProductUltimateTracker = "VIVE Ultimate Tracker";
@@ -351,7 +353,7 @@ namespace VIVE.OpenXR.Tracker
                     return m_sb;
                 }
             }
-            void DEBUG(StringBuilder msg) { Debug.Log(msg); }
+            void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
             #endregion
 
             #region Interactions
@@ -416,12 +418,6 @@ namespace VIVE.OpenXR.Tracker
             public ButtonControl trackpadPress { get; private set; }
 
             /// <summary>
-            /// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="ViveXRTracker.trackpadTouch"/> OpenXR binding.
-            /// </summary>
-            [Preserve, InputControl(aliases = new[] { "TrackpadTouch" }, usage = "TrackpadTouch")]
-            public ButtonControl trackpadTouch { get; private set; }
-
-            /// <summary>
             /// A <see cref="HapticControl"/> that represents the <see cref="ViveXRTracker.haptic"/> binding.
             /// </summary>
             [Preserve, InputControl(usage = "Haptic")]
@@ -451,11 +447,9 @@ namespace VIVE.OpenXR.Tracker
                 gripPress = GetChildControl<ButtonControl>("gripPress");
                 triggerPress = GetChildControl<ButtonControl>("triggerPress");
                 trackpadPress = GetChildControl<ButtonControl>("trackpadPress");
-                trackpadTouch = GetChildControl<ButtonControl>("trackpadTouch");
                 haptic = GetChildControl<HapticControl>("haptic");
 
-                sb.Clear().Append(LOG_TAG)
-                    .Append("FinishSetup() device interfaceName: ").Append(description.interfaceName)
+                sb.Clear().Append("FinishSetup() device interfaceName: ").Append(description.interfaceName)
                     .Append(", deviceClass: ").Append(description.deviceClass)
                     .Append(", product: ").Append(description.product)
                     .Append(", serial: ").Append(description.serial)
@@ -471,14 +465,14 @@ namespace VIVE.OpenXR.Tracker
                     /// we can simply call SetDeviceUsage(m_UltimateTrackerUsageMap[description.product])
                     /// to set assign the XrTrackerDevice with product name kProductUltimateTracker0 to the commonUsage kUltimateTrackerUsage0.
                     InputSystem.SetDeviceUsage(this, m_UltimateTrackerUsageMap[description.product]);
-                    sb.Clear().Append(LOG_TAG).Append("FinishSetup() usage: ").Append(m_UltimateTrackerUsageMap[description.product]); DEBUG(sb);
+                    sb.Clear().Append("FinishSetup() usage: ").Append(m_UltimateTrackerUsageMap[description.product]); DEBUG(sb);
 #if DEBUG_CODE
                     /// We cannot update the ActionMap outside the RegisterActionMapsWithRuntime method so ignore this code.
                     if (inputActionIsTracked == null)
                     {
                         //string actionBindingIsTracked = "<XRController>{LeftHand}/isTracked";
                         string actionBindingIsTracked = "<" + kLayoutName + ">{" + m_UltimateTrackerUsageMap[description.product] + "}/isTracked";
-                        sb.Clear().Append(LOG_TAG).Append("FinishSetup() ").Append(m_UltimateTrackerUsageMap[description.product]).Append(", action binding of IsTracked: ").Append(actionBindingIsTracked);
+                        sb.Clear().Append("FinishSetup() ").Append(m_UltimateTrackerUsageMap[description.product]).Append(", action binding of IsTracked: ").Append(actionBindingIsTracked);
                         DEBUG(sb);
 
                         inputActionIsTracked = new InputAction(
@@ -504,7 +498,7 @@ namespace VIVE.OpenXR.Tracker
                 /// Updates the Usage (tracker role) when IsTracked becomes true.
                 if (inputActionIsTracked.ReadValue<float>() > 0 && !bRoleUpdated)
                 {
-                    sb.Clear().Append(LOG_TAG).Append("OnUpdate() Update the InputDevice with product: ").Append(description.product); DEBUG(sb);
+                    sb.Clear().Append("OnUpdate() Update the InputDevice with product: ").Append(description.product); DEBUG(sb);
 
                     if (m_UltimateTrackerUsageMap.ContainsKey(description.product)) { m_Instance.UpdateInputDeviceUltimateTracker(description.product); }
 
@@ -532,7 +526,7 @@ namespace VIVE.OpenXR.Tracker
             m_XrInstanceCreated = true;
             m_XrInstance = xrInstance;
             m_Instance = this;
-            sb.Clear().Append(LOG_TAG).Append("OnInstanceCreate() ").Append(m_XrInstance); DEBUG(sb);
+            sb.Clear().Append("OnInstanceCreate() ").Append(m_XrInstance); DEBUG(sb);
 
             GetXrFunctionDelegates(m_XrInstance);
             return true;
@@ -548,10 +542,12 @@ namespace VIVE.OpenXR.Tracker
                 m_XrInstanceCreated = false;
                 m_XrInstance = 0;
             }
-            sb.Clear().Append(LOG_TAG).Append("OnInstanceDestroy() ").Append(xrInstance); DEBUG(sb);
+            sb.Clear().Append("OnInstanceDestroy() ").Append(xrInstance); DEBUG(sb);
         }
 
+#pragma warning disable
         private static bool m_XrSessionCreated = false;
+#pragma warning enable
         private static XrSession m_XrSession = 0;
         /// <summary>
         /// Called when <see href="https://registry.khronos.org/OpenXR/specs/1.0/html/xrspec.html#xrCreateSession">xrCreateSession</see> is done.
@@ -561,7 +557,7 @@ namespace VIVE.OpenXR.Tracker
         {
             m_XrSession = xrSession;
             m_XrSessionCreated = true;
-            sb.Clear().Append(LOG_TAG).Append("OnSessionCreate() ").Append(m_XrSession); DEBUG(sb);
+            sb.Clear().Append("OnSessionCreate() ").Append(m_XrSession); DEBUG(sb);
         }
         /// <summary>
         /// Called when <see href="https://registry.khronos.org/OpenXR/specs/1.0/html/xrspec.html#xrDestroySession">xrDestroySession</see> is done.
@@ -569,7 +565,7 @@ namespace VIVE.OpenXR.Tracker
         /// <param name="xrSession">The session ID to destroy.</param>
         protected override void OnSessionDestroy(ulong xrSession)
         {
-            sb.Clear().Append(LOG_TAG).Append("OnSessionDestroy() ").Append(xrSession); DEBUG(sb);
+            sb.Clear().Append("OnSessionDestroy() ").Append(xrSession); DEBUG(sb);
             if (m_XrSession == xrSession)
             {
                 m_XrSession = 0;
@@ -585,12 +581,12 @@ namespace VIVE.OpenXR.Tracker
         /// </summary>
         protected override void RegisterDeviceLayout()
         {
-            sb.Clear().Append(LOG_TAG).Append("RegisterDeviceLayout() ").Append(kLayoutName).Append(", product: ").Append(@kProducts); DEBUG(sb);
+            sb.Clear().Append("RegisterDeviceLayout() ").Append(kLayoutName).Append(", product: ").Append(@kProducts); DEBUG(sb);
             InputSystem.RegisterLayout(typeof(XrTrackerDevice),
-                        kLayoutName,
-                        matches: new InputDeviceMatcher()
-                        .WithInterface(XRUtilities.InterfaceMatchAnyVersion)
-                        .WithProduct(@kProducts));
+                kLayoutName,
+                matches: new InputDeviceMatcher()
+                    .WithInterface(XRUtilities.InterfaceMatchAnyVersion)
+                    .WithProduct(@kProducts));
         }
 
         /// <summary>
@@ -598,9 +594,29 @@ namespace VIVE.OpenXR.Tracker
         /// </summary>
         protected override void UnregisterDeviceLayout()
         {
-            sb.Clear().Append(LOG_TAG).Append("UnregisterDeviceLayout() ").Append(kLayoutName); DEBUG(sb);
+            sb.Clear().Append("UnregisterDeviceLayout() ").Append(kLayoutName); DEBUG(sb);
             InputSystem.RemoveLayout(kLayoutName);
         }
+
+#if UNITY_XR_OPENXR_1_9_1
+        /// <summary>
+        /// Return interaction profile type. XrTrackerDevice profile is Device type.
+        /// </summary>
+        /// <returns>Interaction profile type.</returns>
+        protected override InteractionProfileType GetInteractionProfileType()
+        {
+            return typeof(XrTrackerDevice).IsSubclassOf(typeof(XRController)) ? InteractionProfileType.XRController : InteractionProfileType.Device;
+        }
+
+        /// <summary>
+        /// Return device layer out string used for registering device XrTrackerDevice in InputSystem.
+        /// </summary>
+        /// <returns>Device layout string.</returns>
+        protected override string GetDeviceLayoutName()
+        {
+            return kLayoutName;
+        }
+#endif
         #endregion
 
         #region OpenXR function delegates
@@ -615,14 +631,14 @@ namespace VIVE.OpenXR.Tracker
             /// xrGetInstanceProcAddr
             if (xrGetInstanceProcAddr != null && xrGetInstanceProcAddr != IntPtr.Zero)
             {
-                sb.Clear().Append(LOG_TAG).Append("Get function pointer of xrGetInstanceProcAddr."); DEBUG(sb);
+                sb.Clear().Append("Get function pointer of xrGetInstanceProcAddr."); DEBUG(sb);
                 XrGetInstanceProcAddr = Marshal.GetDelegateForFunctionPointer(
                     xrGetInstanceProcAddr,
                     typeof(OpenXRHelper.xrGetInstanceProcAddrDelegate)) as OpenXRHelper.xrGetInstanceProcAddrDelegate;
             }
             else
             {
-                sb.Clear().Append(LOG_TAG).Append("No function pointer of xrGetInstanceProcAddr"); ERROR(sb);
+                sb.Clear().Append("No function pointer of xrGetInstanceProcAddr"); ERROR(sb);
                 return false;
             }
 
@@ -633,20 +649,20 @@ namespace VIVE.OpenXR.Tracker
             {
                 if (funcPtr != IntPtr.Zero)
                 {
-                    sb.Clear().Append(LOG_TAG).Append("Get function pointer of xrEnumerateInstanceExtensionProperties."); DEBUG(sb);
+                    sb.Clear().Append("Get function pointer of xrEnumerateInstanceExtensionProperties."); DEBUG(sb);
                     xrEnumerateInstanceExtensionProperties = Marshal.GetDelegateForFunctionPointer(
                         funcPtr,
                         typeof(OpenXRHelper.xrEnumerateInstanceExtensionPropertiesDelegate)) as OpenXRHelper.xrEnumerateInstanceExtensionPropertiesDelegate;
                 }
                 else
                 {
-                    sb.Clear().Append(LOG_TAG).Append("No function pointer of xrEnumerateInstanceExtensionProperties.");
+                    sb.Clear().Append("No function pointer of xrEnumerateInstanceExtensionProperties.");
                     ERROR(sb);
                 }
             }
             else
             {
-                sb.Clear().Append(LOG_TAG).Append("No function pointer of xrEnumerateInstanceExtensionProperties");
+                sb.Clear().Append("No function pointer of xrEnumerateInstanceExtensionProperties");
                 ERROR(sb);
             }
 
@@ -655,20 +671,20 @@ namespace VIVE.OpenXR.Tracker
             {
                 if (funcPtr != IntPtr.Zero)
                 {
-                    sb.Clear().Append(LOG_TAG).Append("Get function pointer of xrGetInputSourceLocalizedName."); DEBUG(sb);
+                    sb.Clear().Append("Get function pointer of xrGetInputSourceLocalizedName."); DEBUG(sb);
                     xrGetInputSourceLocalizedName = Marshal.GetDelegateForFunctionPointer(
                         funcPtr,
                         typeof(OpenXRHelper.xrGetInputSourceLocalizedNameDelegate)) as OpenXRHelper.xrGetInputSourceLocalizedNameDelegate;
                 }
                 else
                 {
-                    sb.Clear().Append(LOG_TAG).Append("No function pointer of xrGetInputSourceLocalizedName.");
+                    sb.Clear().Append("No function pointer of xrGetInputSourceLocalizedName.");
                     ERROR(sb);
                 }
             }
             else
             {
-                sb.Clear().Append(LOG_TAG).Append("No function pointer of xrGetInputSourceLocalizedName");
+                sb.Clear().Append("No function pointer of xrGetInputSourceLocalizedName");
                 ERROR(sb);
             }
 
@@ -702,10 +718,6 @@ namespace VIVE.OpenXR.Tracker
         /// Constant for a boolean interaction binding '.../input/trackpad/click' OpenXR Input Binding. Used by input subsystem to bind actions to physical inputs.
         /// </summary>
         public const string trackpadClick = "/input/trackpad/click";
-        /// <summary>
-        /// Constant for a boolean interaction binding '.../input/trackpad/touch' OpenXR Input Binding. Used by input subsystem to bind actions to physical inputs.
-        /// </summary>
-        public const string trackpadTouch = "/input/trackpad/touch";
         /// <summary>
         /// Constant for a haptic interaction binding '.../output/haptic' OpenXR Input Binding. Used by input subsystem to bind actions to physical outputs.
         /// </summary>
@@ -825,25 +837,6 @@ namespace VIVE.OpenXR.Tracker
                             new ActionBinding()
                             {
                                 interactionPath = trackpadClick,
-                                interactionProfileName = profile,
-                            }
-                        }
-                    },
-			        // Trackpad Touch
-			        new ActionConfig()
-                    {
-                        name = "trackpadTouch",
-                        localizedName = "Trackpad Touch",
-                        type = ActionType.Binary,
-                        usages = new List<string>()
-                        {
-                            "TrackpadTouch"
-                        },
-                        bindings = new List<ActionBinding>()
-                        {
-                            new ActionBinding()
-                            {
-                                interactionPath = trackpadTouch,
                                 interactionProfileName = profile,
                             }
                         }
@@ -981,25 +974,6 @@ namespace VIVE.OpenXR.Tracker
                             }
                         }
                     },
-			        // Trackpad Touch
-			        new ActionConfig()
-                    {
-                        name = "trackpadTouch",
-                        localizedName = "Trackpad Touch",
-                        type = ActionType.Binary,
-                        usages = new List<string>()
-                        {
-                            "TrackpadTouch"
-                        },
-                        bindings = new List<ActionBinding>()
-                        {
-                            new ActionBinding()
-                            {
-                                interactionPath = trackpadTouch,
-                                interactionProfileName = profile,
-                            }
-                        }
-                    },
                     // Haptics
                     new ActionConfig()
                     {
@@ -1129,25 +1103,6 @@ namespace VIVE.OpenXR.Tracker
                             new ActionBinding()
                             {
                                 interactionPath = trackpadClick,
-                                interactionProfileName = profile,
-                            }
-                        }
-                    },
-			        // Trackpad Touch
-			        new ActionConfig()
-                    {
-                        name = "trackpadTouch",
-                        localizedName = "Trackpad Touch",
-                        type = ActionType.Binary,
-                        usages = new List<string>()
-                        {
-                            "TrackpadTouch"
-                        },
-                        bindings = new List<ActionBinding>()
-                        {
-                            new ActionBinding()
-                            {
-                                interactionPath = trackpadTouch,
                                 interactionProfileName = profile,
                             }
                         }
@@ -1285,25 +1240,6 @@ namespace VIVE.OpenXR.Tracker
                             }
                         }
                     },
-			        // Trackpad Touch
-			        new ActionConfig()
-                    {
-                        name = "trackpadTouch",
-                        localizedName = "Trackpad Touch",
-                        type = ActionType.Binary,
-                        usages = new List<string>()
-                        {
-                            "TrackpadTouch"
-                        },
-                        bindings = new List<ActionBinding>()
-                        {
-                            new ActionBinding()
-                            {
-                                interactionPath = trackpadTouch,
-                                interactionProfileName = profile,
-                            }
-                        }
-                    },
                     // Haptics
                     new ActionConfig()
                     {
@@ -1437,21 +1373,136 @@ namespace VIVE.OpenXR.Tracker
                             }
                         }
                     },
-			        // Trackpad Touch
-			        new ActionConfig()
+                    // Haptics
+                    new ActionConfig()
                     {
-                        name = "trackpadTouch",
-                        localizedName = "Trackpad Touch",
-                        type = ActionType.Binary,
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+#if UNITY_STANDALONE
+            { kProductUltimateTracker5, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
                         usages = new List<string>()
                         {
-                            "TrackpadTouch"
+                            "Device"
                         },
                         bindings = new List<ActionBinding>()
                         {
                             new ActionBinding()
                             {
-                                interactionPath = trackpadTouch,
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
                                 interactionProfileName = profile,
                             }
                         }
@@ -1473,9 +1524,1872 @@ namespace VIVE.OpenXR.Tracker
                         }
                     }
                 } },
+            { kProductUltimateTracker6, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker7, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker8, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker9, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker10, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker11, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker12, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker13, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker14, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker15, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker16, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker17, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker18, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+            { kProductUltimateTracker19, new List<ActionConfig>()
+                {
+                    // Device Pose
+                    new ActionConfig()
+                    {
+                        name = "devicePose",
+                        localizedName = "Grip Pose",
+                        type = ActionType.Pose,
+                        usages = new List<string>()
+                        {
+                            "Device"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = entityPose,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // System
+                    new ActionConfig()
+                    {
+                        name = "system",
+                        localizedName = "System",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "SystemButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = system,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Menu
+			        new ActionConfig()
+                    {
+                        name = "menu",
+                        localizedName = "Menu",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "MenuButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = menu,
+                                interactionProfileName = profile,
+                            },
+                        }
+                    },
+			        // Grip Press
+			        new ActionConfig()
+                    {
+                        name = "gripPress",
+                        localizedName = "Grip Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "GripButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = gripPress,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trigger Press
+			        new ActionConfig()
+                    {
+                        name = "triggerPress",
+                        localizedName = "Trigger Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TriggerButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = triggerClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+			        // Trackpad Press
+			        new ActionConfig()
+                    {
+                        name = "trackpadPress",
+                        localizedName = "Trackpad Press",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "TrackpadButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = trackpadClick,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    },
+                    // Haptics
+                    new ActionConfig()
+                    {
+                        name = "haptic",
+                        localizedName = "Haptic Output",
+                        type = ActionType.Vibrate,
+                        usages = new List<string>() { "Haptic" },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = haptic,
+                                interactionProfileName = profile,
+                            }
+                        }
+                    }
+                } },
+#endif
         };
         private void UpdateInputActionPath(List<ActionConfig> in_actions, string in_name, string in_path)
-		{
+        {
             if (in_actions == null || in_actions.Count <= 0) { return; }
 
             string func = "UpdateInputActionPath() ";
@@ -1485,17 +3399,17 @@ namespace VIVE.OpenXR.Tracker
                 if (in_actions[i].name.Equals(in_name))
                 {
                     for (int j = 0; j < in_actions[i].bindings.Count; j++)
-					{
-                        sb.Clear().Append(LOG_TAG).Append(func).Append("Replace action path from ").Append(in_actions[i].bindings[j].interactionPath).Append(" to ").Append(in_path); DEBUG(sb);
+                    {
+                        sb.Clear().Append(func).Append("Replace action path from ").Append(in_actions[i].bindings[j].interactionPath).Append(" to ").Append(in_path); DEBUG(sb);
                         in_actions[i].bindings[j].interactionPath = in_path;
-					}
+                    }
                 }
             }
         }
 
         private void RegisterActionMap(string in_name, string in_product, string in_sn, string in_path, List<ActionConfig> in_action)
         {
-            sb.Clear().Append(LOG_TAG).Append("RegisterActionMap() Added ActionMapConfig of ").Append(in_path)
+            sb.Clear().Append("RegisterActionMap() Added ActionMapConfig of ").Append(in_path)
                 .Append(", localizedName = ").Append(in_product)
                 .Append(" { name = ").Append(in_name)
                 .Append(", desiredInteractionProfile = ").Append(profile)
@@ -1529,14 +3443,14 @@ namespace VIVE.OpenXR.Tracker
         {
             if (OpenXRHelper.IsExtensionSupported(xrEnumerateInstanceExtensionProperties, kOpenxrExtensionString) != XrResult.XR_SUCCESS)
             {
-                sb.Clear().Append(LOG_TAG).Append("RegisterActionMapsWithRuntime() ").Append(kOpenxrExtensionString).Append(" is NOT supported."); ERROR(sb);
+                sb.Clear().Append("RegisterActionMapsWithRuntime() ").Append(kOpenxrExtensionString).Append(" is NOT supported."); ERROR(sb);
                 return;
             }
 
             /// Updates m_UltimateTrackerPathMap.
             if (!EnumeratePath())
             {
-                sb.Clear().Append(LOG_TAG).Append("RegisterActionMapsWithRuntime() EnumeratePath failed.");
+                sb.Clear().Append("RegisterActionMapsWithRuntime() EnumeratePath failed.");
                 ERROR(sb);
             }
 
@@ -1564,7 +3478,7 @@ namespace VIVE.OpenXR.Tracker
                 for (int i = 0; i < trackerPaths.Length; i++)
                 {
                     string userPath = PathToString(trackerPaths[i]);
-                    sb.Clear().Append(LOG_TAG).Append(func).Append("trackerPaths[").Append(i).Append("] ").Append(userPath); DEBUG(sb);
+                    sb.Clear().Append(func).Append("trackerPaths[").Append(i).Append("] ").Append(userPath); DEBUG(sb);
 
                     // Ultimate Tracker
                     if (userPath.Contains("ultimate", StringComparison.OrdinalIgnoreCase) && ultimate_tracker_index < s_UltimateTrackerProduct.Length)
@@ -1572,10 +3486,10 @@ namespace VIVE.OpenXR.Tracker
                         string product = s_UltimateTrackerProduct[ultimate_tracker_index];
 
                         m_UltimateTrackerPathMap[product] = userPath;
-                        sb.Clear().Append(LOG_TAG).Append(func).Append("Updates ").Append(product).Append(" path to ").Append(m_UltimateTrackerPathMap[product]); DEBUG(sb);
+                        sb.Clear().Append(func).Append("Updates ").Append(product).Append(" path to ").Append(m_UltimateTrackerPathMap[product]); DEBUG(sb);
 
                         m_UltimateTrackerSerialMap[product] = ConvertUserPathToSerialNumber(userPath);
-                        sb.Clear().Append(LOG_TAG).Append(func).Append("Updates ").Append(product).Append(" serial number to ").Append(m_UltimateTrackerSerialMap[product]); DEBUG(sb);
+                        sb.Clear().Append(func).Append("Updates ").Append(product).Append(" serial number to ").Append(m_UltimateTrackerSerialMap[product]); DEBUG(sb);
 
                         ultimate_tracker_index++;
 
@@ -1586,66 +3500,60 @@ namespace VIVE.OpenXR.Tracker
                             {
                                 string fullPath = PathToString(inputPaths[p]);
                                 string actionPath = fullPath.Replace(userPath, "");
-                                sb.Clear().Append(LOG_TAG).Append(func).Append(userPath).Append(" inputPaths[").Append(p).Append("] ").Append(actionPath); DEBUG(sb);
+                                sb.Clear().Append(func).Append(userPath).Append(" inputPaths[").Append(p).Append("] ").Append(actionPath); DEBUG(sb);
 
                                 // devicePose: "/input/entity_htc/pose"
                                 if (actionPath.Contains("pose"))
                                 {
-                                    sb.Clear().Append(LOG_TAG).Append(func).Append("Updates ").Append(product).Append(" action path of devicePose to ").Append(actionPath); DEBUG(sb);
+                                    sb.Clear().Append(func).Append("Updates ").Append(product).Append(" action path of devicePose to ").Append(actionPath); DEBUG(sb);
                                     UpdateInputActionPath(m_UltimateTrackerActionConfig[product], "devicePose", actionPath);
                                 }
                                 // system: "/input/system/click"
                                 if (actionPath.Contains("system") && actionPath.Contains("click"))
-								{
-                                    sb.Clear().Append(LOG_TAG).Append(func).Append("Updates ").Append(product).Append(" action path of system to ").Append(actionPath); DEBUG(sb);
+                                {
+                                    sb.Clear().Append(func).Append("Updates ").Append(product).Append(" action path of system to ").Append(actionPath); DEBUG(sb);
                                     UpdateInputActionPath(m_UltimateTrackerActionConfig[product], "system", actionPath);
-								}
+                                }
                                 // menu: "/input/menu/click"
                                 if (actionPath.Contains("menu") && actionPath.Contains("click"))
                                 {
-                                    sb.Clear().Append(LOG_TAG).Append(func).Append("Updates ").Append(product).Append(" action path of menu to ").Append(actionPath); DEBUG(sb);
+                                    sb.Clear().Append(func).Append("Updates ").Append(product).Append(" action path of menu to ").Append(actionPath); DEBUG(sb);
                                     UpdateInputActionPath(m_UltimateTrackerActionConfig[product], "menu", actionPath);
                                 }
                                 // gripPress: "/input/squeeze/click"
                                 if (actionPath.Contains("squeeze") && actionPath.Contains("click"))
                                 {
-                                    sb.Clear().Append(LOG_TAG).Append(func).Append("Updates ").Append(product).Append(" action path of gripPress to ").Append(actionPath); DEBUG(sb);
+                                    sb.Clear().Append(func).Append("Updates ").Append(product).Append(" action path of gripPress to ").Append(actionPath); DEBUG(sb);
                                     UpdateInputActionPath(m_UltimateTrackerActionConfig[product], "gripPress", actionPath);
                                 }
                                 // triggerPress: "/input/trigger/click"
                                 if (actionPath.Contains("trigger") && actionPath.Contains("click"))
                                 {
-                                    sb.Clear().Append(LOG_TAG).Append(func).Append("Updates ").Append(product).Append(" action path of triggerPress to ").Append(actionPath); DEBUG(sb);
+                                    sb.Clear().Append(func).Append("Updates ").Append(product).Append(" action path of triggerPress to ").Append(actionPath); DEBUG(sb);
                                     UpdateInputActionPath(m_UltimateTrackerActionConfig[product], "triggerPress", actionPath);
                                 }
                                 // trackpadPress: "/input/trackpad/click"
                                 if (actionPath.Contains("trackpad") && actionPath.Contains("click"))
                                 {
-                                    sb.Clear().Append(LOG_TAG).Append(func).Append("Updates ").Append(product).Append(" action path of trackpadPress to ").Append(actionPath); DEBUG(sb);
+                                    sb.Clear().Append(func).Append("Updates ").Append(product).Append(" action path of trackpadPress to ").Append(actionPath); DEBUG(sb);
                                     UpdateInputActionPath(m_UltimateTrackerActionConfig[product], "trackpadPress", actionPath);
-                                }
-                                // trackpadTouch: "/input/trackpad/touch"
-                                if (actionPath.Contains("trackpad") && actionPath.Contains("touch"))
-                                {
-                                    sb.Clear().Append(LOG_TAG).Append(func).Append("Updates ").Append(product).Append(" action path of trackpadTouch to ").Append(actionPath); DEBUG(sb);
-                                    UpdateInputActionPath(m_UltimateTrackerActionConfig[product], "trackpadTouch", actionPath);
                                 }
                                 // haptic: "/output/haptic"
                                 if (actionPath.Contains("haptic"))
                                 {
-                                    sb.Clear().Append(LOG_TAG).Append(func).Append("Updates ").Append(product).Append(" action path of haptic to ").Append(actionPath); DEBUG(sb);
+                                    sb.Clear().Append(func).Append("Updates ").Append(product).Append(" action path of haptic to ").Append(actionPath); DEBUG(sb);
                                     UpdateInputActionPath(m_UltimateTrackerActionConfig[product], "haptic", actionPath);
                                 }
                             }
                         }
                     }
                 }
-			}
-			else
-			{
-                sb.Clear().Append(LOG_TAG).Append(func).Append("GetUserPaths(").Append(profile).Append(") failed."); ERROR(sb);
+            }
+            else
+            {
+                sb.Clear().Append(func).Append("GetUserPaths(").Append(profile).Append(") failed."); ERROR(sb);
                 return false;
-			}
+            }
 
 
             return true;
@@ -1674,70 +3582,6 @@ namespace VIVE.OpenXR.Tracker
             return result;
         }
 
-        [Obsolete("This enumeration is deprecated. Please use XrInputSourceLocalizedNameFlags instead.")]
-        public enum InputSourceType : UInt64
-        {
-            SerialNumber = XrInputSourceLocalizedNameFlags.XR_INPUT_SOURCE_LOCALIZED_NAME_SERIAL_NUMBER_BIT_HTC,
-            TrackerRole = XrInputSourceLocalizedNameFlags.XR_INPUT_SOURCE_LOCALIZED_NAME_USER_PATH_BIT,
-        }
-        [Obsolete("This function is deprecated. Please use OpenXRHelper.GetInputSourceName instead.")]
-        public static XrResult GetInputSourceName(XrPath path, InputSourceType sourceType, out string sourceName)
-        {
-            string func = "GetInputSourceName() ";
-
-            sourceName = "";
-            if (!m_XrSessionCreated || xrGetInputSourceLocalizedName == null) { return XrResult.XR_ERROR_VALIDATION_FAILURE; }
-
-            string userPath = PathToString(path);
-            sb.Clear().Append(LOG_TAG).Append(func)
-                .Append("userPath: ").Append(userPath).Append(", flag: ").Append((UInt64)sourceType); DEBUG(sb);
-
-            XrInputSourceLocalizedNameGetInfo nameInfo = new XrInputSourceLocalizedNameGetInfo(
-                XrStructureType.XR_TYPE_INPUT_SOURCE_LOCALIZED_NAME_GET_INFO,
-                IntPtr.Zero, path, (XrInputSourceLocalizedNameFlags)sourceType);
-
-            UInt32 nameSizeIn = 0;
-            UInt32 nameSizeOut = 0;
-            char[] buffer = new char[0];
-
-            XrResult result = xrGetInputSourceLocalizedName(m_XrSession, ref nameInfo, nameSizeIn, ref nameSizeOut, buffer);
-            sb.Clear().Append(LOG_TAG).Append(func)
-                .Append("1.xrGetInputSourceLocalizedName(").Append(userPath).Append(") result: ").Append(result)
-                .Append(", flag: ").Append((UInt64)nameInfo.whichComponents)
-                .Append(", bufferCapacityInput: ").Append(nameSizeIn)
-                .Append(", bufferCountOutput: ").Append(nameSizeOut);
-            DEBUG(sb);
-            if (result == XrResult.XR_SUCCESS)
-            {
-                if (nameSizeOut < 1)
-                {
-                    sb.Clear().Append(LOG_TAG).Append(func)
-                        .Append("xrGetInputSourceLocalizedName(").Append(userPath).Append(")")
-                        .Append(", flag: ").Append((UInt64)sourceType)
-                        .Append("bufferCountOutput size is invalid!");
-                    ERROR(sb);
-                    return XrResult.XR_ERROR_VALIDATION_FAILURE;
-                }
-
-                nameSizeIn = nameSizeOut;
-                buffer = new char[nameSizeIn];
-
-                result = xrGetInputSourceLocalizedName(m_XrSession, ref nameInfo, nameSizeIn, ref nameSizeOut, buffer);
-                sb.Clear().Append(LOG_TAG).Append(func)
-                    .Append("2.xrGetInputSourceLocalizedName(").Append(userPath).Append(") result: ").Append(result)
-                    .Append(", flag: ").Append((UInt64)nameInfo.whichComponents)
-                    .Append(", bufferCapacityInput: ").Append(nameSizeIn)
-                    .Append(", bufferCountOutput: ").Append(nameSizeOut);
-                DEBUG(sb);
-                if (result == XrResult.XR_SUCCESS)
-                {
-                    sourceName = new string(buffer).TrimEnd('\0');
-                }
-            }
-
-            return result;
-        }
-
 #if DEBUG_CODE
         XrInputSourceLocalizedNameGetInfo nameInfo;
         private bool updateSerialNumber = true, updateUsage = false;
@@ -1745,7 +3589,7 @@ namespace VIVE.OpenXR.Tracker
         {
             string func = "UpdateTrackerMaps() ";
             string s_path = PathToString(path);
-            sb.Clear().Append(LOG_TAG).Append(func).Append("product: ").Append(product).Append(", path: ").Append(s_path); DEBUG(sb);
+            sb.Clear().Append(func).Append("product: ").Append(product).Append(", path: ").Append(s_path); DEBUG(sb);
 
             // -------------------- Tracker Serial Number --------------------
             if (updateSerialNumber)
@@ -1761,7 +3605,7 @@ namespace VIVE.OpenXR.Tracker
                     ref nameInfo,
                     out string sn);
 
-                sb.Clear().Append(LOG_TAG).Append(func).Append("GetInputSourceName(").Append(s_path).Append(")")
+                sb.Clear().Append(func).Append("GetInputSourceName(").Append(s_path).Append(")")
                     .Append(", sourceType: ").Append(nameInfo.whichComponents)
                     .Append(", serial number: ").Append(sn)
                     .Append(", result: ").Append(result);
@@ -1778,7 +3622,7 @@ namespace VIVE.OpenXR.Tracker
                     else
                         serialMap[product] = sn;
 
-                    sb.Clear().Append(LOG_TAG).Append(func).Append("Sets product ").Append(product).Append(" with serial number ").Append(serialMap[product]); DEBUG(sb);
+                    sb.Clear().Append(func).Append("Sets product ").Append(product).Append(" with serial number ").Append(serialMap[product]); DEBUG(sb);
                 }
             }
             // -------------------- Tracker Role --------------------
@@ -1795,7 +3639,7 @@ namespace VIVE.OpenXR.Tracker
                     ref nameInfo,
                     out string role);
 
-                sb.Clear().Append(LOG_TAG).Append(func).Append("GetInputSourceName(").Append(s_path).Append(")")
+                sb.Clear().Append(func).Append("GetInputSourceName(").Append(s_path).Append(")")
                     .Append(", sourceType: ").Append(nameInfo.whichComponents)
                     .Append(", role: ").Append(role)
                     .Append(", result: ").Append(result);
@@ -1812,7 +3656,7 @@ namespace VIVE.OpenXR.Tracker
                     else
                         roleMap[product] = role;
 
-                    sb.Clear().Append(LOG_TAG).Append(func).Append("Sets product ").Append(product).Append(" with usage ").Append(roleMap[product]); DEBUG(sb);
+                    sb.Clear().Append(func).Append("Sets product ").Append(product).Append(" with usage ").Append(roleMap[product]); DEBUG(sb);
                 }
             }
 
@@ -1828,7 +3672,7 @@ namespace VIVE.OpenXR.Tracker
             if (!IsUltimateTracker(product)) { return; }
             string func = "UpdateInputDeviceUltimateTracker() ";
 
-            sb.Clear().Append(LOG_TAG).Append(func)
+            sb.Clear().Append(func)
                 .Append("product: ").Append(product)
                 .Append(", serial number: ").Append(m_UltimateTrackerSerialMap[product])
                 .Append(", user path: ").Append(m_UltimateTrackerPathMap[product])
@@ -1839,7 +3683,7 @@ namespace VIVE.OpenXR.Tracker
             /// Updates tracker serial number (m_UltimateTrackerSerialMap) and role (m_UltimateTrackerUsageMap)
             if (UpdateTrackerMaps(product, path, ref m_UltimateTrackerSerialMap, ref m_UltimateTrackerUsageMap))
             {
-                sb.Clear().Append(LOG_TAG).Append(func)
+                sb.Clear().Append(func)
                     .Append("Maps of ").Append(product)
                     .Append(" with user path ").Append(m_UltimateTrackerPathMap[product]).Append(" are updated.");
                 DEBUG(sb);
@@ -1850,7 +3694,7 @@ namespace VIVE.OpenXR.Tracker
                     if (InputSystem.devices[i] is XrTrackerDevice &&
                         InputSystem.devices[i].description.product.Equals(product))
                     {
-                        sb.Clear().Append(LOG_TAG).Append(func)
+                        sb.Clear().Append(func)
                             .Append("Removes the XrTrackerDevice product ").Append(product);
                         DEBUG(sb);
 
@@ -1861,7 +3705,7 @@ namespace VIVE.OpenXR.Tracker
                 }
                 if (foundProduct)
                 {
-                    sb.Clear().Append(LOG_TAG).Append(func).Append("Adds a XrTrackerDevice product ").Append(product); DEBUG(sb);
+                    sb.Clear().Append(func).Append("Adds a XrTrackerDevice product ").Append(product); DEBUG(sb);
                     RegisterActionMap(
                         product: product,
                         in_name: m_UltimateTrackerActionMap[product],

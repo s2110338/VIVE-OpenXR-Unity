@@ -31,10 +31,10 @@ namespace VIVE.OpenXR.Samples.FacialTracking
             MouthUpperOverturn = XrLipExpressionHTC.XR_LIP_EXPRESSION_MOUTH_UPPER_OVERTURN_HTC,
             MouthLowerOverturn = XrLipExpressionHTC.XR_LIP_EXPRESSION_MOUTH_LOWER_OVERTURN_HTC, // 10
             MouthPout = XrLipExpressionHTC.XR_LIP_EXPRESSION_MOUTH_POUT_HTC,
-            MouthSmileRight = XrLipExpressionHTC.XR_LIP_EXPRESSION_MOUTH_SMILE_RIGHT_HTC,
-            MouthSmileLeft = XrLipExpressionHTC.XR_LIP_EXPRESSION_MOUTH_SMILE_LEFT_HTC,
-            MouthSadRight = XrLipExpressionHTC.XR_LIP_EXPRESSION_MOUTH_SAD_RIGHT_HTC,
-            MouthSadLeft = XrLipExpressionHTC.XR_LIP_EXPRESSION_MOUTH_SAD_LEFT_HTC, // 15
+            MouthRaiserRight = XrLipExpressionHTC.XR_LIP_EXPRESSION_MOUTH_RAISER_RIGHT_HTC,
+            MouthRaiserLeft = XrLipExpressionHTC.XR_LIP_EXPRESSION_MOUTH_RAISER_LEFT_HTC,
+            MouthStretcherRight = XrLipExpressionHTC.XR_LIP_EXPRESSION_MOUTH_STRETCHER_RIGHT_HTC,
+            MouthStretcherLeft = XrLipExpressionHTC.XR_LIP_EXPRESSION_MOUTH_STRETCHER_LEFT_HTC, // 15
             CheekPuffRight = XrLipExpressionHTC.XR_LIP_EXPRESSION_CHEEK_PUFF_RIGHT_HTC,
             CheekPuffLeft = XrLipExpressionHTC.XR_LIP_EXPRESSION_CHEEK_PUFF_LEFT_HTC,
             CheekSuck = XrLipExpressionHTC.XR_LIP_EXPRESSION_CHEEK_SUCK_HTC,

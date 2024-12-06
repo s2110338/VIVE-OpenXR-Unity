@@ -30,20 +30,8 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 
 #if ENABLE_INPUT_SYSTEM
 		[SerializeField]
-		private InputActionReference m_IsTracked = null;
-		public InputActionReference IsTracked { get { return m_IsTracked; } set { m_IsTracked = value; } }
-
-		[SerializeField]
-		private InputActionReference m_TrackingState = null;
-		public InputActionReference TrackingState { get { return m_TrackingState; } set { m_TrackingState = value; } }
-
-		[SerializeField]
-		private InputActionReference m_Position = null;
-		public InputActionReference Position { get { return m_Position; } set { m_Position = value; } }
-
-		[SerializeField]
-		private InputActionReference m_Rotation = null;
-		public InputActionReference Rotation { get { return m_Rotation; } set { m_Rotation = value; } }
+		private InputActionReference m_GripPose = null;
+		public InputActionReference GripPose { get { return m_GripPose; } set { m_GripPose = value; } }
 
 		[SerializeField]
 		private InputActionReference m_Strength = null;
@@ -72,7 +60,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 #if ENABLE_INPUT_SYSTEM
 			m_Text.text += "\nisTracked: ";
 			{
-				if (Utils.GetButton(m_IsTracked, out bool value, out string msg))
+				if (CommonHelper.GetPoseIsTracked(m_GripPose, out bool value, out string msg))
 				{
 					m_Text.text += value;
 				}
@@ -83,7 +71,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 			}
 			m_Text.text += "\ntrackingState: ";
 			{
-				if (Utils.GetInteger(m_TrackingState, out InputTrackingState value, out string msg))
+				if (CommonHelper.GetPoseTrackingState(m_GripPose, out InputTrackingState value, out string msg))
 				{
 					m_Text.text += value;
 				}
@@ -94,7 +82,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 			}
 			m_Text.text += "\nposition (";
 			{
-				if (Utils.GetVector3(m_Position, out Vector3 value, out string msg))
+				if (CommonHelper.GetPosePosition(m_GripPose, out Vector3 value, out string msg))
 				{
 					m_Text.text += value.x.ToString() + ", " + value.y.ToString() + ", " + value.z.ToString();
 				}
@@ -105,7 +93,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 			}
 			m_Text.text += ")\nrotation (";
 			{
-				if (Utils.GetQuaternion(m_Rotation, out Quaternion value, out string msg))
+				if (CommonHelper.GetPoseRotation(m_GripPose, out Quaternion value, out string msg))
 				{
 					m_Text.text += value.x.ToString() + ", " + value.y.ToString() + ", " + value.z.ToString() + ", " + value.w.ToString();
 				}
@@ -116,7 +104,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 			}
 			m_Text.text += ")\nstrength: ";
 			{
-				if (Utils.GetAnalog(m_Strength, out float value, out string msg))
+				if (CommonHelper.GetAnalog(m_Strength, out float value, out string msg))
 				{
 					m_Text.text += value.ToString();
 				}
@@ -131,7 +119,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 #if ENABLE_INPUT_SYSTEM
 			m_Text.text += "\nisTracked: ";
 			{
-				if (Utils.GetPoseIsTracked(m_AimPose, out bool value, out string msg))
+				if (CommonHelper.GetPoseIsTracked(m_AimPose, out bool value, out string msg))
 				{
 					m_Text.text += value;
 				}
@@ -142,7 +130,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 			}
 			m_Text.text += "\ntrackingState: ";
 			{
-				if (Utils.GetPoseTrackingState(m_AimPose, out InputTrackingState value, out string msg))
+				if (CommonHelper.GetPoseTrackingState(m_AimPose, out InputTrackingState value, out string msg))
 				{
 					m_Text.text += value;
 				}
@@ -153,7 +141,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 			}
 			m_Text.text += "\nposition (";
 			{
-				if (Utils.GetPosePosition(m_AimPose, out Vector3 value, out string msg))
+				if (CommonHelper.GetPosePosition(m_AimPose, out Vector3 value, out string msg))
 				{
 					m_Text.text += value.x.ToString() + ", " + value.y.ToString() + ", " + value.z.ToString();
 				}
@@ -164,7 +152,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 			}
 			m_Text.text += ")\nrotation (";
 			{
-				if (Utils.GetPoseRotation(m_AimPose, out Quaternion value, out string msg))
+				if (CommonHelper.GetPoseRotation(m_AimPose, out Quaternion value, out string msg))
 				{
 					m_Text.text += value.x.ToString() + ", " + value.y.ToString() + ", " + value.z.ToString() + ", " + value.w.ToString();
 				}
@@ -176,7 +164,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 			m_Text.text += ")\n";
 			m_Text.text += "select: ";
 			{
-				if (Utils.GetAnalog(m_SelectValue, out float value, out string msg))
+				if (CommonHelper.GetAnalog(m_SelectValue, out float value, out string msg))
 				{
 					m_Text.text += value;
 				}

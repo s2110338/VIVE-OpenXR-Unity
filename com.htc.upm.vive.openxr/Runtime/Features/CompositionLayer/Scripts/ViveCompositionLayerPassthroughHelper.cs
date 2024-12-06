@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 
 namespace VIVE.OpenXR.CompositionLayer.Passthrough
 {
+	[Obsolete("This enumeration is deprecated. Please use XrStructureType instead.")]
 	//[StructLayout(LayoutKind.Sequential)]
     public enum XrStructureTypeHTC
     {
@@ -16,6 +17,7 @@ namespace VIVE.OpenXR.CompositionLayer.Passthrough
 		XR_TYPE_COMPOSITION_LAYER_PASSTHROUGH_HTC = 1000317004,
 	}
 
+	[Obsolete("This enumeration is deprecated. Please use VIVE.OpenXR.Passthrough.PassthroughLayerForm instead.")]
 	public enum PassthroughLayerForm
 	{
 		///<summary> Fullscreen Passthrough Form</summary>
@@ -24,6 +26,7 @@ namespace VIVE.OpenXR.CompositionLayer.Passthrough
 		Projected = 1
 	}
 
+	[Obsolete("This enumeration is deprecated. Please use VIVE.OpenXR.Passthrough.ProjectedPassthroughSpaceType instead.")]
 	public enum ProjectedPassthroughSpaceType
 	{
 		///<summary> 

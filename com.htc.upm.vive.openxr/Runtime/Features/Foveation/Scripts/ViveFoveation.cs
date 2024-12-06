@@ -85,12 +85,12 @@ namespace VIVE.OpenXR
 		private static extern IntPtr intercept_xrGetInstanceProcAddr(IntPtr func);
 
 		[DllImport(ExtLib, EntryPoint = "applyFoveationHTC")]
-		private static extern XrResult applyFoveationHTC(XrFoveationModeHTC mode, UInt32 configCount, XrFoveationConfigurationHTC[] configs, UInt64 flags);
+		private static extern XrResult applyFoveationHTC(Foveation.XrFoveationModeHTC mode, UInt32 configCount, Foveation.XrFoveationConfigurationHTC[] configs, UInt64 flags);
 
 		/// <summary>
 		/// function to apply HTC Foveation
 		/// </summary>
-		public static XrResult ApplyFoveationHTC(XrFoveationModeHTC mode, UInt32 configCount, XrFoveationConfigurationHTC[] configs, UInt64 flags = 0)
+		public static XrResult ApplyFoveationHTC(Foveation.XrFoveationModeHTC mode, UInt32 configCount, Foveation.XrFoveationConfigurationHTC[] configs, UInt64 flags = 0)
 		{
 			//Debug.Log("Unity HTCFoveat:configCount " + configCount);
 			//if (configCount >=2) {

@@ -83,11 +83,25 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		{
 			if (!HandPoseMap.ContainsKey(poseType))
 			{
+				UnityEngine.Object[] handObjects = UnityEngine.Object.FindObjectsOfType(typeof(RealHandPose));
+				for (int i = 0; i < handObjects.Length; i++)
+				{
+					UnityEngine.Object handObject = handObjects[i];
+					if (handObject is RealHandPose realHand &&
+					   (realHand.isLeft ? poseType == HandPoseType.HAND_LEFT : poseType == HandPoseType.HAND_RIGHT))
+					{
+						realHand.SetType(poseType);
+						RegisterHandPose(poseType, realHand);
+						return realHand;
+					}
+				}
+
 				GameObject handPoseObject = new GameObject(poseName);
-				RealHandPose realHandPose = handPoseObject.AddComponent<RealHandPose>();
-				realHandPose.SetType(poseType);
-				RegisterHandPose(poseType, realHandPose);
-				return realHandPose;
+				RealHandPose newRealHand = handPoseObject.AddComponent<RealHandPose>();
+				newRealHand.SetType(poseType);
+				RegisterHandPose(poseType, newRealHand);
+				return newRealHand;
+
 			}
 			return HandPoseMap[poseType];
 		}

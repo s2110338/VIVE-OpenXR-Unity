@@ -31,10 +31,11 @@ namespace VIVE.OpenXR.Hand
     /// </summary>
 #if UNITY_EDITOR
     [OpenXRFeature(UiName = "VIVE XR Hand Interaction",
-        BuildTargetGroups = new[] { BuildTargetGroup.Android , BuildTargetGroup.Standalone},
+        Hidden = true,
+        BuildTargetGroups = new[] { BuildTargetGroup.Android, BuildTargetGroup.Standalone },
         Company = "HTC",
-        Desc = "Support for enabling the hand interaction profile. Will register the controller map for hand interaction if enabled.",
-        DocumentationLink = "..\\Documentation",
+        Desc = "Support for enabling the VIVE hand interaction profile. Will register the controller map for hand interaction if enabled.",
+        DocumentationLink = "https://registry.khronos.org/OpenXR/specs/1.1/html/xrspec.html#XR_HTC_hand_interaction",
         Version = "1.0.0",
         OpenxrExtensionStrings = kOpenxrExtensionString,
         Category = FeatureCategory.Interaction,
@@ -42,6 +43,7 @@ namespace VIVE.OpenXR.Hand
 #endif
     public class ViveHandInteraction : OpenXRInteractionFeature
     {
+        #region Log
         const string LOG_TAG = "VIVE.OpenXR.Hand.ViveHandInteraction ";
         StringBuilder m_sb = null;
         StringBuilder sb {
@@ -50,8 +52,9 @@ namespace VIVE.OpenXR.Hand
                 return m_sb;
             }
         }
-        void DEBUG(StringBuilder msg) { Debug.Log(msg); }
-        void WARNING(StringBuilder msg) { Debug.LogWarning(msg); }
+        void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
+        void WARNING(StringBuilder msg) { Debug.LogWarningFormat("{0} {1}", LOG_TAG, msg); }
+        #endregion
 
         /// <summary>
         /// OpenXR specification <see href="https://registry.khronos.org/OpenXR/specs/1.0/html/xrspec.html#XR_HTC_hand_interaction">12.69. XR_HTC_hand_interaction</see>.
@@ -68,6 +71,7 @@ namespace VIVE.OpenXR.Hand
         /// </summary>
         private const string profile = "/interaction_profiles/htc/hand_interaction";
 
+        #region Supported component paths
         private const string leftHand = "/user/hand_htc/left";
         private const string rightHand = "/user/hand_htc/right";
 
@@ -85,21 +89,22 @@ namespace VIVE.OpenXR.Hand
         /// <summary>
         /// Constant for a pose interaction binding '.../input/aim/pose' OpenXR Input Binding. Used by input subsystem to bind actions to physical inputs.
         /// </summary>
-        private const string pointerPose = "/input/aim/pose";
+        public const string pointerPose = "/input/aim/pose";
 
         /// <summary>
         /// Constant for a pose interaction binding '.../input/grip/pose' OpenXR Input Binding. Used by input subsystem to bind actions to physical inputs.
         /// </summary>
         public const string devicePose = "/input/grip/pose";
+        #endregion
 
         [Preserve, InputControlLayout(displayName = "VIVE Hand Interaction (OpenXR)", commonUsages = new[] { "LeftHand", "RightHand" }, isGenericTypeOfDevice = true)]
         public class HandInteractionDevice : OpenXRDevice
         {
             const string LOG_TAG = "VIVE.OpenXR.Hand.ViveHandInteraction.HandInteractionDevice";
-            void DEBUG(string msg) { Debug.Log(LOG_TAG + " " + msg); }
+            void DEBUG(string msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
 
             /// <summary>
-            /// A [AxisControl](xref:UnityEngine.InputSystem.Controls.AxisControl) that represents the <see cref="ViveHandInteraction.selectValue"/> OpenXR binding.
+            /// A <see cref="AxisControl"/> representing the <see cref="ViveHandInteraction.selectValue"/> OpenXR binding.
             /// </summary>
             [Preserve, InputControl(aliases = new[] { "selectAxis, pinchStrength" }, usage = "Select")]
             public AxisControl selectValue { get; private set; }
@@ -122,29 +127,29 @@ namespace VIVE.OpenXR.Hand
 			[Preserve, InputControl(offset = 0, alias = "aimPose", usage = "Pointer")]
             public PoseControl pointerPose { get; private set; }
 
-			/// <summary>
-			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) required for backwards compatibility with the XRSDK layouts. This represents the overall tracking state of the device. This value is equivalent to mapping devicePose/isTracked.
-			/// </summary>
-			[Preserve, InputControl(offset = 8, usage = "IsTracked")]
-			public ButtonControl isTracked { get; private set; }
+            /// <summary>
+            /// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) required for backwards compatibility with the XRSDK layouts. This represents the overall tracking state of the device. This value is equivalent to mapping devicePose/isTracked.
+            /// </summary>
+            [Preserve, InputControl(offset = 8)]
+            public ButtonControl isTracked { get; private set; }
 
-			/// <summary>
-			/// A [IntegerControl](xref:UnityEngine.InputSystem.Controls.IntegerControl) required for backwards compatibility with the XRSDK layouts. This represents the bit flag set to indicate what data is valid. This value is equivalent to mapping devicePose/trackingState.
-			/// </summary>
-			[Preserve, InputControl(offset = 12, usage = "TrackingState")]
-			public IntegerControl trackingState { get; private set; }
+            /// <summary>
+            /// A [IntegerControl](xref:UnityEngine.InputSystem.Controls.IntegerControl) required for backwards compatibility with the XRSDK layouts. This represents the bit flag set to indicate what data is valid. This value is equivalent to mapping devicePose/trackingState.
+            /// </summary>
+            [Preserve, InputControl(offset = 12)]
+            public IntegerControl trackingState { get; private set; }
 
-			/// <summary>
-			/// A [Vector3Control](xref:UnityEngine.InputSystem.Controls.Vector3Control) required for backwards compatibility with the XRSDK layouts. This is the device position. For the VIVE Focus 3 device, this is both the device and the pointer position. This value is equivalent to mapping devicePose/position.
-			/// </summary>
-			[Preserve, InputControl(offset = 16, alias = "gripPosition")]
-			public Vector3Control devicePosition { get; private set; }
+            /// <summary>
+            /// A [Vector3Control](xref:UnityEngine.InputSystem.Controls.Vector3Control) required for backwards compatibility with the XRSDK layouts. This is the device position. This value is equivalent to mapping devicePose/position.
+            /// </summary>
+            [Preserve, InputControl(offset = 16, alias = "gripPosition")]
+            public Vector3Control devicePosition { get; private set; }
 
-			/// <summary>
-			/// A [QuaternionControl](xref:UnityEngine.InputSystem.Controls.QuaternionControl) required for backwards compatibility with the XRSDK layouts. This is the device orientation. For the VIVE Focus 3 device, this is both the device and the pointer rotation. This value is equivalent to mapping devicePose/rotation.
-			/// </summary>
-			[Preserve, InputControl(offset = 28, alias = "gripOrientation")]
-			public QuaternionControl deviceRotation { get; private set; }
+            /// <summary>
+            /// A [QuaternionControl](xref:UnityEngine.InputSystem.Controls.QuaternionControl) required for backwards compatibility with the XRSDK layouts. This is the device orientation. This value is equivalent to mapping devicePose/rotation.
+            /// </summary>
+            [Preserve, InputControl(offset = 28, alias = "gripOrientation")]
+            public QuaternionControl deviceRotation { get; private set; }
 
 
             /// <summary>
@@ -184,16 +189,15 @@ namespace VIVE.OpenXR.Hand
         /// <returns>True for valid <see cref="XrInstance">XrInstance</see></returns>
         protected override bool OnInstanceCreate(ulong xrInstance)
         {
-            // Requires the eye tracking extension
             if (!OpenXRRuntime.IsExtensionEnabled(kOpenxrExtensionString))
             {
-                sb.Clear().Append(LOG_TAG).Append("OnInstanceCreate() ").Append(kOpenxrExtensionString).Append(" is NOT enabled."); WARNING(sb);
+                sb.Clear().Append("OnInstanceCreate() ").Append(kOpenxrExtensionString).Append(" is NOT enabled."); WARNING(sb);
                 return false;
             }
 
             m_XrInstanceCreated = true;
             m_XrInstance = xrInstance;
-            sb.Clear().Append(LOG_TAG).Append("OnInstanceCreate() " + m_XrInstance); DEBUG(sb);
+            sb.Clear().Append("OnInstanceCreate() " + m_XrInstance); DEBUG(sb);
 
             return base.OnInstanceCreate(xrInstance);
         }
@@ -205,14 +209,12 @@ namespace VIVE.OpenXR.Hand
         /// </summary>
         protected override void RegisterDeviceLayout()
         {
-            sb.Clear().Append(LOG_TAG).Append("RegisterDeviceLayout() Layout: ").Append(kLayoutName)
-                .Append(", Product: ").Append(kDeviceLocalizedName);
-            DEBUG(sb);
+            sb.Clear().Append("RegisterDeviceLayout() ").Append(kLayoutName).Append(", product: ").Append(kDeviceLocalizedName); DEBUG(sb);
             InputSystem.RegisterLayout(typeof(HandInteractionDevice),
-                        kLayoutName,
-                        matches: new InputDeviceMatcher()
-                        .WithInterface(XRUtilities.InterfaceMatchAnyVersion)
-                        .WithProduct(kDeviceLocalizedName));
+                kLayoutName,
+                matches: new InputDeviceMatcher()
+                    .WithInterface(XRUtilities.InterfaceMatchAnyVersion)
+                    .WithProduct(kDeviceLocalizedName));
         }
 
         /// <summary>
@@ -220,16 +222,36 @@ namespace VIVE.OpenXR.Hand
         /// </summary>
         protected override void UnregisterDeviceLayout()
         {
-            sb.Clear().Append(LOG_TAG).Append("UnregisterDeviceLayout() ").Append(kLayoutName); DEBUG(sb);
+            sb.Clear().Append("UnregisterDeviceLayout() ").Append(kLayoutName); DEBUG(sb);
             InputSystem.RemoveLayout(kLayoutName);
         }
+
+#if UNITY_XR_OPENXR_1_9_1
+        /// <summary>
+        /// Return interaction profile type. HandInteractionDevice profile is Device type.
+        /// </summary>
+        /// <returns>Interaction profile type.</returns>
+        protected override InteractionProfileType GetInteractionProfileType()
+        {
+            return typeof(HandInteractionDevice).IsSubclassOf(typeof(XRController)) ? InteractionProfileType.XRController : InteractionProfileType.Device;
+        }
+
+        /// <summary>
+        /// Return device layer out string used for registering device HandInteractionDevice in InputSystem.
+        /// </summary>
+        /// <returns>Device layout string.</returns>
+        protected override string GetDeviceLayoutName()
+        {
+            return kLayoutName;
+        }
+#endif
 
         /// <summary>
         /// Registers action maps to Unity XR.
         /// </summary>
         protected override void RegisterActionMapsWithRuntime()
         {
-            sb.Clear().Append(LOG_TAG).Append("RegisterActionMapsWithRuntime() Action map vivehandinteraction")
+            sb.Clear().Append("RegisterActionMapsWithRuntime() Action map vivehandinteraction")
                 .Append(", localizedName: ").Append(kDeviceLocalizedName)
                 .Append(", desiredInteractionProfile").Append(profile);
             DEBUG(sb);

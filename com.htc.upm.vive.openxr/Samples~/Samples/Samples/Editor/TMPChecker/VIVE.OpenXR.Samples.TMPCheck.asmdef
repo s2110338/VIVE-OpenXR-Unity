@@ -14,6 +14,11 @@
             "name": "com.unity.textmeshpro",
             "expression": "",
             "define": "TMPExist"
+        },
+        {
+            "name": "Unity",
+            "expression": "6000.0.0",
+            "define": "TMPExist"
         }
     ],
     "noEngineReferences": false

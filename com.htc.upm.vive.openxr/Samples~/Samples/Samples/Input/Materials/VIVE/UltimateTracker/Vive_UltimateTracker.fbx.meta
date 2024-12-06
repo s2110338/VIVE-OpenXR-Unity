@@ -3,7 +3,12 @@ guid: 407031a402781d048945abb5156739ad
 ModelImporter:
   serializedVersion: 21300
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Vive_UltimateTracker1
+    second: {fileID: 2100000, guid: 059b53ad53194a842b6db98a2ec57e27, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0

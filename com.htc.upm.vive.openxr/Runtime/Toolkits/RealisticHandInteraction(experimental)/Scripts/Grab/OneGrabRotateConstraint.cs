@@ -40,9 +40,12 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		private RotationAxis m_RotationAxis = RotationAxis.XAxis;
 		[SerializeField]
 		private ConstraintInfo m_ClockwiseAngle = ConstraintInfo.Identity;
+		public float clockwiseAngle => m_ClockwiseAngle.value;
 		[SerializeField]
 		private ConstraintInfo m_CounterclockwiseAngle = ConstraintInfo.Identity;
-		private float totalRotationAngle = 0.0f;
+		public float counterclockwiseAngle => m_CounterclockwiseAngle.value;
+		private float m_TotalDegrees = 0.0f;
+		public float totalDegrees => m_TotalDegrees;
 		private Pose previousHandPose = Pose.identity;
 
 		public override void Initialize(IGrabbable grabbable)
@@ -99,17 +102,17 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			float angleDelta = Vector3.Angle(previousVector, targetVector);
 			angleDelta *= Vector3.Dot(Vector3.Cross(previousVector, targetVector), worldAxis) > 0.0f ? 1.0f : -1.0f;
 
-			float previousAngle = totalRotationAngle;
-			totalRotationAngle += angleDelta;
+			float previousAngle = m_TotalDegrees;
+			m_TotalDegrees += angleDelta;
 			if (m_CounterclockwiseAngle.enableConstraint)
 			{
-				totalRotationAngle = Mathf.Max(totalRotationAngle, -m_CounterclockwiseAngle.value);
+				m_TotalDegrees = Mathf.Max(m_TotalDegrees, -m_CounterclockwiseAngle.value);
 			}
 			if (m_ClockwiseAngle.enableConstraint)
 			{
-				totalRotationAngle = Mathf.Min(totalRotationAngle, m_ClockwiseAngle.value);
+				m_TotalDegrees = Mathf.Min(m_TotalDegrees, m_ClockwiseAngle.value);
 			}
-			angleDelta = totalRotationAngle - previousAngle;
+			angleDelta = m_TotalDegrees - previousAngle;
 			m_Constraint.RotateAround(m_Pivot.position, worldAxis, angleDelta);
 
 			previousHandPose = handPose;

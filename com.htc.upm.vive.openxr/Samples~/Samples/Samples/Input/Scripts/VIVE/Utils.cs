@@ -10,6 +10,7 @@ using UnityEngine.InputSystem;
 
 namespace VIVE.OpenXR.Samples.OpenXRInput
 {
+	[Obsolete("This class is deprecated. Please use VIVE.OpenXR.Samples.CommonHelper instead.")]
 	public static class Utils
 	{
 		public enum DeviceTypes : UInt32
@@ -219,7 +220,6 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 				if (actionReference.action.activeControl.valueType == typeof(Quaternion))
 					value = actionReference.action.ReadValue<Quaternion>();
 
-				Vector3 direction = value * Vector3.forward;
 				return true;
 			}
 

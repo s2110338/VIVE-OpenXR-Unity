@@ -186,6 +186,15 @@
                     "initialStateCheck": true
                 },
                 {
+                    "name": "Aim Pose",
+                    "type": "PassThrough",
+                    "id": "3512397c-e99e-4289-b1e0-f99ec3028d26",
+                    "expectedControlType": "Pose",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "AimPosition",
                     "type": "Value",
                     "id": "4c72e7e0-5dda-44f9-855f-6bcae7eb29db",
@@ -202,6 +211,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "Grip Pose",
+                    "type": "PassThrough",
+                    "id": "4e720a4b-2508-4e49-b5e2-161b2a69dd6d",
+                    "expectedControlType": "Pose",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 },
                 {
                     "name": "GripPosition",
@@ -497,6 +515,28 @@
                     "action": "ParkingTouch",
                     "isComposite": false,
                     "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "ba4db256-30e6-4b76-a798-1316475bff71",
+                    "path": "<XRController>{LeftHand}/pointer",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Aim Pose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3715cf9f-5515-4aa0-9e72-7906238cc4ed",
+                    "path": "<XRController>{LeftHand}/devicePose",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Grip Pose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 }
             ]
         },
@@ -685,6 +725,15 @@
                     "initialStateCheck": true
                 },
                 {
+                    "name": "Aim Pose",
+                    "type": "PassThrough",
+                    "id": "d8a6fd35-4e43-4c5a-b9da-db65fd4c6eac",
+                    "expectedControlType": "Pose",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "AimPosition",
                     "type": "Value",
                     "id": "cdabdfa9-be08-4d02-a187-8ca7fb8de227",
@@ -701,6 +750,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "Grip Pose",
+                    "type": "PassThrough",
+                    "id": "c2ca0eeb-07c0-45da-8008-c2c79aeabb21",
+                    "expectedControlType": "Pose",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 },
                 {
                     "name": "GripPosition",
@@ -994,6 +1052,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "TriggerTouch",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7ffedc8b-f249-4916-928d-432510711ebc",
+                    "path": "<XRController>{RightHand}/devicePose",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Grip Pose",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "812993e2-759f-4a25-ada3-205a04882ccd",
+                    "path": "<XRController>{RightHand}/pointer",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Aim Pose",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

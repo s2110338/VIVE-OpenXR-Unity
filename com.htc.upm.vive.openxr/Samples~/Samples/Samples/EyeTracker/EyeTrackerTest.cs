@@ -4,11 +4,11 @@ using UnityEngine;
 using UnityEngine.UI;
 using VIVE.OpenXR.EyeTracker;
 
-namespace VIVE.OpenXR.Samples.OpenXRInput
+namespace VIVE.OpenXR.Samples.EyeTracker
 {
     public class EyeTrackerTest : MonoBehaviour
     {
-        const string LOG_TAG = "VIVE.OpenXR.Samples.OpenXRInput.EyeTrackerText";
+        const string LOG_TAG = "VIVE.OpenXR.Samples.EyeTracker.EyeTrackerText";
         void DEBUG(string msg) { Debug.Log(LOG_TAG + " " + msg); }
         public Transform leftGazeTransform = null;
         public Transform rightGazeTransform = null;

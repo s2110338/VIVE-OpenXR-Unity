@@ -16,7 +16,7 @@ using UnityEditor.XR.OpenXR.Features;
 namespace VIVE.OpenXR
 {
 #if UNITY_EDITOR
-    [OpenXRFeature(UiName = "VIVE XR Path Enumeration",
+    [OpenXRFeature(UiName = "VIVE XR Path Enumeration (Beta)",
         BuildTargetGroups = new[] { BuildTargetGroup.Android, BuildTargetGroup.Standalone },
         Company = "HTC",
         Desc = "The extension provides more flexibility for the user paths and input/output source paths related to an interaction profile. Developers can use this extension to obtain the path that the user has decided on.",

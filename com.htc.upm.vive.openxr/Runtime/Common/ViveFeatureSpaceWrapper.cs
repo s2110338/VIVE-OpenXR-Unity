@@ -1,10 +1,5 @@
 // Copyright HTC Corporation All Rights Reserved.
 
-// Remove FAKE_DATA if editor or windows is supported.
-#if UNITY_EDITOR
-#define FAKE_DATA
-#endif
-
 using System;
 using UnityEngine;
 
@@ -15,21 +10,8 @@ namespace VIVE.OpenXR.Feature
     /// To use this wrapper, you need to call CommonWrapper.Instance.OnInstanceCreate() in your feature's OnInstanceCreate(),
     /// and call CommonWrapper.Instance.OnInstanceDestroy() in your feature's OnInstanceDestroy().
     /// </summary>
-    public class SpaceWrapper
+    public class SpaceWrapper : ViveFeatureWrapperBase<SpaceWrapper>, IViveFeatureWrapper
     {
-        static SpaceWrapper instance = null;
-        public static SpaceWrapper Instance
-        {
-            get
-            {
-                if (instance == null)
-                    instance = new SpaceWrapper();
-                return instance;
-            }
-        }
-
-        bool isInited = false;
-
         delegate XrResult DelegateXrLocateSpace(XrSpace space, XrSpace baseSpace, XrTime time, ref XrSpaceLocation location);
         delegate XrResult DelegateXrDestroySpace(XrSpace space);
 
@@ -44,31 +26,30 @@ namespace VIVE.OpenXR.Feature
         /// <param name="GetAddr"></param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public bool OnInstanceCreate(XrInstance xrInstance, OpenXRHelper.xrGetInstanceProcAddrDelegate GetAddr)
+        public bool OnInstanceCreate(XrInstance xrInstance, IntPtr GetAddr)
         {
-            if (isInited) return true;
+            if (IsInited) return true;
 
             if (xrInstance == null)
                 throw new Exception("ViveSpace: xrInstance is null");
 
-            if (GetAddr == null)
-                throw new Exception("ViveSpace: xrGetInstanceProcAddr is null");
+            SetGetInstanceProcAddrPtr(GetAddr);
 
             Debug.Log("ViveSpace: OnInstanceCreate()");
 
             bool ret = true;
             IntPtr funcPtr = IntPtr.Zero;
 
-            ret &= OpenXRHelper.GetXrFunctionDelegate(GetAddr, xrInstance, "xrCreateReferenceSpace", out XrCreateReferenceSpace);
-            ret &= OpenXRHelper.GetXrFunctionDelegate(GetAddr, xrInstance, "xrLocateSpace", out XrLocateSpace);
-            ret &= OpenXRHelper.GetXrFunctionDelegate(GetAddr, xrInstance, "xrDestroySpace", out XrDestroySpace);
-            isInited = ret;
+            ret &= OpenXRHelper.GetXrFunctionDelegate(xrGetInstanceProcAddr, xrInstance, "xrCreateReferenceSpace", out XrCreateReferenceSpace);
+            ret &= OpenXRHelper.GetXrFunctionDelegate(xrGetInstanceProcAddr, xrInstance, "xrLocateSpace", out XrLocateSpace);
+            ret &= OpenXRHelper.GetXrFunctionDelegate(xrGetInstanceProcAddr, xrInstance, "xrDestroySpace", out XrDestroySpace);
+            IsInited = ret;
             return ret;
         }
 
         public void OnInstanceDestroy()
         {
-            isInited = false;
+            IsInited = false;
             XrCreateReferenceSpace = null;
             XrLocateSpace = null;
             XrDestroySpace = null;
@@ -77,8 +58,8 @@ namespace VIVE.OpenXR.Feature
         /// <summary>
         /// Create a reference space without create info.
         /// Example:
-        ///   CreateReferenceSpace(session, XrReferenceSpaceType.XR_REFERENCE_SPACE_TYPE_LOCAL, XrPosef.identity, out space);
-        ///   CreateReferenceSpace(session, XrReferenceSpaceType.XR_REFERENCE_SPACE_TYPE_STAGE, XrPosef.identity, out space);
+        ///   CreateReferenceSpace(session, XrReferenceSpaceType.XR_REFERENCE_SPACE_TYPE_LOCAL, XrPosef.Identity, out space);
+        ///   CreateReferenceSpace(session, XrReferenceSpaceType.XR_REFERENCE_SPACE_TYPE_STAGE, XrPosef.Identity, out space);
         /// </summary>
         /// <param name="session"></param>
         /// <param name="referenceSpaceType"></param>
@@ -87,8 +68,9 @@ namespace VIVE.OpenXR.Feature
         /// <returns></returns>
         public XrResult CreateReferenceSpace(XrSession session, XrReferenceSpaceType referenceSpaceType, XrPosef pose, out XrSpace space)
         {
-            if (!isInited)
-                throw new Exception("ViveSpace: not initialized");
+            space = 0;
+            if (!IsInited)
+                return XrResult.XR_ERROR_HANDLE_INVALID;
 
             var createInfo = new XrReferenceSpaceCreateInfo();
             createInfo.type = XrStructureType.XR_TYPE_REFERENCE_SPACE_CREATE_INFO;
@@ -107,24 +89,25 @@ namespace VIVE.OpenXR.Feature
         /// <returns></returns>
         public XrResult CreateReferenceSpace(XrSession session, XrReferenceSpaceCreateInfo createInfo, out XrSpace space)
         {
-            if (!isInited)
-                throw new Exception("ViveSpace: not initialized");
+            space = 0;
+            if (!IsInited)
+                return XrResult.XR_ERROR_HANDLE_INVALID;
 
             return XrCreateReferenceSpace(session, ref createInfo, out space);
         }
 
         public XrResult LocateSpace(XrSpace space, XrSpace baseSpace, XrTime time, ref XrSpaceLocation location)
         {
-            if (!isInited)
-                throw new Exception("ViveSpace: not initialized");
-            Debug.Log($"LocateSpace(s={space}, bs={baseSpace}, t={time}");
+            if (!IsInited)
+                return XrResult.XR_ERROR_HANDLE_INVALID;
+            //Debug.Log($"LocateSpace(s={space}, bs={baseSpace}, t={time}");
             return XrLocateSpace(space, baseSpace, time, ref location);
         }
 
         public XrResult DestroySpace(XrSpace space)
         {
-            if (!isInited)
-                throw new Exception("ViveSpace: not initialized");
+            if (!IsInited)
+                return XrResult.XR_ERROR_HANDLE_INVALID;
             Debug.Log($"DestroySpace({space})");
             return XrDestroySpace(space);
         }
@@ -157,19 +140,6 @@ namespace VIVE.OpenXR.Feature
 
         public bool GetRelatedPose(XrSpace baseSpace, XrTime time, out UnityEngine.Pose pose)
         {
-#if FAKE_DATA
-			if (Application.isEditor)
-			{
-				// make a random Pose
-				//var pos = new Vector3(UnityEngine.Random.Range(-1f, 1f), UnityEngine.Random.Range(-1f, 1f), UnityEngine.Random.Range(-1f, 1f));
-				//var rot = new Quaternion(UnityEngine.Random.Range(-1f, 1f), UnityEngine.Random.Range(-1f, 1f), UnityEngine.Random.Range(-1f, 1f), UnityEngine.Random.Range(-1f, 1f));
-				var pos = Vector3.up;
-				var rot = Quaternion.identity;
-				rot.Normalize();
-				pose = new Pose(pos, rot);
-				return true;
-			}
-#endif
             // If the xrBaseSpace is changed, the pose will be updated.
             pose = default;
             XrSpaceLocation location = new XrSpaceLocation();
@@ -179,14 +149,14 @@ namespace VIVE.OpenXR.Feature
 
             if (ret != XrResult.XR_SUCCESS)
             {
-                Debug.Log("Space: LocateSpace ret=" + ret);
+                //Debug.Log("Space: LocateSpace ret=" + ret);
                 return false;
             }
 
-            Debug.Log("Space: baseSpace=" + baseSpace + ", space=" + space + ", time=" + time + ", ret=" + ret);
-            Debug.Log("Space: location.locationFlags=" + location.locationFlags);
-            Debug.Log("Space: location.pose.position=" + location.pose.position.x + "," + location.pose.position.y + "," + location.pose.position.z);
-            Debug.Log("Space: location.pose.orientation=" + location.pose.orientation.x + "," + location.pose.orientation.y + "," + location.pose.orientation.z + "," + location.pose.orientation.w);
+            //Debug.Log("Space: baseSpace=" + baseSpace + ", space=" + space + ", time=" + time + ", ret=" + ret);
+            //Debug.Log("Space: location.locationFlags=" + location.locationFlags);
+            //Debug.Log("Space: location.pose.position=" + location.pose.position.x + "," + location.pose.position.y + "," + location.pose.position.z);
+            //Debug.Log("Space: location.pose.orientation=" + location.pose.orientation.x + "," + location.pose.orientation.y + "," + location.pose.orientation.z + "," + location.pose.orientation.w);
             if ((location.locationFlags & XrSpaceLocationFlags.XR_SPACE_LOCATION_POSITION_VALID_BIT) > 0 &&
                 (location.locationFlags & XrSpaceLocationFlags.XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) > 0)
             {
@@ -211,7 +181,7 @@ namespace VIVE.OpenXR.Feature
                     // Managered resource
                 }
                 // Non managered resource
-                Debug.Log($"Space: DestroySpace({space})");
+                //Debug.Log($"Space: DestroySpace({space})");
                 SpaceWrapper.Instance.DestroySpace(space);
                 space = 0;
                 disposed = true;

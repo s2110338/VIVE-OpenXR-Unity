@@ -10,7 +10,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking.Editor
 	[CustomEditor(typeof(HumanoidTracking))]
 	public class HumanoidTrackingEditor : UnityEditor.Editor
 	{
-		SerializedProperty m_Tracking, m_AvatarHeight, m_AvatarOffset, m_AvatarScale, m_ContentCalibration;
+		SerializedProperty m_Tracking, m_AvatarHeight, m_AvatarOffset, m_AvatarScale, m_JointCoordinate;
 		SerializedProperty m_Head,
 			m_LeftWrist, m_RightWrist,
 			m_LeftHandheld, m_RightHandheld,
@@ -26,7 +26,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking.Editor
 			m_AvatarHeight = serializedObject.FindProperty("m_AvatarHeight");
 			m_AvatarOffset = serializedObject.FindProperty("m_AvatarOffset");
 			m_AvatarScale = serializedObject.FindProperty("m_AvatarScale");
-			m_ContentCalibration = serializedObject.FindProperty("m_ContentCalibration");
+			m_JointCoordinate = serializedObject.FindProperty("m_JointCoordinate");
 
 			m_Head = serializedObject.FindProperty("m_Head");
 			m_LeftWrist = serializedObject.FindProperty("m_LeftWrist");
@@ -44,7 +44,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking.Editor
 			m_RightToes = serializedObject.FindProperty("m_RightToes");
 		}
 
-		bool customizeExtrinsicOptions = false;
+		static bool customizeExtrinsicOptions = false;
 		public override void OnInspectorGUI()
 		{
 			serializedObject.Update();
@@ -56,12 +56,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking.Editor
 			EditorGUILayout.PropertyField(m_Tracking);
 
 			EditorGUILayout.HelpBox(
-				"Calibrates the standard pose inside content.",
-				MessageType.Info);
-			EditorGUILayout.PropertyField(m_ContentCalibration);
-
-			EditorGUILayout.HelpBox(
-				"Moves the avatar by applying the position offset.",
+				"Moves the avatar by applying the transform offset.",
 				MessageType.Info);
 			EditorGUILayout.PropertyField(m_AvatarOffset);
 
@@ -69,6 +64,11 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking.Editor
 				"Resize the avatar.",
 				MessageType.Info);
 			EditorGUILayout.PropertyField(m_AvatarScale);
+
+			/*EditorGUILayout.HelpBox(
+				"Defines the coordinate of an Avatar's each joint, keep null for Unity identity (x-right, y-up and z-forward).",
+				MessageType.Info);
+			EditorGUILayout.PropertyField(m_JointCoordinate);*/
 
 			myScript.CustomSettings = EditorGUILayout.Toggle("Custom Settings", myScript.CustomSettings);
 			if (myScript.CustomSettings)
@@ -79,7 +79,11 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking.Editor
 				EditorGUILayout.PropertyField(m_AvatarHeight);
 			}
 
+			GUIStyle foldoutStyle = EditorStyles.foldout;
+			foldoutStyle.fontSize = 12;
+			foldoutStyle.fontStyle = FontStyle.Bold;
 			customizeExtrinsicOptions = EditorGUILayout.Foldout(customizeExtrinsicOptions, "Tracked Device Extrinsics");
+			foldoutStyle.fontStyle = FontStyle.Normal;
 			if (customizeExtrinsicOptions)
 			{
 				EditorGUILayout.HelpBox(

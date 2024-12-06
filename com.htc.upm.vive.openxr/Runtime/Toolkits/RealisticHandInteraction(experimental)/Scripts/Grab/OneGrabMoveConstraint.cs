@@ -1,7 +1,7 @@
 using System.Text;
 using UnityEngine;
 
-namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction 
+namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 {
 	public class OneGrabMoveConstraint : IOneHandContraintMovement
 	{
@@ -30,21 +30,28 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		[SerializeField]
 		private ConstraintInfo m_NegativeXMove = ConstraintInfo.Identity;
 		private float defaultNegativeXPos = 0.0f;
+		public float xNegativeBoundary => defaultNegativeXPos;
 		[SerializeField]
 		private ConstraintInfo m_PositiveXMove = ConstraintInfo.Identity;
 		private float defaultPositiveXPos = 0.0f;
+		public float xPositiveBoundary => defaultPositiveXPos;
 		[SerializeField]
 		private ConstraintInfo m_NegativeYMove = ConstraintInfo.Identity;
 		private float defaultNegativeYPos = 0.0f;
+		public float yNegativeBoundary => defaultNegativeYPos;
 		[SerializeField]
 		private ConstraintInfo m_PositiveYMove = ConstraintInfo.Identity;
 		private float defaultPositiveYPos = 0.0f;
+		public float yPositiveBoundary => defaultPositiveYPos;
 		[SerializeField]
 		private ConstraintInfo m_NegativeZMove = ConstraintInfo.Identity;
 		private float defaultNegativeZPos = 0.0f;
+		public float zNegativeBoundary => defaultNegativeZPos;
 		[SerializeField]
 		private ConstraintInfo m_PositiveZMove = ConstraintInfo.Identity;
 		private float defaultPositiveZPos = 0.0f;
+		public float zPositiveBoundary => defaultPositiveZPos;
+
 		private Pose previousHandPose = Pose.identity;
 		private GrabPose currentGrabPose = GrabPose.Identity;
 

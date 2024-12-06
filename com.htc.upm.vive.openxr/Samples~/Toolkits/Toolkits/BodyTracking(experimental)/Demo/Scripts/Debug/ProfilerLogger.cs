@@ -10,8 +10,10 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking.Demo
 	{
 		const string LOG_TAG = "VIVE.OpenXR.Toolkits.BodyTracking.Demo.ProfilerLogger ";
 		private StringBuilder m_sb = null;
-		internal StringBuilder sb {
-			get {
+		internal StringBuilder sb
+		{
+			get
+			{
 				if (m_sb == null) { m_sb = new StringBuilder(); }
 				return m_sb;
 			}

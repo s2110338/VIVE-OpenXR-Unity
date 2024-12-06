@@ -68,8 +68,11 @@ namespace VIVE.OpenXR.FacialTracking
         /// <param name="xrInstance">The instance to destroy.</param>
         protected override void OnInstanceDestroy(ulong xrInstance)
         {
-            m_XrInstanceCreated = false;
-            m_XrInstance = 0;
+            if (m_XrInstance == xrInstance)
+            {
+                m_XrInstanceCreated = false;
+                m_XrInstance = 0;
+            }
             DEBUG("OnInstanceDestroy() " + xrInstance);
         }
 

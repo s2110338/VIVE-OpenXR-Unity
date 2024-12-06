@@ -59,20 +59,20 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
             m_Text.text = "Left Tracker ";
 
             { // Tracked
-                if (Utils.GetButton(m_TrackedL, out bool value, out string msg))
+                if (CommonHelper.GetButton(m_TrackedL, out bool value, out string msg))
                 {
                     m_Text.text += "tracked: " + value + ", ";
                 }
             }
             { // trackingState
-                if (Utils.GetInteger(m_TrackingStateL, out InputTrackingState value, out string msg))
+                if (CommonHelper.GetInteger(m_TrackingStateL, out InputTrackingState value, out string msg))
                 {
                     m_Text.text += "state: " + value + ", ";
                 }
             }
 
             { // Left X
-                if (Utils.GetButton(m_LeftX, out bool value, out string msg))
+                if (CommonHelper.GetButton(m_LeftX, out bool value, out string msg))
                 {
                     if (value)
                     {
@@ -82,7 +82,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
                 }
             }
             { // Left Menu
-                if (Utils.GetButton(m_LeftMenu, out bool value, out string msg))
+                if (CommonHelper.GetButton(m_LeftMenu, out bool value, out string msg))
                 {
                     if (value)
                     {
@@ -96,20 +96,20 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
             m_Text.text += "\nRight Tracker ";
 
             { // Tracked
-                if (Utils.GetButton(m_TrackedR, out bool value, out string msg))
+                if (CommonHelper.GetButton(m_TrackedR, out bool value, out string msg))
                 {
                     m_Text.text += "tracked: " + value + ", ";
                 }
             }
             { // trackingState
-                if (Utils.GetInteger(m_TrackingStateR, out InputTrackingState value, out string msg))
+                if (CommonHelper.GetInteger(m_TrackingStateR, out InputTrackingState value, out string msg))
                 {
                     m_Text.text += "state: " + value + ", ";
                 }
             }
 
             { // Right A
-                if (Utils.GetButton(m_RightA, out bool value, out string msg))
+                if (CommonHelper.GetButton(m_RightA, out bool value, out string msg))
                 {
                     if (value)
                     {

@@ -1,10 +1,11 @@
+// Copyright HTC Corporation All Rights Reserved.
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.OpenXR;
-using VIVE.OpenXR.CompositionLayer;
-using VIVE.OpenXR.CompositionLayer.Passthrough;
+using VIVE.OpenXR.Passthrough;
 
 namespace VIVE.OpenXR
 {
@@ -13,11 +14,11 @@ namespace VIVE.OpenXR
         const string LOG_TAG = "VIVE.OpenXR.XR_HTC_passthrough_impls";
         void DEBUG(string msg) { Debug.Log(LOG_TAG + " " + msg); }
         public XR_HTC_passthrough_impls() { DEBUG("XR_HTC_passthrough_impls()"); }
-        private ViveCompositionLayerPassthrough feature = null;
+        private VivePassthrough feature = null;
 
         private void ASSERT_FEATURE()
         {
-            if (feature == null) { feature = OpenXRSettings.Instance.GetFeature<ViveCompositionLayerPassthrough>(); }
+            if (feature == null) { feature = OpenXRSettings.Instance.GetFeature<VivePassthrough>(); }
         }
 
         public override XrResult xrCreatePassthroughHTC(XrPassthroughCreateInfoHTC createInfo, out XrPassthroughHTC passthrough)
@@ -25,20 +26,20 @@ namespace VIVE.OpenXR
             XrResult result = XrResult.XR_ERROR_VALIDATION_FAILURE;
             passthrough = 0;
             ASSERT_FEATURE();
-#if UNITY_STANDALONE
+
             if(feature)
                 result =  feature.CreatePassthroughHTC(createInfo,out passthrough);
-#endif
+
             return result;
         }
         public override XrResult xrDestroyPassthroughHTC(XrPassthroughHTC passthrough)
         {
             XrResult result = XrResult.XR_ERROR_VALIDATION_FAILURE;
             ASSERT_FEATURE();
-#if UNITY_STANDALONE
+
             if(feature)
                 result =  feature.DestroyPassthroughHTC(passthrough);
-#endif
+
             return result;
         }
 
@@ -66,10 +67,10 @@ namespace VIVE.OpenXR
         public override XrSpace GetTrackingSpace()
         {
             ASSERT_FEATURE();
-#if UNITY_STANDALONE
+
             if (feature)
                 return feature.GetTrackingSpace();
-#endif
+
             return 0;
         }
 

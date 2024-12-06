@@ -1,22 +1,20 @@
-// "VIVE SDK 
-// © 2017 HTC Corporation. All Rights Reserved.
-//
-// Unless otherwise required by copyright law and practice,
-// upon the execution of HTC SDK license agreement,
-// HTC grants you access to and use of the VIVE SDK(s).
-// You shall fully comply with all of HTC’s SDK license agreement terms and
-// conditions signed by you and all SDK and API requirements,
-// specifications, and documentation provided by HTC to You."
+// Copyright HTC Corporation All Rights Reserved.
 
 using System;
 using UnityEngine;
+using UnityEngine.UI;  
 using VIVE.OpenXR;
+
+using XrFoveationModeHTC = VIVE.OpenXR.Foveation.XrFoveationModeHTC;
+using XrFoveationLevelHTC = VIVE.OpenXR.Foveation.XrFoveationLevelHTC;
+using XrFoveationConfigurationHTC = VIVE.OpenXR.Foveation.XrFoveationConfigurationHTC;
 
 public class MyFoveatedTest : MonoBehaviour
 {
 	private float FOVLarge = 57;
     private float FOVSmall = 19;
     private float FOVMiddle = 38;
+    private GameObject button01, button02, button03;
 	
     public static XrFoveationConfigurationHTC config_left, config_right;
     public static XrFoveationConfigurationHTC[] configs = { config_left, config_right };
@@ -33,6 +31,13 @@ public class MyFoveatedTest : MonoBehaviour
         configs[1].focalCenterOffset.y = 0.0f;
     }
 
+    void Start()
+    {
+        button01 = GameObject.FindGameObjectWithTag("EnableButton01");
+        button02 = GameObject.FindGameObjectWithTag("EnableButton02");
+        button03 = GameObject.FindGameObjectWithTag("EnableButton03");
+    }
+
     public void FoveationIsDisable()
 	{
         ViveFoveation.ApplyFoveationHTC(XrFoveationModeHTC.XR_FOVEATION_MODE_DISABLE_HTC, 0, null);
@@ -43,11 +48,33 @@ public class MyFoveatedTest : MonoBehaviour
         ViveFoveation.ApplyFoveationHTC(XrFoveationModeHTC.XR_FOVEATION_MODE_FIXED_HTC, 0, null);
     }
 
+    bool FoveationIsDynamic_bit01 = true;
+    bool FoveationIsDynamic_bit02 = true;
+    bool FoveationIsDynamic_bit04 = true;
+
+    public void FoveationIsDynamic_setbit01(){
+        FoveationIsDynamic_bit01 = !FoveationIsDynamic_bit01;
+        if (button01 != null)
+            button01.GetComponentInChildren<Text>().text = FoveationIsDynamic_bit01 ? "01" : "00";
+    }
+
+    public void FoveationIsDynamic_setbit02(){
+        FoveationIsDynamic_bit02 = !FoveationIsDynamic_bit02;
+        if (button02 != null)
+            button02.GetComponentInChildren<Text>().text = FoveationIsDynamic_bit02 ? "02" : "00";
+    }
+
+    public void FoveationIsDynamic_setbit04(){
+        FoveationIsDynamic_bit04 = !FoveationIsDynamic_bit04;
+        if (button03 != null)
+           button03.GetComponentInChildren<Text>().text = FoveationIsDynamic_bit04 ? "04" : "00";
+    }
+
     public void FoveationIsDynamic()
     {
-        UInt64 flags = ViveFoveation.XR_FOVEATION_DYNAMIC_CLEAR_FOV_ENABLED_BIT_HTC |
-            ViveFoveation.XR_FOVEATION_DYNAMIC_FOCAL_CENTER_OFFSET_ENABLED_BIT_HTC |
-            ViveFoveation.XR_FOVEATION_DYNAMIC_LEVEL_ENABLED_BIT_HTC;
+        UInt64 flags = (FoveationIsDynamic_bit01 ? ViveFoveation.XR_FOVEATION_DYNAMIC_LEVEL_ENABLED_BIT_HTC : 0x00) |
+            (FoveationIsDynamic_bit02 ? ViveFoveation.XR_FOVEATION_DYNAMIC_CLEAR_FOV_ENABLED_BIT_HTC : 0x00) |
+            (FoveationIsDynamic_bit04 ? ViveFoveation.XR_FOVEATION_DYNAMIC_FOCAL_CENTER_OFFSET_ENABLED_BIT_HTC : 0x00);
         ViveFoveation.ApplyFoveationHTC(XrFoveationModeHTC.XR_FOVEATION_MODE_DYNAMIC_HTC, 0, null, flags);
     }
 

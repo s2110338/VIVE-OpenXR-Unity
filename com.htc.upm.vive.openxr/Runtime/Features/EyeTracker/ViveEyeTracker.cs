@@ -15,8 +15,8 @@ using UnityEditor.XR.OpenXR.Features;
 namespace VIVE.OpenXR.EyeTracker
 {
 #if UNITY_EDITOR
-    [OpenXRFeature(UiName = "VIVE XR Eye Tracker",
-        BuildTargetGroups = new[] { BuildTargetGroup.Standalone },
+    [OpenXRFeature(UiName = "VIVE XR Eye Tracker (Beta)",
+        BuildTargetGroups = new[] { BuildTargetGroup.Android, BuildTargetGroup.Standalone },
         Company = "HTC",
         Desc = "Support the eye tracker extension.",
         DocumentationLink = "..\\Documentation",

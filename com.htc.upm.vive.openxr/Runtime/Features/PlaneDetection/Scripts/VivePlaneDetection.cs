@@ -225,6 +225,7 @@ planeDetector);
 		#region override functions
 		protected override IntPtr HookGetInstanceProcAddr(IntPtr func)
 		{
+			ViveInterceptors.Instance.AddRequiredFunction("xrWaitFrame");
 			return ViveInterceptors.Instance.HookGetInstanceProcAddr(func);
 		}
 
@@ -243,7 +244,7 @@ planeDetector);
 			//Debug.Log("OnInstanceCreate() " + m_XrInstance);
 
 			CommonWrapper.Instance.OnInstanceCreate(xrInstance, xrGetInstanceProcAddr);
-			SpaceWrapper.Instance.OnInstanceCreate(xrInstance, CommonWrapper.Instance.GetInstanceProcAddr);
+			SpaceWrapper.Instance.OnInstanceCreate(xrInstance, xrGetInstanceProcAddr);
 
 			return GetXrFunctionDelegates(m_XrInstance);
 		}

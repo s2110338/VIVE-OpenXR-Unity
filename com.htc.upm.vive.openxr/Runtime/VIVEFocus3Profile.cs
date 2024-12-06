@@ -12,6 +12,7 @@ using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.XR;
 using UnityEngine.Scripting;
 using UnityEngine.XR;
+using UnityEngine.XR.OpenXR;
 using UnityEngine.XR.OpenXR.Features;
 using UnityEngine.XR.OpenXR.Input;
 
@@ -25,6 +26,8 @@ using PoseControl = UnityEngine.InputSystem.XR.PoseControl;
 #else
 using PoseControl = UnityEngine.XR.OpenXR.Input.PoseControl;
 #endif
+
+using VIVE.OpenXR.Hand;
 
 namespace VIVE.OpenXR
 {
@@ -44,7 +47,8 @@ namespace VIVE.OpenXR
 #endif
 	public class VIVEFocus3Profile : OpenXRInteractionFeature
 	{
-		const string LOG_TAG = "VIVE.OpenXR.VIVEFocus3Profile ";
+		#region Log
+		const string LOG_TAG = "VIVE.OpenXR.VIVEFocus3Profile";
 		StringBuilder m_sb = null;
 		StringBuilder sb {
 			get {
@@ -52,8 +56,9 @@ namespace VIVE.OpenXR
 				return m_sb;
 			}
 		}
-		void DEBUG(StringBuilder msg) { Debug.Log(msg); }
-		void ERROR(StringBuilder msg) { Debug.LogError(msg); }
+		void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
+		void ERROR(StringBuilder msg) { Debug.LogErrorFormat("{0} {1}", LOG_TAG, msg); }
+		#endregion
 
 		private static VIVEFocus3Profile m_Instance = null;
 
@@ -64,27 +69,34 @@ namespace VIVE.OpenXR
 		/// </summary>
 		public const string featureId = "vive.openxr.feature.focus3controller";
 
+		private static bool HandInteractionExtEnabled { get { return OpenXRRuntime.IsExtensionEnabled(ViveHandInteractionExt.kOpenxrExtensionString); } }
+
 		/// <summary>
 		/// An Input System device based on the hand interaction profile in the <a href="https://www.khronos.org/registry/OpenXR/specs/1.0/html/xrspec.html#XR_HTC_vive_focus3_controller_interaction">Interaction Profile</a>.
 		/// </summary>
 		[Preserve, InputControlLayout(displayName = "VIVE Focus 3 Controller (OpenXR)", commonUsages = new[] { "LeftHand", "RightHand" })]
 		public class VIVEFocus3Controller : XRControllerWithRumble, IInputUpdateCallbackReceiver
 		{
-			const string LOG_TAG = "VIVE.OpenXR.VIVEFocus3Profile.VIVEFocus3Controller ";
+			#region Log
+			const string LOG_TAG = "VIVE.OpenXR.VIVEFocus3Profile.VIVEFocus3Controller";
 			StringBuilder m_sb = null;
-			StringBuilder sb {
-				get {
+			StringBuilder sb
+			{
+				get
+				{
 					if (m_sb == null) { m_sb = new StringBuilder(); }
 					return m_sb;
 				}
 			}
-			void DEBUG(StringBuilder msg) { Debug.Log(msg); }
-			void ERROR(StringBuilder msg) { Debug.LogError(msg); }
+			void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
+			void ERROR(StringBuilder msg) { Debug.LogErrorFormat("{0} {1}", LOG_TAG, msg); }
+			#endregion
 
+			#region Action Path
 			/// <summary>
 			/// A [Vector2Control](xref:UnityEngine.InputSystem.Controls.Vector2Control) that represents the <see cref="VIVEFocus3Profile.thumbstick"/> OpenXR binding.
 			/// </summary>
-			[Preserve, InputControl(aliases = new[] { "Primary2DAxis", "joystick", "joystickAxis", "thumbstickAxis" }, usage = "Primary2DAxis")]
+			[Preserve, InputControl(aliases = new[] { "Joystick", "primary2DAxis", "joystickAxis", "thumbstickAxis" }, usage = "Primary2DAxis")]
 			public Vector2Control thumbstick { get; private set; }
 
 			/// <summary>
@@ -96,19 +108,19 @@ namespace VIVE.OpenXR
 			/// <summary>
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="gripPress"/> OpenXR binding.
 			/// </summary>
-			[Preserve, InputControl(aliases = new[] { "GripButton", "squeezeClick" }, usage = "GripButton")]
+			[Preserve, InputControl(aliases = new[] { "gripButton", "squeezeClicked" }, usage = "GripButton")]
 			public ButtonControl gripPressed { get; private set; }
 
 			/// <summary>
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="gripTouch"/> OpenXR binding.
 			/// </summary>
-			[Preserve, InputControl(aliases = new[] { "GripTouch", "squeezeTouch" }, usage = "GripTouch")]
+			[Preserve, InputControl(aliases = new[] { "GripTouch", "squeezeTouched" }, usage = "GripTouch")]
 			public ButtonControl gripTouched { get; private set; }
 
 			/// <summary>
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="VIVEFocus3Profile.menu"/> OpenXR bindings, depending on handedness.
 			/// </summary>
-			[Preserve, InputControl(aliases = new[] { "menuButton" }, usage = "MenuButton")]
+			[Preserve, InputControl(aliases = new[] { "Primary", "menubutton" }, usage = "MenuButton")]
 			public ButtonControl menu { get; private set; }
 
 			/// <summary>
@@ -132,32 +144,32 @@ namespace VIVE.OpenXR
 			/// <summary>
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="triggerClick"/> OpenXR binding.
 			/// </summary>
-			[Preserve, InputControl(aliases = new[] { "triggerButton", "triggerClick" }, usage = "TriggerButton")]
+			[Preserve, InputControl(aliases = new[] { "indexButton", "triggerButton" }, usage = "TriggerButton")]
 			public ButtonControl triggerPressed { get; private set; }
 
 			/// <summary>
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="triggerTouch"/> OpenXR binding.
 			/// </summary>
-			[Preserve, InputControl(aliases = new[] { "triggerTouch", "indexTouch", "indexNearTouched" }, usage = "TriggerTouch")]
+			[Preserve, InputControl(aliases = new[] { "indexTouch", "indexNearTouched" }, usage = "TriggerTouch")]
 			public ButtonControl triggerTouched { get; private set; }
 
 			/// <summary>
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="thumbstickClick"/> OpenXR binding.
 			/// </summary>
-			[Preserve, InputControl(aliases = new[] { "Primary2DAxisClick", "joystickPress", "joystickClick" }, usage = "Primary2DAxisClick")]
+			[Preserve, InputControl(aliases = new[] { "JoystickOrPadPressed", "thumbstickClick", "joystickClicked", "primary2DAxisClick" }, usage = "Primary2DAxisClick")]
 			public ButtonControl thumbstickClicked { get; private set; }
 
 			/// <summary>
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="thumbstickTouch"/> OpenXR binding.
 			/// </summary>
-			[Preserve, InputControl(aliases = new[] { "Primary2DAxisTouch", "joystickTouch" }, usage = "Primary2DAxisTouch")]
+			[Preserve, InputControl(aliases = new[] { "JoystickOrPadTouched", "thumbstickTouch", "joystickTouched", "primary2DAxisTouch" }, usage = "Primary2DAxisTouch")]
 			public ButtonControl thumbstickTouched { get; private set; }
 
 			/// <summary>
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="thumbrest"/> OpenXR binding.
 			/// </summary>
-			[Preserve, InputControl(aliases = new[] { "ParkingTouched" })]
-			public ButtonControl parkingTouched { get; private set; }
+			[Preserve, InputControl(aliases = new[] { "ParkingTouched", "parkingTouched" })]
+			public ButtonControl thumbrestTouched { get; private set; }
 
 			/// <summary>
 			/// A <see cref="PoseControl"/> that represents the <see cref="gripPose"/> OpenXR binding. The grip pose represents the location of the user's palm or holding a motion controller.
@@ -166,52 +178,84 @@ namespace VIVE.OpenXR
 			public PoseControl devicePose { get; private set; }
 
 			/// <summary>
-			/// A <see cref="PoseControl"/> that represents the <see cref="VIVEFocus3Profile.pointerPose"/> OpenXR binding. The pointer pose represents the tip of the controller pointing forward.
+			/// A <see cref="PoseControl"/> that represents the <see cref="VIVEFocus3Profile.aim"/> OpenXR binding. The pointer pose represents the tip of the controller pointing forward.
 			/// </summary>
-			[Preserve, InputControl(offset = 0, alias = "aimPose", usage = "Pointer")]
-			public PoseControl pointerPose { get; private set; }
+			[Preserve, InputControl(offset = 0, aliases = new[] { "aimPose", "pointerPose" }, usage = "Pointer")]
+			public PoseControl pointer { get; private set; }
+#if UNITY_ANDROID
+			/// <summary>
+			/// A <see cref="PoseControl"/> representing the <see cref="VIVEFocus3Profile.pokePose"/> OpenXR binding.
+			/// </summary>
+			[Preserve, InputControl(offset = 0, alias = "indexTip", usage = "Poke")]
+			public PoseControl pokePose { get; private set; }
+
+			/// <summary>
+			/// A <see cref="PoseControl"/> representing the <see cref="VIVEFocus3Profile.pinchPose"/> OpenXR binding.
+			/// </summary>
+			[Preserve, InputControl(offset = 0, usage = "Pinch")]
+			public PoseControl pinchPose { get; private set; }
+#endif
 
 			/// <summary>
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) required for backwards compatibility with the XRSDK layouts. This represents the overall tracking state of the device. This value is equivalent to mapping devicePose/isTracked.
 			/// </summary>
-			[Preserve, InputControl(offset = 24, usage = "IsTracked")]
+			[Preserve, InputControl(offset = 24)]
 			new public ButtonControl isTracked { get; private set; }
-
 			/// <summary>
 			/// A [IntegerControl](xref:UnityEngine.InputSystem.Controls.IntegerControl) required for backwards compatibility with the XRSDK layouts. This represents the bit flag set to indicate what data is valid. This value is equivalent to mapping devicePose/trackingState.
 			/// </summary>
-			[Preserve, InputControl(offset = 28, usage = "TrackingState")]
+			[Preserve, InputControl(offset = 28)]
 			new public IntegerControl trackingState { get; private set; }
-
 			/// <summary>
-			/// A [Vector3Control](xref:UnityEngine.InputSystem.Controls.Vector3Control) required for backwards compatibility with the XRSDK layouts. This is the device position. For the VIVE Focus 3 device, this is both the device and the pointer position. This value is equivalent to mapping devicePose/position.
+			/// A [Vector3Control](xref:UnityEngine.InputSystem.Controls.Vector3Control) required for backwards compatibility with the XRSDK layouts. This is the device position. This value is equivalent to mapping devicePose/position.
 			/// </summary>
-			[Preserve, InputControl(offset = 32, alias = "gripPosition")]
+			[Preserve, InputControl(offset = 32, noisy = true, alias = "gripPosition")]
 			new public Vector3Control devicePosition { get; private set; }
-
 			/// <summary>
-			/// A [QuaternionControl](xref:UnityEngine.InputSystem.Controls.QuaternionControl) required for backwards compatibility with the XRSDK layouts. This is the device orientation. For the VIVE Focus 3 device, this is both the device and the pointer rotation. This value is equivalent to mapping devicePose/rotation.
+			/// A [QuaternionControl](xref:UnityEngine.InputSystem.Controls.QuaternionControl) required for backwards compatibility with the XRSDK layouts. This is the device orientation. This value is equivalent to mapping devicePose/rotation.
 			/// </summary>
-			[Preserve, InputControl(offset = 44, alias = "gripOrientation")]
+			[Preserve, InputControl(offset = 44, noisy = true, alias = "gripOrientation")]
 			new public QuaternionControl deviceRotation { get; private set; }
 
 			/// <summary>
-			/// A [Vector3Control](xref:UnityEngine.InputSystem.Controls.Vector3Control) required for back compatibility with the XRSDK layouts. This is the pointer position. This value is equivalent to mapping pointerPose/position.
+			/// A [Vector3Control](xref:UnityEngine.InputSystem.Controls.Vector3Control) required for back compatibility with the XRSDK layouts. This is the pointer position. This value is equivalent to mapping pointer/position.
 			/// </summary>
-			[Preserve, InputControl(offset = 92)]
+			[Preserve, InputControl(offset = 92, noisy = true)]
 			public Vector3Control pointerPosition { get; private set; }
+			/// <summary>
+			/// A [QuaternionControl](xref:UnityEngine.InputSystem.Controls.QuaternionControl) required for backwards compatibility with the XRSDK layouts. This is the pointer rotation. This value is equivalent to mapping pointer/rotation.
+			/// </summary>
+			[Preserve, InputControl(offset = 104, noisy = true, alias = "pointerOrientation")]
+			public QuaternionControl pointerRotation { get; private set; }
+#if UNITY_ANDROID
+			/// <summary>
+			/// A [Vector3Control](xref:UnityEngine.InputSystem.Controls.Vector3Control) required for backwards compatibility with the XRSDK layouts. This is the poke position. This value is equivalent to mapping pokePose/position.
+			/// </summary>
+			[Preserve, InputControl(offset = 152, noisy = true)]
+			public Vector3Control pokePosition { get; private set; }
+			/// <summary>
+			/// A [QuaternionControl](xref:UnityEngine.InputSystem.Controls.QuaternionControl) required for backwards compatibility with the XRSDK layouts. This is the poke orientation. This value is equivalent to mapping pokePose/rotation.
+			/// </summary>
+			[Preserve, InputControl(offset = 164, noisy = true)]
+			public QuaternionControl pokeRotation { get; private set; }
 
 			/// <summary>
-			/// A [QuaternionControl](xref:UnityEngine.InputSystem.Controls.QuaternionControl) required for backwards compatibility with the XRSDK layouts. This is the pointer rotation. This value is equivalent to mapping pointerPose/rotation.
+			/// A [Vector3Control](xref:UnityEngine.InputSystem.Controls.Vector3Control) required for backwards compatibility with the XRSDK layouts. This is the pinch position. This value is equivalent to mapping pinchPose/position.
 			/// </summary>
-			[Preserve, InputControl(offset = 104, alias = "pointerOrientation")]
-			public QuaternionControl pointerRotation { get; private set; }
-
+			[Preserve, InputControl(offset = 212, noisy = true)]
+			public Vector3Control pinchPosition { get; private set; }
+			/// <summary>
+			/// A [QuaternionControl](xref:UnityEngine.InputSystem.Controls.QuaternionControl) required for backwards compatibility with the XRSDK layouts. This is the pinch orientation. This value is equivalent to mapping pinchPose/rotation.
+			/// </summary>
+			[Preserve, InputControl(offset = 224, noisy = true)]
+			public QuaternionControl pinchRotation { get; private set; }
+#endif
 			/// <summary>
 			/// A <see cref="HapticControl"/> that represents the <see cref="VIVEFocus3Profile.haptic"/> binding.
 			/// </summary>
 			[Preserve, InputControl(usage = "Haptic")]
 			public HapticControl haptic { get; private set; }
+#endregion
 
 			private bool UpdateInputDeviceInRuntime = false;
 
@@ -234,11 +278,17 @@ namespace VIVE.OpenXR
 				secondaryButton = GetChildControl<ButtonControl>("secondaryButton");
 				thumbstickClicked = GetChildControl<ButtonControl>("thumbstickClicked");
 				thumbstickTouched = GetChildControl<ButtonControl>("thumbstickTouched");
-				parkingTouched = GetChildControl<ButtonControl>("parkingTouched");
+				thumbrestTouched = GetChildControl<ButtonControl>("thumbrestTouched");
 
 				devicePose = GetChildControl<PoseControl>("devicePose");
-				pointerPose = GetChildControl<PoseControl>("pointerPose");
-
+				pointer = GetChildControl<PoseControl>("pointer");
+#if UNITY_ANDROID
+				if (HandInteractionExtEnabled)
+				{
+					pinchPose = GetChildControl<PoseControl>("pinchPose");
+					pokePose = GetChildControl<PoseControl>("pokePose");
+				}
+#endif
 				isTracked = GetChildControl<ButtonControl>("isTracked");
 				trackingState = GetChildControl<IntegerControl>("trackingState");
 				devicePosition = GetChildControl<Vector3Control>("devicePosition");
@@ -247,7 +297,7 @@ namespace VIVE.OpenXR
 				pointerRotation = GetChildControl<QuaternionControl>("pointerRotation");
 				haptic = GetChildControl<HapticControl>("haptic");
 
-				sb.Clear().Append(LOG_TAG)
+				sb.Clear()
 					.Append("FinishSetup() device interfaceName: ").Append(description.interfaceName)
 					.Append(", deviceClass: ").Append(description.deviceClass)
 					.Append(", product: ").Append(description.product)
@@ -265,7 +315,7 @@ namespace VIVE.OpenXR
 				string func = "OnUpdate() ";
 				if (leftHand.isTracked.ReadValue() > 0 && !bRoleUpdatedLeft)
 				{
-					sb.Clear().Append(LOG_TAG).Append(func)
+					sb.Clear().Append(func)
 						.Append("product: ").Append(description.product)
 						.Append(" with user path: ").Append(UserPaths.leftHand).Append(" is_tracked."); DEBUG(sb);
 
@@ -273,24 +323,24 @@ namespace VIVE.OpenXR
 
 					if (m_Instance.GetInputSourceName(path, XrInputSourceLocalizedNameFlags.XR_INPUT_SOURCE_LOCALIZED_NAME_USER_PATH_BIT, out string role) != XrResult.XR_SUCCESS)
 					{
-						sb.Clear().Append(LOG_TAG).Append(func)
+						sb.Clear().Append(func)
 							.Append("GetInputSourceName XR_INPUT_SOURCE_LOCALIZED_NAME_USER_PATH_BIT failed."); ERROR(sb);
 					}
 					else
 					{
-						sb.Clear().Append(LOG_TAG).Append(func)
+						sb.Clear().Append(func)
 							.Append("product: ").Append(description.product)
 							.Append(" with user path: ").Append(UserPaths.leftHand).Append(" has role: ").Append(role); DEBUG(sb);
 					}
 
 					if (m_Instance.GetInputSourceName(path, XrInputSourceLocalizedNameFlags.XR_INPUT_SOURCE_LOCALIZED_NAME_SERIAL_NUMBER_BIT_HTC, out string sn) != XrResult.XR_SUCCESS)
 					{
-						sb.Clear().Append(LOG_TAG).Append(func)
+						sb.Clear().Append(func)
 							.Append("GetInputSourceName XR_INPUT_SOURCE_LOCALIZED_NAME_SERIAL_NUMBER_BIT_HTC failed."); ERROR(sb);
 					}
 					else
 					{
-						sb.Clear().Append(LOG_TAG).Append(func)
+						sb.Clear().Append(func)
 							.Append("product: ").Append(description.product)
 							.Append(" with user path: ").Append(UserPaths.leftHand).Append(" has serial number: ").Append(role); DEBUG(sb);
 					}
@@ -299,7 +349,7 @@ namespace VIVE.OpenXR
 				}
 				if (rightHand.isTracked.ReadValue() > 0 && !bRoleUpdatedRight)
 				{
-					sb.Clear().Append(LOG_TAG).Append(func)
+					sb.Clear().Append(func)
 						.Append("product: ").Append(description.product)
 						.Append(" with user path: ").Append(UserPaths.rightHand).Append(" is_tracked."); DEBUG(sb);
 
@@ -307,24 +357,24 @@ namespace VIVE.OpenXR
 
 					if (m_Instance.GetInputSourceName(path, XrInputSourceLocalizedNameFlags.XR_INPUT_SOURCE_LOCALIZED_NAME_USER_PATH_BIT, out string role) != XrResult.XR_SUCCESS)
 					{
-						sb.Clear().Append(LOG_TAG).Append(func)
+						sb.Clear().Append(func)
 							.Append("GetInputSourceName XR_INPUT_SOURCE_LOCALIZED_NAME_USER_PATH_BIT failed."); ERROR(sb);
 					}
 					else
 					{
-						sb.Clear().Append(LOG_TAG).Append(func)
+						sb.Clear().Append(func)
 							.Append("product: ").Append(description.product)
 							.Append(" with user path: ").Append(UserPaths.rightHand).Append(" has role: ").Append(role); DEBUG(sb);
 					}
 
 					if (m_Instance.GetInputSourceName(path, XrInputSourceLocalizedNameFlags.XR_INPUT_SOURCE_LOCALIZED_NAME_SERIAL_NUMBER_BIT_HTC, out string sn) != XrResult.XR_SUCCESS)
 					{
-						sb.Clear().Append(LOG_TAG).Append(func)
+						sb.Clear().Append(func)
 							.Append("GetInputSourceName XR_INPUT_SOURCE_LOCALIZED_NAME_SERIAL_NUMBER_BIT_HTC failed."); ERROR(sb);
 					}
 					else
 					{
-						sb.Clear().Append(LOG_TAG).Append(func)
+						sb.Clear().Append(func)
 							.Append("product: ").Append(description.product)
 							.Append(" with user path: ").Append(UserPaths.leftHand).Append(" has serial number: ").Append(role); DEBUG(sb);
 					}
@@ -339,6 +389,7 @@ namespace VIVE.OpenXR
 		/// </summary>
 		public const string profile = "/interaction_profiles/htc/vive_focus3_controller";
 
+#region Supported component paths
 		// Available Bindings
 		// Left Hand Only
 		/// <summary>
@@ -409,31 +460,49 @@ namespace VIVE.OpenXR
 		/// Constant for a boolean interaction binding '.../input/thumbrest/touch' OpenXR Input Binding. Used by input subsystem to bind actions to physical inputs.
 		/// </summary>
 		public const string thumbrest = "/input/thumbrest/touch";
+
 		/// <summary>
 		/// Constant for a hand grip pose interaction binding '.../input/grip/pose' OpenXR Input Binding. Used by input subsystem to bind actions to physical inputs.
 		/// </summary>
 		public const string gripPose = "/input/grip/pose";
+
 		/// <summary>
 		/// Constant for a hand point pose interaction binding '.../input/aim/pose' OpenXR Input Binding. Used by input subsystem to bind actions to physical inputs.
 		/// </summary>
-		public const string pointerPose = "/input/aim/pose";
+		public const string aim = "/input/aim/pose";
+#if UNITY_ANDROID
+		/// <summary>
+		/// Constant for a pose interaction binding '.../input/pinch_ext/pose' OpenXR Input Binding.<br></br>
+		/// Typically used for directly manipulating a small object using the pinch gesture. When using a hand interaction profile, it is typically paired with the <see cref="pinchValue"/>.<br></br>
+		/// When using a controller interaction profile, it is typically paired with a trigger manipulated with the index finger, which typically requires curling the index finger and applying pressure with the fingertip.
+		/// </summary>
+		public const string pinchPose = "/input/pinch_ext/pose";
+
+		/// <summary>
+		/// Constant for a pose interaction binding '.../input/poke_ext/pose' OpenXR Input Binding.<br></br>
+		/// Typically used for contact-based interactions using the motion of the hand or fingertip. It typically does not pair with other hand gestures or buttons on the controller. The application typically uses a sphere collider with the "poke" pose to visualize the pose and detect touch with a virtual object.
+		/// </summary>
+		public const string pokePose = "/input/poke_ext/pose";
+#endif
 		/// <summary>
 		/// Constant for a haptic interaction binding '.../output/haptic' OpenXR Input Binding. Used by input subsystem to bind actions to physical outputs.
 		/// </summary>
 		public const string haptic = "/output/haptic";
+#endregion
 
-
+		private const string kLayoutName = "VIVEFocus3Controller";
 		private const string kDeviceLocalizedName = "VIVE Focus 3 Controller OpenXR";
-
 		/// <summary>
 		/// Registers the <see cref="VIVEFocus3Controller"/> layout with the Input System.
 		/// </summary>
 		protected override void RegisterDeviceLayout()
 		{
+			sb.Clear().Append("RegisterDeviceLayout() ").Append(kLayoutName).Append(", product: ").Append(kDeviceLocalizedName); DEBUG(sb);
 			InputSystem.RegisterLayout(typeof(VIVEFocus3Controller),
-						matches: new InputDeviceMatcher()
-						.WithInterface(XRUtilities.InterfaceMatchAnyVersion)
-						.WithProduct(kDeviceLocalizedName));
+				kLayoutName,
+				matches: new InputDeviceMatcher()
+					.WithInterface(XRUtilities.InterfaceMatchAnyVersion)
+					.WithProduct(kDeviceLocalizedName));
 		}
 
 		/// <summary>
@@ -441,33 +510,36 @@ namespace VIVE.OpenXR
 		/// </summary>
 		protected override void UnregisterDeviceLayout()
 		{
-			InputSystem.RemoveLayout(typeof(VIVEFocus3Controller).Name);
+			sb.Clear().Append("UnregisterDeviceLayout() ").Append(kLayoutName); DEBUG(sb);
+			InputSystem.RemoveLayout(kLayoutName);
 		}
 
-		/// <inheritdoc/>
-		protected override void RegisterActionMapsWithRuntime()
+#if UNITY_XR_OPENXR_1_9_1
+		/// <summary>
+		/// Return interaction profile type. VIVEFocus3Controller profile is Device type.
+		/// </summary>
+		/// <returns>Interaction profile type.</returns>
+		protected override InteractionProfileType GetInteractionProfileType()
 		{
-			ActionMapConfig actionMap = new ActionMapConfig()
+			return typeof(VIVEFocus3Controller).IsSubclassOf(typeof(XRController)) ? InteractionProfileType.XRController : InteractionProfileType.Device;
+		}
+
+		/// <summary>
+		/// Return device layer out string used for registering device VIVEFocus3Controller in InputSystem.
+		/// </summary>
+		/// <returns>Device layout string.</returns>
+		protected override string GetDeviceLayoutName()
+		{
+			return kLayoutName;
+		}
+#endif
+
+		private List<ActionConfig> RequestActionConfigs()
+		{
+			if (HandInteractionExtEnabled)
 			{
-				name = "vivefocus3controller",
-				localizedName = kDeviceLocalizedName,
-				desiredInteractionProfile = profile,
-				manufacturer = "HTC",
-				serialNumber = "",
-				deviceInfos = new List<DeviceConfig>()
-				{
-					new DeviceConfig()
-					{
-						characteristics = InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.TrackedDevice | InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.Left,
-						userPath = UserPaths.leftHand // "/user/hand/left"
-					},
-					new DeviceConfig()
-					{
-						characteristics = InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.TrackedDevice | InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.Right,
-						userPath = UserPaths.rightHand // "/user/hand/right"
-					}
-				},
-				actions = new List<ActionConfig>()
+				sb.Clear().Append("RequestActionConfigs() XR_EXT_hand_interaction is enabled."); DEBUG(sb);
+				return new List<ActionConfig>()
 				{
 					// Thumbstick Axis
 					new ActionConfig()
@@ -726,7 +798,7 @@ namespace VIVE.OpenXR
 					// Thumbrest Touch
 					new ActionConfig()
 					{
-						name = "parkingTouched",
+						name = "thumbrestTouched",
 						localizedName = "Parking Touch",
 						type = ActionType.Binary,
 						bindings = new List<ActionBinding>()
@@ -760,7 +832,7 @@ namespace VIVE.OpenXR
 					// Pointer Pose
 					new ActionConfig()
 					{
-						name = "pointerPose",
+						name = "pointer",
 						localizedName = "Pointer Pose",
 						type = ActionType.Pose,
 						usages = new List<string>()
@@ -771,11 +843,51 @@ namespace VIVE.OpenXR
 						{
 							new ActionBinding()
 							{
-								interactionPath = pointerPose,
+								interactionPath = aim,
 								interactionProfileName = profile,
 							}
 						}
 					},
+#if UNITY_ANDROID
+					// Pinch Pose
+					new ActionConfig()
+					{
+						name = "pinchPose",
+						localizedName = "Pinch Pose",
+						type = ActionType.Pose,
+						usages = new List<string>()
+						{
+							"Pinch"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = pinchPose,
+								interactionProfileName = profile,
+							}
+						}
+					},
+					// Poke Pose
+					new ActionConfig()
+					{
+						name = "pokePose",
+						localizedName = "Index Tip",
+						type = ActionType.Pose,
+						usages = new List<string>()
+						{
+							"Poke"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = pokePose,
+								interactionProfileName = profile,
+							}
+						}
+					},
+#endif
 					// Haptics
 					new ActionConfig()
 					{
@@ -792,13 +904,352 @@ namespace VIVE.OpenXR
 							}
 						}
 					}
-				}
+				};
+			}
+			else
+			{
+				sb.Clear().Append("RequestActionConfigs() XR_EXT_hand_interaction is disabled."); DEBUG(sb);
+				return new List<ActionConfig>()
+				{
+					// Thumbstick Axis
+					new ActionConfig()
+					{
+						name = "thumbstick",
+						localizedName = "Thumbstick Axis",
+						type = ActionType.Axis2D,
+						usages = new List<string>()
+						{
+							"Primary2DAxis"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = thumbstick,
+								interactionProfileName = profile,
+							}
+						}
+					},
+					// Grip Axis
+					new ActionConfig()
+					{
+						name = "grip",
+						localizedName = "Grip Axis",
+						type = ActionType.Axis1D,
+						usages = new List<string>()
+						{
+							"Grip"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = grip,
+								interactionProfileName = profile,
+							}
+						}
+					},
+					// Grip Press
+					new ActionConfig()
+					{
+						name = "gripPressed",
+						localizedName = "Grip Pressed",
+						type = ActionType.Binary,
+						usages = new List<string>()
+						{
+							"GripButton"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = gripPress,
+								interactionProfileName = profile,
+							}
+						}
+					},
+					// Menu
+					new ActionConfig()
+					{
+						name = "menu",
+						localizedName = "Menu",
+						type = ActionType.Binary,
+						usages = new List<string>()
+						{
+							"MenuButton"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = menu,
+								interactionProfileName = profile,
+								userPaths = new List<string>() { UserPaths.leftHand }
+							},
+							new ActionBinding()
+							{
+								interactionPath = system,
+								interactionProfileName = profile,
+								userPaths = new List<string>() { UserPaths.rightHand }
+							},
+						}
+					},
+					// X / A Press
+					new ActionConfig()
+					{
+						name = "primaryButton",
+						localizedName = "Primary Pressed",
+						type = ActionType.Binary,
+						usages = new List<string>()
+						{
+							"PrimaryButton"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = buttonX,
+								interactionProfileName = profile,
+								userPaths = new List<string>() { UserPaths.leftHand }
+							},
+							new ActionBinding()
+							{
+								interactionPath = buttonA,
+								interactionProfileName = profile,
+								userPaths = new List<string>() { UserPaths.rightHand }
+							},
+						}
+					},
+
+
+					// Y / B Press
+					new ActionConfig()
+					{
+						name = "secondaryButton",
+						localizedName = "Secondary Pressed",
+						type = ActionType.Binary,
+						usages = new List<string>()
+						{
+							"SecondaryButton"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = buttonY,
+								interactionProfileName = profile,
+								userPaths = new List<string>() { UserPaths.leftHand }
+							},
+							new ActionBinding()
+							{
+								interactionPath = buttonB,
+								interactionProfileName = profile,
+								userPaths = new List<string>() { UserPaths.rightHand }
+							},
+						}
+					},
+
+
+					// Trigger Axis
+					new ActionConfig()
+					{
+						name = "trigger",
+						localizedName = "Trigger Axis",
+						type = ActionType.Axis1D,
+						usages = new List<string>()
+						{
+							"Trigger"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = trigger,
+								interactionProfileName = profile,
+							}
+						}
+					},
+					// Trigger Press
+					new ActionConfig()
+					{
+						name = "triggerPressed",
+						localizedName = "Trigger Pressed",
+						type = ActionType.Binary,
+						usages = new List<string>()
+						{
+							"TriggerButton"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = triggerClick,
+								interactionProfileName = profile,
+							}
+						}
+					},
+					// Trigger Touch
+					new ActionConfig()
+					{
+						name = "triggerTouched",
+						localizedName = "Trigger Touched",
+						type = ActionType.Binary,
+						usages = new List<string>()
+						{
+							"TriggerTouch"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = triggerTouch,
+								interactionProfileName = profile,
+							}
+						}
+					},
+					// Thumbstick Click
+					new ActionConfig()
+					{
+						name = "thumbstickClicked",
+						localizedName = "Thumbstick Pressed",
+						type = ActionType.Binary,
+						usages = new List<string>()
+						{
+							"Primary2DAxisClick"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = thumbstickClick,
+								interactionProfileName = profile,
+							}
+						}
+					},
+					// Thumbstick Touch
+					new ActionConfig()
+					{
+						name = "thumbstickTouched",
+						localizedName = "Thumbstick Touched",
+						type = ActionType.Binary,
+						usages = new List<string>()
+						{
+							"Primary2DAxisTouch"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = thumbstickTouch,
+								interactionProfileName = profile,
+							}
+						}
+					},
+					// Thumbrest Touch
+					new ActionConfig()
+					{
+						name = "thumbrestTouched",
+						localizedName = "Parking Touch",
+						type = ActionType.Binary,
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = thumbrest,
+								interactionProfileName = profile,
+							}
+						}
+					},
+					// Device Pose
+					new ActionConfig()
+					{
+						name = "devicePose",
+						localizedName = "Grip Pose",
+						type = ActionType.Pose,
+						usages = new List<string>()
+						{
+							"Device"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = gripPose,
+								interactionProfileName = profile,
+							}
+						}
+					},
+					// Pointer Pose
+					new ActionConfig()
+					{
+						name = "pointer",
+						localizedName = "Pointer Pose",
+						type = ActionType.Pose,
+						usages = new List<string>()
+						{
+							"Pointer"
+						},
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = aim,
+								interactionProfileName = profile,
+							}
+						}
+					},
+
+					// Haptics
+					new ActionConfig()
+					{
+						name = "haptic",
+						localizedName = "Haptic Output",
+						type = ActionType.Vibrate,
+						usages = new List<string>() { "Haptic" },
+						bindings = new List<ActionBinding>()
+						{
+							new ActionBinding()
+							{
+								interactionPath = haptic,
+								interactionProfileName = profile,
+							}
+						}
+					}
+				};
+			}
+		}
+		/// <summary>
+		/// Register action maps for this device with the OpenXR Runtime. Called at runtime before Start.
+		/// </summary>
+		protected override void RegisterActionMapsWithRuntime()
+		{
+			ActionMapConfig actionMap = new ActionMapConfig()
+			{
+				name = "vivefocus3controller",
+				localizedName = kDeviceLocalizedName,
+				desiredInteractionProfile = profile,
+				manufacturer = "HTC",
+				serialNumber = "",
+				deviceInfos = new List<DeviceConfig>()
+				{
+					new DeviceConfig()
+					{
+						characteristics = InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.TrackedDevice | InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.Left,
+						userPath = UserPaths.leftHand // "/user/hand/left"
+					},
+					new DeviceConfig()
+					{
+						characteristics = InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.TrackedDevice | InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.Right,
+						userPath = UserPaths.rightHand // "/user/hand/right"
+					}
+				},
+				actions = RequestActionConfigs()
 			};
 
 			AddActionMap(actionMap);
 		}
 
-		#region OpenXR function delegates
+#region OpenXR function delegates
 		/// xrGetInstanceProcAddr
 		OpenXRHelper.xrGetInstanceProcAddrDelegate XrGetInstanceProcAddr;
 		/// xrEnumerateDisplayRefreshRatesFB
@@ -808,14 +1259,14 @@ namespace VIVE.OpenXR
 			/// xrGetInstanceProcAddr
 			if (xrGetInstanceProcAddr != null && xrGetInstanceProcAddr != IntPtr.Zero)
 			{
-				sb.Clear().Append(LOG_TAG).Append("Get function pointer of xrGetInstanceProcAddr."); DEBUG(sb);
+				sb.Clear().Append("Get function pointer of xrGetInstanceProcAddr."); DEBUG(sb);
 				XrGetInstanceProcAddr = Marshal.GetDelegateForFunctionPointer(
 					xrGetInstanceProcAddr,
 					typeof(OpenXRHelper.xrGetInstanceProcAddrDelegate)) as OpenXRHelper.xrGetInstanceProcAddrDelegate;
 			}
 			else
 			{
-				sb.Clear().Append(LOG_TAG).Append("No function pointer of xrGetInstanceProcAddr"); ERROR(sb);
+				sb.Clear().Append("No function pointer of xrGetInstanceProcAddr"); ERROR(sb);
 				return false;
 			}
 
@@ -826,26 +1277,26 @@ namespace VIVE.OpenXR
 			{
 				if (funcPtr != IntPtr.Zero)
 				{
-					sb.Clear().Append(LOG_TAG).Append("Get function pointer of xrGetInputSourceLocalizedName."); DEBUG(sb);
+					sb.Clear().Append("Get function pointer of xrGetInputSourceLocalizedName."); DEBUG(sb);
 					xrGetInputSourceLocalizedName = Marshal.GetDelegateForFunctionPointer(
 						funcPtr,
 						typeof(OpenXRHelper.xrGetInputSourceLocalizedNameDelegate)) as OpenXRHelper.xrGetInputSourceLocalizedNameDelegate;
 				}
 				else
 				{
-					sb.Clear().Append(LOG_TAG).Append("No function pointer of xrGetInputSourceLocalizedName.");
+					sb.Clear().Append("No function pointer of xrGetInputSourceLocalizedName.");
 					ERROR(sb);
 				}
 			}
 			else
 			{
-				sb.Clear().Append(LOG_TAG).Append("No function pointer of xrGetInputSourceLocalizedName");
+				sb.Clear().Append("No function pointer of xrGetInputSourceLocalizedName");
 				ERROR(sb);
 			}
 
 			return true;
 		}
-		#endregion
+#endregion
 
 		private XrResult GetInputSourceName(XrPath path, XrInputSourceLocalizedNameFlags sourceType, out string sourceName)
 		{
@@ -855,8 +1306,7 @@ namespace VIVE.OpenXR
 			if (!m_XrSessionCreated || xrGetInputSourceLocalizedName == null) { return XrResult.XR_ERROR_VALIDATION_FAILURE; }
 
 			string userPath = PathToString(path);
-			sb.Clear().Append(LOG_TAG).Append(func)
-				.Append("userPath: ").Append(userPath).Append(", flag: ").Append((UInt64)sourceType); DEBUG(sb);
+			sb.Clear().Append(func).Append("userPath: ").Append(userPath).Append(", flag: ").Append((UInt64)sourceType); DEBUG(sb);
 
 			XrInputSourceLocalizedNameGetInfo nameInfo = new XrInputSourceLocalizedNameGetInfo(
 				XrStructureType.XR_TYPE_INPUT_SOURCE_LOCALIZED_NAME_GET_INFO,
@@ -870,7 +1320,7 @@ namespace VIVE.OpenXR
 			{
 				if (nameSizeOut < 1)
 				{
-					sb.Clear().Append(LOG_TAG).Append(func)
+					sb.Clear().Append(func)
 						.Append("xrGetInputSourceLocalizedName(").Append(userPath).Append(")")
 						.Append(", flag: ").Append((UInt64)sourceType)
 						.Append("bufferCountOutput size is invalid!");
@@ -885,7 +1335,7 @@ namespace VIVE.OpenXR
 				if (result == XrResult.XR_SUCCESS)
 				{
 					sourceName = new string(buffer).TrimEnd('\0');
-					sb.Clear().Append(LOG_TAG).Append(func)
+					sb.Clear().Append(func)
 						.Append("xrGetInputSourceLocalizedName(").Append(userPath).Append(")")
 						.Append(", flag: ").Append((UInt64)sourceType)
 						.Append(", bufferCapacityInput: ").Append(nameSizeIn)
@@ -895,7 +1345,7 @@ namespace VIVE.OpenXR
 				}
 				else
 				{
-					sb.Clear().Append(LOG_TAG).Append(func)
+					sb.Clear().Append(func)
 						.Append("2.xrGetInputSourceLocalizedName(").Append(userPath).Append(")")
 						.Append(", flag: ").Append((UInt64)sourceType)
 						.Append(", bufferCapacityInput: ").Append(nameSizeIn)
@@ -906,7 +1356,7 @@ namespace VIVE.OpenXR
 			}
 			else
 			{
-				sb.Clear().Append(LOG_TAG).Append(func)
+				sb.Clear().Append(func)
 					.Append("1.xrGetInputSourceLocalizedName(").Append(userPath).Append(")")
 					.Append(", flag: ").Append((UInt64)sourceType)
 					.Append(", bufferCapacityInput: ").Append(nameSizeIn)
@@ -918,7 +1368,7 @@ namespace VIVE.OpenXR
 			return result;
 		}
 
-		#region OpenXR Life Cycle
+#region OpenXR Life Cycle
 #pragma warning disable
 		private bool m_XrInstanceCreated = false;
 #pragma warning restore
@@ -933,7 +1383,7 @@ namespace VIVE.OpenXR
 			m_XrInstanceCreated = true;
 			m_XrInstance = xrInstance;
 			m_Instance = this;
-			sb.Clear().Append(LOG_TAG).Append("OnInstanceCreate() ").Append(m_XrInstance); DEBUG(sb);
+			sb.Clear().Append("OnInstanceCreate() ").Append(m_XrInstance); DEBUG(sb);
 
 			GetXrFunctionDelegates(m_XrInstance);
 			return true;
@@ -949,7 +1399,7 @@ namespace VIVE.OpenXR
 				m_XrInstanceCreated = false;
 				m_XrInstance = 0;
 			}
-			sb.Clear().Append(LOG_TAG).Append("OnInstanceDestroy() ").Append(xrInstance); DEBUG(sb);
+			sb.Clear().Append("OnInstanceDestroy() ").Append(xrInstance); DEBUG(sb);
 		}
 
 		private bool m_XrSessionCreated = false;
@@ -962,7 +1412,7 @@ namespace VIVE.OpenXR
 		{
 			m_XrSession = xrSession;
 			m_XrSessionCreated = true;
-			sb.Clear().Append(LOG_TAG).Append("OnSessionCreate() ").Append(m_XrSession); DEBUG(sb);
+			sb.Clear().Append("OnSessionCreate() ").Append(m_XrSession); DEBUG(sb);
 		}
 		/// <summary>
 		/// Called when <see href="https://registry.khronos.org/OpenXR/specs/1.0/html/xrspec.html#xrDestroySession">xrDestroySession</see> is done.
@@ -970,13 +1420,13 @@ namespace VIVE.OpenXR
 		/// <param name="xrSession">The session ID to destroy.</param>
 		protected override void OnSessionDestroy(ulong xrSession)
 		{
-			sb.Clear().Append(LOG_TAG).Append("OnSessionDestroy() ").Append(xrSession); DEBUG(sb);
+			sb.Clear().Append("OnSessionDestroy() ").Append(xrSession); DEBUG(sb);
 			if (m_XrSession == xrSession)
 			{
 				m_XrSession = 0;
 				m_XrSessionCreated = false;
 			}
 		}
-		#endregion
+#endregion
 	}
 }

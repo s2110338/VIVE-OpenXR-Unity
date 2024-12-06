@@ -49,7 +49,14 @@ namespace VIVE.OpenXR.DisplayRefreshRate
         public const string featureId = "vive.openxr.feature.displayrefreshrate";
 
         #region OpenXR Life Cycle
-        private XrInstance m_XrInstance = 0;
+
+        protected override IntPtr HookGetInstanceProcAddr(IntPtr func)
+        {
+            ViveInterceptors.Instance.AddRequiredFunction("xrPollEvent");
+            return ViveInterceptors.Instance.HookGetInstanceProcAddr(func);
+        }
+
+	    private XrInstance m_XrInstance = 0;
         /// <summary>
         /// Called when <see href="https://registry.khronos.org/OpenXR/specs/1.0/html/xrspec.html#xrCreateInstance">xrCreateInstance</see> is done.
         /// </summary>

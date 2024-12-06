@@ -18,7 +18,7 @@ using UnityEditor.XR.OpenXR.Features;
 namespace VIVE.OpenXR.CompositionLayer.Passthrough
 {
 #if UNITY_EDITOR
-	[OpenXRFeature(UiName = "VIVE XR Composition Layer (Passthrough)",
+	[OpenXRFeature(UiName = "VIVE XR Composition Layer (Passthrough) (Deprecated)",
 		Desc = "Enable this feature to use the HTC Passthrough feature.",
 		Company = "HTC",
 		DocumentationLink = "..\\Documentation",
@@ -28,6 +28,7 @@ namespace VIVE.OpenXR.CompositionLayer.Passthrough
 		FeatureId = featureId
 	)]
 #endif
+	[Obsolete("This class is deprecated. Please use VivePassthrough instead.")]
 	public class ViveCompositionLayerPassthrough : OpenXRFeature
 	{
 		const string LOG_TAG = "VIVE.OpenXR.ViveCompositionLayerPassthrough";

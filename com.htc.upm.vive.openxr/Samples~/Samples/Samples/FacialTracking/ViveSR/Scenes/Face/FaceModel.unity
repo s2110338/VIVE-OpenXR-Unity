@@ -2206,7 +2206,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 'MouthSmileRight:'
+  m_Text: 'MouthRaiserRight:'
 --- !u!114 &7920586719574310195
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2253,7 +2253,7 @@ GameObject:
   - component: {fileID: 7920586719574310194}
   - component: {fileID: 7920586719574310195}
   m_Layer: 5
-  m_Name: MouthSmileRight
+  m_Name: MouthRaiserRight
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2488,7 +2488,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 'MouthSmileLeft:'
+  m_Text: 'MouthRaiserLeft:'
 --- !u!114 &7920586719626268234
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2535,7 +2535,7 @@ GameObject:
   - component: {fileID: 7920586719626268233}
   - component: {fileID: 7920586719626268234}
   m_Layer: 5
-  m_Name: MouthSmileLeft
+  m_Name: MouthRaiserLeft
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4051,7 +4051,7 @@ GameObject:
   - component: {fileID: 7920586720091468126}
   - component: {fileID: 7920586720091468127}
   m_Layer: 5
-  m_Name: MouthSadLeft
+  m_Name: MouthStretcherLeft
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4098,7 +4098,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 'MouthSadLeft:'
+  m_Text: 'MouthStretcherLeft:'
 --- !u!114 &7920586720091468127
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4961,7 +4961,7 @@ GameObject:
   - component: {fileID: 7920586720398776223}
   - component: {fileID: 7920586720398776208}
   m_Layer: 5
-  m_Name: MouthSadRight
+  m_Name: MouthStretcherRight
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5008,7 +5008,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 'MouthSadRight:'
+  m_Text: 'MouthStretcherRight:'
 --- !u!114 &7920586720406047248
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7193,6 +7193,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -7233,6 +7234,18 @@ MonoBehaviour:
         m_Flags: 0
       m_Flags: 0
     m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 37527834-e56e-4a3b-8e3a-657ba53bc50c
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: Position
     m_Type: 0
@@ -7267,7 +7280,6 @@ MonoBehaviour:
       m_Action: Rotation
       m_Flags: 0
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &8315893866599987621
 GameObject:
   m_ObjectHideFlags: 0
@@ -7308,7 +7320,7 @@ LineRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 0}
+  - {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -7334,7 +7346,7 @@ LineRenderer:
   - {x: 0, y: 0, z: 1}
   m_Parameters:
     serializedVersion: 3
-    widthMultiplier: 1
+    widthMultiplier: 0.001
     widthCurve:
       serializedVersion: 2
       m_Curve:
@@ -7449,9 +7461,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_CameraOffset: {fileID: 8315893868100911252}
-  m_CameraObject: {fileID: 0}
   m_TrackingOrigin: 1
+  m_CameraHeight: 0
   m_CameraYOffset: 0
+  m_ActionAsset: {fileID: 0}
 --- !u!114 &8315893866959931017
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7561,6 +7574,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -7601,6 +7615,18 @@ MonoBehaviour:
         m_Flags: 0
       m_Flags: 0
     m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 7bcbd21e-bd98-413d-8be6-f2cf4158d439
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: Position
     m_Type: 0
@@ -7635,7 +7661,6 @@ MonoBehaviour:
       m_Action: Rotation
       m_Flags: 0
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!81 &8315893867055095324
 AudioListener:
   m_ObjectHideFlags: 0
@@ -8209,7 +8234,7 @@ LineRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 0}
+  - {fileID: 10306, guid: 0000000000000000f000000000000000, type: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -8235,7 +8260,7 @@ LineRenderer:
   - {x: 0, y: 0, z: 1}
   m_Parameters:
     serializedVersion: 3
-    widthMultiplier: 1
+    widthMultiplier: 0.001
     widthCurve:
       serializedVersion: 2
       m_Curve:
@@ -8302,6 +8327,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -8342,6 +8368,18 @@ MonoBehaviour:
         m_Flags: 0
       m_Flags: 0
     m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 56d84f34-6b84-4475-aacf-acb4b8c4fff1
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: Position
     m_Type: 0
@@ -8376,7 +8414,6 @@ MonoBehaviour:
       m_Action: Rotation
       m_Flags: 0
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!114 &8315893868601279389
 MonoBehaviour:
   m_ObjectHideFlags: 0

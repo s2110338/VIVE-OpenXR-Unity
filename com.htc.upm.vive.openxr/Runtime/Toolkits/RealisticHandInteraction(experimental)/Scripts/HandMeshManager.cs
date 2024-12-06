@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using VIVE.OpenXR.Toolkits.Common;
 
 namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 {
@@ -50,6 +51,7 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		[SerializeField]
 		private Transform[] m_HandJoints = new Transform[k_JointCount];
 
+		private SkinnedMeshRenderer skinnedMeshRenderer = null;
 		private const int k_JointCount = (int)JointType.Count;
 		private const int k_RootId = (int)JointType.Wrist;
 		private bool updateRoot = false;
@@ -77,6 +79,8 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 
 			MeshHandPose meshHandPose = transform.gameObject.AddComponent<MeshHandPose>();
 			meshHandPose.SetHandMeshRenderer(this);
+
+			skinnedMeshRenderer = transform.GetComponentInChildren<SkinnedMeshRenderer>();
 		}
 
 		private void OnDisable()
@@ -95,9 +99,9 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 
 		private void Update()
 		{
-			HandData handData = CachedHand.Get(isLeft);
-			EnableHandModel(handData.isTracked);
-			if (!handData.isTracked) { return; }
+			bool isTracked = VIVEInput.IsHandTracked(isLeft ? Common.Handedness.Left : Common.Handedness.Right);
+			EnableHandModel(isTracked);
+			if (!isTracked) { return; }
 
 			//if (m_UseRuntimeModel || (!m_UseRuntimeModel && m_UseScale))
 			//{
@@ -118,22 +122,23 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			}
 			if (!updateRoot)
 			{
-				Vector3 rootPosition = Vector3.zero;
-				Quaternion rootRotation = Quaternion.identity;
-				handData.GetJointPosition((JointType)k_RootId, ref rootPosition);
-				handData.GetJointRotation((JointType)k_RootId, ref rootRotation);
-
-				m_HandJoints[k_RootId].position = m_HandJoints[k_RootId].parent.position + rootPosition;
-				m_HandJoints[k_RootId].rotation = m_HandJoints[k_RootId].parent.rotation * rootRotation;
+				VIVEInput.GetJointPose(isLeft ? Common.Handedness.Left : Common.Handedness.Right, HandJointType.Wrist, out Pose jointPose);
+				m_HandJoints[k_RootId].localPosition = jointPose.position;
+				m_HandJoints[k_RootId].localRotation = jointPose.rotation;
 			}
 
 			for (int i = 0; i < m_HandJoints.Length; i++)
 			{
 				if (m_HandJoints[i] == null || i == k_RootId) { continue; }
 
-				Quaternion jointRotation = Quaternion.identity;
-				handData.GetJointRotation((JointType)i, ref jointRotation);
-				m_HandJoints[i].rotation = m_HandJoints[k_RootId].parent.rotation * jointRotation;
+				VIVEInput.GetJointPose(isLeft ? Common.Handedness.Left : Common.Handedness.Right, (HandJointType)i, out Pose jointPose);
+				m_HandJoints[i].rotation = m_HandJoints[k_RootId].parent.rotation * jointPose.rotation;
+            }
+
+			if (VIVERig.Instance)
+			{
+                m_HandJoints[k_RootId].rotation = VIVERig.Instance.transform.rotation * m_HandJoints[k_RootId].localRotation;
+                m_HandJoints[k_RootId].position = VIVERig.Instance.transform.position + VIVERig.Instance.transform.rotation * m_HandJoints[k_RootId].localPosition;
 			}
 
 			if (isGrabbing)
@@ -343,6 +348,11 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			if (m_HandJoints[k_RootId].gameObject.activeSelf != enable)
 			{
 				m_HandJoints[k_RootId].gameObject.SetActive(enable);
+
+				if (skinnedMeshRenderer)
+				{
+					skinnedMeshRenderer.enabled = enable;
+				}
 			}
 		}
 

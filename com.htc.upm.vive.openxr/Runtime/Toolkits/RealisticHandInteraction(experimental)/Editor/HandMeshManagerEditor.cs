@@ -5,7 +5,7 @@ using UnityEditor;
 namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 {
 	[CustomEditor(typeof(HandMeshManager))]
-	public class HandMeshManagerEditor : Editor
+	public class HandMeshManagerEditor : UnityEditor.Editor
 	{
 		private HandMeshManager m_HandMesh;
 		private SerializedProperty m_Handedness, m_EnableCollider, m_HandJoints;

@@ -1,35 +1,53 @@
-// ===================== 2022 HTC Corporation. All Rights Reserved. ===================
+// Copyright HTC Corporation All Rights Reserved.
 
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
-
-
 using UnityEngine.XR.OpenXR;
+
 using VIVE.OpenXR.Hand;
 
 namespace VIVE.OpenXR
 {
     public class XR_EXT_hand_tracking_impls : XR_EXT_hand_tracking_defs
     {
-        const string LOG_TAG = "VIVE.OpenXR.Android.XR_EXT_hand_tracking_impls";
-        void DEBUG(string msg) { Debug.Log(LOG_TAG + " " + msg); }
+        #region Log
+        const string LOG_TAG = "VIVE.OpenXR.XR_EXT_hand_tracking_impls";
+        StringBuilder m_sb = null;
+        StringBuilder sb
+        {
+            get
+            {
+                if (m_sb == null) { m_sb = new StringBuilder(); }
+                return m_sb;
+            }
+        }
+        void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
+        #endregion
 
-        public XR_EXT_hand_tracking_impls() { DEBUG("XR_EXT_hand_tracking_impls()"); }
+        public XR_EXT_hand_tracking_impls() { sb.Clear().Append("XR_EXT_hand_tracking_impls()"); DEBUG(sb); }
 
         private ViveHandTracking feature = null;
-        private void ASSERT_FEATURE() {
+        private bool ASSERT_FEATURE(bool init = false)
+        {
             if (feature == null) { feature = OpenXRSettings.Instance.GetFeature<ViveHandTracking>(); }
+            bool enabled = (feature != null);
+            if (init)
+            {
+                sb.Clear().Append("ViveHandTracking is ").Append((enabled ? "enabled." : "disabled."));
+                DEBUG(sb);
+            }
+            return enabled;
         }
 
         public override XrResult xrCreateHandTrackerEXT(ref XrHandTrackerCreateInfoEXT createInfo, out ulong handTracker)
         {
-            DEBUG("xrCreateHandTrackerEXT");
             XrResult result = XrResult.XR_ERROR_VALIDATION_FAILURE;
             handTracker = 0;
 
-            ASSERT_FEATURE();
-            if (feature)
+            if (ASSERT_FEATURE(true))
             {
+                sb.Clear().Append("xrCreateHandTrackerEXT"); DEBUG(sb);
                 XrHandTrackerCreateInfoEXT info = createInfo;
                 result = (XrResult)feature.CreateHandTrackerEXT(ref info, out XrHandTrackerEXT tracker);
                 if (result == XrResult.XR_SUCCESS) { handTracker = tracker; }
@@ -39,10 +57,11 @@ namespace VIVE.OpenXR
         }
         public override XrResult xrDestroyHandTrackerEXT(ulong handTracker)
         {
-            DEBUG("xrDestroyHandTrackerEXT");
-
-            ASSERT_FEATURE();
-            if (feature) { return (XrResult)feature.DestroyHandTrackerEXT(handTracker); }
+            if (ASSERT_FEATURE(true))
+            {
+                sb.Clear().Append("xrDestroyHandTrackerEXT"); DEBUG(sb);
+                return (XrResult)feature.DestroyHandTrackerEXT(handTracker);
+            }
 
             return XrResult.XR_ERROR_VALIDATION_FAILURE;
         }
@@ -53,8 +72,7 @@ namespace VIVE.OpenXR
             InitializeHandJointLocations();
             locations = m_JointLocations;
 
-            ASSERT_FEATURE();
-            if (feature)
+            if (ASSERT_FEATURE())
             {
                 XrHandJointLocationsEXT joints = m_JointLocations;
                 result = (XrResult)feature.LocateHandJointsEXT(handTracker, locateInfo, ref joints);
@@ -64,12 +82,11 @@ namespace VIVE.OpenXR
             return result;
         }
 
-        public override bool GetJointLocations(bool isLeft, out XrHandJointLocationEXT[] handJointLocation)
+        public override bool GetJointLocations(bool isLeft, out XrHandJointLocationEXT[] handJointLocation, out XrTime timestamp)
         {
-            ASSERT_FEATURE();
-            if (feature)
+            if (ASSERT_FEATURE())
             {
-                if (feature.GetJointLocations(isLeft, out XrHandJointLocationEXT[] array))
+                if (feature.GetJointLocations(isLeft, out XrHandJointLocationEXT[] array, out timestamp))
                 {
                     if (l_HandJointLocation == null) { l_HandJointLocation = new List<XrHandJointLocationEXT>(); }
                     l_HandJointLocation.Clear();
@@ -81,7 +98,12 @@ namespace VIVE.OpenXR
             }
 
             handJointLocation = s_JointLocation[isLeft];
+            timestamp = 0;
             return false;
+        }
+        public override bool GetJointLocations(bool isLeft, out XrHandJointLocationEXT[] handJointLocation)
+        {
+            return GetJointLocations(isLeft, out handJointLocation, out XrTime timestamp);
         }
     }
 }

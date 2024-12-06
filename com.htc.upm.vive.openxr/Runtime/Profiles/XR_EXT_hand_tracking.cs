@@ -1,4 +1,4 @@
-// ===================== 2022 HTC Corporation. All Rights Reserved. ===================
+// Copyright HTC Corporation All Rights Reserved.
 
 using System;
 using System.Collections.Generic;
@@ -50,10 +50,12 @@ namespace VIVE.OpenXR
         /// </summary>
         /// <param name="isLeft">True for left hand.</param>
         /// <param name="handJointLocation">Joint location data in <see href="https://registry.khronos.org/OpenXR/specs/1.0/html/xrspec.html#XrHandJointLocationEXT">XrHandJointLocationEXT</see>.</param>
+        /// <param name="timestamp">The hand tracking data timestamp.</param>
         /// <returns>True for valid data.</returns>
-        public virtual bool GetJointLocations(bool isLeft, out XrHandJointLocationEXT[] handJointLocation)
+        public virtual bool GetJointLocations(bool isLeft, out XrHandJointLocationEXT[] handJointLocation, out XrTime timestamp)
         {
             handJointLocation = s_JointLocation[isLeft];
+            timestamp = 0;
 
             if (m_JointLocations.isActive == 1)
             {
@@ -77,6 +79,16 @@ namespace VIVE.OpenXR
             }
 
             return false;
+        }
+        /// <summary>
+        /// A convenient function to retrieve the left/right hand joint <see href="https://registry.khronos.org/OpenXR/specs/1.0/html/xrspec.html#XrHandJointLocationEXT">location data</see>.
+        /// </summary>
+        /// <param name="isLeft">True for left hand.</param>
+        /// <param name="handJointLocation">Joint location data in <see href="https://registry.khronos.org/OpenXR/specs/1.0/html/xrspec.html#XrHandJointLocationEXT">XrHandJointLocationEXT</see>.</param>
+        /// <returns>True for valid data.</returns>
+        public virtual bool GetJointLocations(bool isLeft, out XrHandJointLocationEXT[] handJointLocation)
+        {
+            return GetJointLocations(isLeft, out handJointLocation, out XrTime timestamp);
         }
     }
 

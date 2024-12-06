@@ -1,14 +1,18 @@
 // Copyright HTC Corporation All Rights Reserved.
 
+using UnityEngine;
+using UnityEngine.XR;
 using UnityEngine.XR.OpenXR;
 using UnityEngine.XR.OpenXR.Features;
-using UnityEngine;
-using System.Runtime.InteropServices;
 using System;
-using System.Linq;
-using UnityEngine.XR;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using AOT;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
+
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.XR.OpenXR.Features;
@@ -18,7 +22,7 @@ namespace VIVE.OpenXR.Hand
 {
 #if UNITY_EDITOR
     [OpenXRFeature(UiName = "VIVE XR Hand Tracking",
-        BuildTargetGroups = new[] { BuildTargetGroup.Android , BuildTargetGroup.Standalone },
+        BuildTargetGroups = new[] { BuildTargetGroup.Android, BuildTargetGroup.Standalone },
         Company = "HTC",
         Desc = "Support the Hand Tracking extension.",
         DocumentationLink = "..\\Documentation",
@@ -28,10 +32,23 @@ namespace VIVE.OpenXR.Hand
 #endif
     public class ViveHandTracking : OpenXRFeature
     {
-        const string LOG_TAG = "VIVE.OpenXR.Hand.ViveHandTracking";
-        void DEBUG(string msg) { Debug.Log(LOG_TAG + " " + msg); }
-        void WARNING(string msg) { Debug.LogWarning(LOG_TAG + " " + msg); }
-        void ERROR(string msg) { Debug.LogError(LOG_TAG + " " + msg); }
+        #region Log
+        const string LOG_TAG = "VIVE.OpenXR.Hand.ViveHandTracking ";
+        StringBuilder m_sb = null;
+        StringBuilder sb
+        {
+            get
+            {
+                if (m_sb == null) { m_sb = new StringBuilder(); }
+                return m_sb;
+            }
+        }
+        void DEBUG(String msg) { Debug.Log(LOG_TAG + msg); }
+        void DEBUG(StringBuilder msg) { Debug.Log(msg); }
+        void WARNING(StringBuilder msg) { Debug.LogWarning(msg); }
+        void ERROR(String msg) { Debug.LogError(LOG_TAG + msg); }
+        void ERROR(StringBuilder msg) { Debug.LogError(msg); }
+        #endregion
 
         /// <summary>
         /// OpenXR specification <see href="https://registry.khronos.org/OpenXR/specs/1.0/html/xrspec.html#XR_EXT_hand_tracking">12.29 XR_EXT_hand_tracking</see>.
@@ -99,13 +116,14 @@ namespace VIVE.OpenXR.Hand
         {
             if (!OpenXRRuntime.IsExtensionEnabled(kOpenxrExtensionString))
             {
-                WARNING("OnInstanceCreate() " + kOpenxrExtensionString + " is NOT enabled.");
+                sb.Clear().Append(LOG_TAG).Append("OnInstanceCreate() ").Append(kOpenxrExtensionString).Append(" is NOT enabled."); WARNING(sb);
                 return false;
             }
 
             m_XrInstanceCreated = true;
             m_XrInstance = xrInstance;
-            DEBUG("OnInstanceCreate() " + m_XrInstance);
+            InputSystem.onAfterUpdate += UpdateCallback;
+            sb.Clear().Append(LOG_TAG).Append("OnInstanceCreate() ").Append(m_XrInstance); DEBUG(sb);
 
             return GetXrFunctionDelegates(m_XrInstance);
         }
@@ -115,9 +133,13 @@ namespace VIVE.OpenXR.Hand
         /// <param name="xrInstance">The instance to destroy.</param>
         protected override void OnInstanceDestroy(ulong xrInstance)
         {
-            m_XrInstanceCreated = false;
-            m_XrInstance = 0;
-            DEBUG("OnInstanceDestroy() " + xrInstance);
+            if (m_XrInstance == xrInstance)
+            {
+                m_XrInstanceCreated = false;
+                m_XrInstance = 0;
+                InputSystem.onAfterUpdate -= UpdateCallback;
+            }
+            sb.Clear().Append(LOG_TAG).Append("OnInstanceDestroy() ").Append(xrInstance); DEBUG(sb);
         }
 
         private XrSystemId m_XrSystemId = 0;
@@ -128,7 +150,7 @@ namespace VIVE.OpenXR.Hand
         protected override void OnSystemChange(ulong xrSystem)
         {
             m_XrSystemId = xrSystem;
-            DEBUG("OnSystemChange() " + m_XrSystemId);
+            sb.Clear().Append(LOG_TAG).Append("OnSystemChange() ").Append(m_XrSystemId); DEBUG(sb);
         }
 
         private bool m_XrSessionCreated = false;
@@ -146,7 +168,7 @@ namespace VIVE.OpenXR.Hand
         {
             m_XrSession = xrSession;
             m_XrSessionCreated = true;
-            DEBUG("OnSessionCreate() " + m_XrSession);
+            sb.Clear().Append(LOG_TAG).Append("OnSessionCreate() ").Append(m_XrSession); DEBUG(sb);
 
             // Enumerate supported reference space types and create the XrSpace.
             XrReferenceSpaceType[] spaces = new XrReferenceSpaceType[Enum.GetNames(typeof(XrReferenceSpaceType)).Count()];
@@ -158,7 +180,7 @@ namespace VIVE.OpenXR.Hand
                 spaces: out spaces[0]) == XrResult.XR_SUCCESS)
 #pragma warning restore 0618
             {
-                DEBUG("OnSessionCreate() spaceCountOutput: " + spaceCountOutput);
+                sb.Clear().Append(LOG_TAG).Append("OnSessionCreate() spaceCountOutput: ").Append(spaceCountOutput); DEBUG(sb);
 
                 Array.Resize(ref spaces, (int)spaceCountOutput);
 #pragma warning disable 0618
@@ -186,7 +208,7 @@ namespace VIVE.OpenXR.Hand
 #pragma warning restore 0618
                         {
                             hasReferenceSpaceLocal = true;
-                            DEBUG("OnSessionCreate() CreateReferenceSpace LOCAL: " + m_ReferenceSpaceLocal);
+                            sb.Clear().Append(LOG_TAG).Append("OnSessionCreate() CreateReferenceSpace LOCAL: ").Append(m_ReferenceSpaceLocal); DEBUG(sb);
                         }
                         else
                         {
@@ -210,7 +232,7 @@ namespace VIVE.OpenXR.Hand
 #pragma warning restore 0618
                         {
                             hasReferenceSpaceStage = true;
-                            DEBUG("OnSessionCreate() CreateReferenceSpace STAGE: " + m_ReferenceSpaceStage);
+                            sb.Clear().Append(LOG_TAG).Append("OnSessionCreate() CreateReferenceSpace STAGE: ").Append(m_ReferenceSpaceStage); DEBUG(sb);
                         }
                         else
                         {
@@ -220,7 +242,7 @@ namespace VIVE.OpenXR.Hand
                 }
                 else
                 {
-                    ERROR("OnSessionCreate() EnumerateReferenceSpaces(" + spaceCountOutput + ") failed.");
+                    sb.Clear().Append(LOG_TAG).Append("OnSessionCreate() EnumerateReferenceSpaces(").Append(spaceCountOutput).Append(") failed."); ERROR(sb);
                 }
             }
             else
@@ -233,7 +255,7 @@ namespace VIVE.OpenXR.Hand
                 {
                     hasLeftHandTracker = true;
                     leftHandTracker = value;
-                    DEBUG("OnSessionCreate() leftHandTracker " + leftHandTracker);
+                    sb.Clear().Append(LOG_TAG).Append("OnSessionCreate() leftHandTracker ").Append(leftHandTracker); DEBUG(sb);
                 }
             }
             { // right hand tracker
@@ -241,7 +263,7 @@ namespace VIVE.OpenXR.Hand
                 {
                     hasRightHandTracker = true;
                     rightHandTracker = value;
-                    DEBUG("OnSessionCreate() rightHandTracker " + rightHandTracker);
+                    sb.Clear().Append(LOG_TAG).Append("OnSessionCreate() rightHandTracker ").Append(rightHandTracker); DEBUG(sb);
                 }
             }
         }
@@ -252,7 +274,7 @@ namespace VIVE.OpenXR.Hand
         /// <param name="xrSession">The session ID to destroy.</param>
         protected override void OnSessionDestroy(ulong xrSession)
         {
-            DEBUG("OnSessionDestroy() " + xrSession);
+            sb.Clear().Append(LOG_TAG).Append("OnSessionDestroy() ").Append(xrSession); DEBUG(sb);
 
             // Reference Space is binding with xrSession so we destroy the xrSpace when xrSession is destroyed.
             if (hasReferenceSpaceLocal)
@@ -261,12 +283,12 @@ namespace VIVE.OpenXR.Hand
                 if (DestroySpace(m_ReferenceSpaceLocal) == XrResult.XR_SUCCESS)
 #pragma warning restore 0618
                 {
-                    DEBUG("OnSessionDestroy() DestroySpace LOCAL " + m_ReferenceSpaceLocal);
+                    sb.Clear().Append(LOG_TAG).Append("OnSessionDestroy() DestroySpace LOCAL ").Append(m_ReferenceSpaceLocal); DEBUG(sb);
                     m_ReferenceSpaceLocal = 0;
                 }
                 else
                 {
-                    ERROR("OnSessionDestroy() DestroySpace LOCAL " + m_ReferenceSpaceLocal + " failed.");
+                    sb.Clear().Append(LOG_TAG).Append("OnSessionDestroy() DestroySpace LOCAL ").Append(m_ReferenceSpaceLocal).Append(" failed."); ERROR(sb);
                 }
                 hasReferenceSpaceLocal = false;
             }
@@ -276,12 +298,12 @@ namespace VIVE.OpenXR.Hand
                 if (DestroySpace(m_ReferenceSpaceStage) == XrResult.XR_SUCCESS)
 #pragma warning restore 0618
                 {
-                    DEBUG("OnSessionDestroy() DestroySpace STAGE " + m_ReferenceSpaceStage);
+                    sb.Clear().Append(LOG_TAG).Append("OnSessionDestroy() DestroySpace STAGE ").Append(m_ReferenceSpaceStage); DEBUG(sb);
                     m_ReferenceSpaceStage = 0;
                 }
                 else
                 {
-                    ERROR("OnSessionDestroy() DestroySpace STAGE " + m_ReferenceSpaceStage + " failed.");
+                    sb.Clear().Append(LOG_TAG).Append("OnSessionDestroy() DestroySpace STAGE ").Append(m_ReferenceSpaceStage).Append(" failed."); ERROR(sb);
                 }
                 hasReferenceSpaceStage = false;
             }
@@ -291,11 +313,11 @@ namespace VIVE.OpenXR.Hand
             {
                 if (DestroyHandTrackerEXT(leftHandTracker) == XrResult.XR_SUCCESS)
                 {
-                    DEBUG("OnSessionDestroy() Left DestroyHandTrackerEXT " + leftHandTracker);
+                    sb.Clear().Append(LOG_TAG).Append("OnSessionDestroy() Left DestroyHandTrackerEXT ").Append(leftHandTracker); DEBUG(sb);
                 }
                 else
                 {
-                    ERROR("OnSessionDestroy() Left DestroyHandTrackerEXT " + leftHandTracker + " failed.");
+                    sb.Clear().Append(LOG_TAG).Append("OnSessionDestroy() Left DestroyHandTrackerEXT ").Append(leftHandTracker).Append(" failed."); ERROR(sb);
                 }
                 hasLeftHandTracker = false;
             }
@@ -303,11 +325,11 @@ namespace VIVE.OpenXR.Hand
             {
                 if (DestroyHandTrackerEXT(rightHandTracker) == XrResult.XR_SUCCESS)
                 {
-                    DEBUG("OnSessionDestroy() Right DestroyHandTrackerEXT " + rightHandTracker);
+                    sb.Clear().Append(LOG_TAG).Append("OnSessionDestroy() Right DestroyHandTrackerEXT ").Append(rightHandTracker); DEBUG(sb);
                 }
                 else
                 {
-                    ERROR("OnSessionDestroy() Right DestroyHandTrackerEXT " + rightHandTracker + " failed.");
+                    sb.Clear().Append(LOG_TAG).Append("OnSessionDestroy() Right DestroyHandTrackerEXT ").Append(rightHandTracker).Append(" failed."); ERROR(sb);
                 }
                 hasRightHandTracker = false;
             }
@@ -453,13 +475,13 @@ namespace VIVE.OpenXR.Hand
 
             if (createInfo.hand == XrHandEXT.XR_HAND_LEFT_EXT && hasLeftHandTracker)
             {
-                DEBUG("CreateHandTrackerEXT() Left tracker " + leftHandTracker + " already created.");
+                sb.Clear().Append(LOG_TAG).Append("CreateHandTrackerEXT() Left tracker ").Append(leftHandTracker).Append(" already created."); DEBUG(sb);
                 handTracker = leftHandTracker;
                 return XrResult.XR_SUCCESS;
             }
             if (createInfo.hand == XrHandEXT.XR_HAND_RIGHT_EXT && hasRightHandTracker)
             {
-                DEBUG("CreateHandTrackerEXT() Right tracker " + rightHandTracker + " already created.");
+                sb.Clear().Append(LOG_TAG).Append("CreateHandTrackerEXT() Right tracker ").Append(rightHandTracker).Append(" already created."); DEBUG(sb);
                 handTracker = rightHandTracker;
                 return XrResult.XR_SUCCESS;
             }
@@ -677,7 +699,7 @@ namespace VIVE.OpenXR.Hand
             bool support = false;
             for (int i = 0; i < spaceCountOutput; i++)
             {
-                DEBUG("IsReferenceSpaceTypeSupported() supported space[" + i + "]: " + spaces[i]);
+                sb.Clear().Append(LOG_TAG).Append("IsReferenceSpaceTypeSupported() supported space[").Append(i).Append("]: ").Append(spaces[i]); DEBUG(sb);
                 if (spaces[i] == space) { support = true; }
             }
 
@@ -720,7 +742,7 @@ namespace VIVE.OpenXR.Hand
                 sys_hand_tracking_prop_ptr = new IntPtr(offset);
                 handTrackingSystemProperties = (XrSystemHandTrackingPropertiesEXT)Marshal.PtrToStructure(sys_hand_tracking_prop_ptr, typeof(XrSystemHandTrackingPropertiesEXT));
 
-                DEBUG("IsHandTrackingSupported() XrSystemHandTrackingPropertiesEXT.supportsHandTracking: " + handTrackingSystemProperties.supportsHandTracking);
+                sb.Clear().Append(LOG_TAG).Append("IsHandTrackingSupported() XrSystemHandTrackingPropertiesEXT.supportsHandTracking: ").Append((UInt32)handTrackingSystemProperties.supportsHandTracking); DEBUG(sb);
                 ret = handTrackingSystemProperties.supportsHandTracking > 0;
             }
             else
@@ -736,7 +758,7 @@ namespace VIVE.OpenXR.Hand
         {
             if (!IsHandTrackingSupported())
             {
-                ERROR("CreateHandTrackers() " + (isLeft ? "Left" : "Right") + " hand tracking is NOT supported.");
+                sb.Clear().Append(LOG_TAG).Append("CreateHandTrackers() ").Append((isLeft ? "Left" : "Right")).Append(" hand tracking is NOT supported."); ERROR(sb);
                 handTracker = 0;
                 return false;
             }
@@ -748,7 +770,7 @@ namespace VIVE.OpenXR.Hand
             createInfo.handJointSet = XrHandJointSetEXT.XR_HAND_JOINT_SET_DEFAULT_EXT;
 
             var ret = CreateHandTrackerEXT(ref createInfo, out handTracker);
-            DEBUG("CreateHandTrackers() " + (isLeft ? "Left" : "Right") + " CreateHandTrackerEXT = " + ret);
+            sb.Clear().Append(LOG_TAG).Append("CreateHandTrackers() ").Append((isLeft ? "Left" : "Right")).Append(" CreateHandTrackerEXT = ").Append(ret); DEBUG(sb);
 
             return ret == XrResult.XR_SUCCESS;
         }
@@ -773,19 +795,51 @@ namespace VIVE.OpenXR.Hand
             return true;
         }
 
+        private int lastUpdateFrameL = -1, lastUpdateFrameR = -1;
+        private void UpdateCallback()
+        {
+            // Only allow updating poses once at BeforeRender & Dynamic per frame.
+            if (InputState.currentUpdateType == InputUpdateType.BeforeRender ||
+                InputState.currentUpdateType == InputUpdateType.Dynamic)
+            {
+                lastUpdateFrameL = -1;
+                lastUpdateFrameR = -1;
+            }
+        }
+        private bool AllowUpdate(bool isLeft)
+        {
+            bool allow;
+            if (isLeft)
+            {
+                allow = (lastUpdateFrameL != Time.frameCount);
+                lastUpdateFrameL = Time.frameCount;
+            }
+            else
+            {
+                allow = (lastUpdateFrameR != Time.frameCount);
+                lastUpdateFrameR = Time.frameCount;
+            }
+            return allow;
+        }
+
         /// <summary>
         /// Retrieves the <see cref="XrHandJointLocationEXT"> XrHandJointLocationEXT </see> data.
         /// </summary>
         /// <param name="isLeft">Left or right hand.</param>
         /// <param name="handJointLocation">Output parameter to retrieve <see cref="XrHandJointLocationEXT"> XrHandJointLocationEXT </see> data.</param>
+        /// <param name="timestamp">The hand tracking data timestamp.</param>
         /// <returns>True for valid data.</returns>
-        public bool GetJointLocations(bool isLeft, out XrHandJointLocationEXT[] handJointLocation)
+        public bool GetJointLocations(bool isLeft, out XrHandJointLocationEXT[] handJointLocation, out XrTime timestamp)
         {
-            bool ret = false;
             handJointLocation = isLeft ? jointLocationsL : jointLocationsR;
+            timestamp = m_frameState.predictedDisplayTime;
+            if (!AllowUpdate(isLeft)) { return true; }
 
+            bool ret = false;
             if (isLeft && !hasLeftHandTracker) { return ret; }
             if (!isLeft && !hasRightHandTracker) { return ret; }
+
+            OpenXRHelper.Trace.Begin("GetJointLocations");
 
             TrackingOriginModeFlags origin = GetTrackingOriginMode();
             if (origin == TrackingOriginModeFlags.Unknown || origin == TrackingOriginModeFlags.Unbounded) { return ret; }
@@ -831,6 +885,8 @@ namespace VIVE.OpenXR.Hand
                 locateInfo: locateInfo,
                 locations: ref locations) == XrResult.XR_SUCCESS)
             {
+                timestamp = locateInfo.time;
+
                 if (locations.isActive)
                 {
                     if (IntPtr.Size == 4)
@@ -858,7 +914,19 @@ namespace VIVE.OpenXR.Hand
             }
 
             Marshal.FreeHGlobal(locations.jointLocations);
+
+            OpenXRHelper.Trace.End();
             return ret;
+        }
+        /// <summary>
+        /// Retrieves the <see cref="XrHandJointLocationEXT"> XrHandJointLocationEXT </see> data.
+        /// </summary>
+        /// <param name="isLeft">Left or right hand.</param>
+        /// <param name="handJointLocation">Output parameter to retrieve <see cref="XrHandJointLocationEXT"> XrHandJointLocationEXT </see> data.</param>
+        /// <returns>True for valid data.</returns>
+        public bool GetJointLocations(bool isLeft, out XrHandJointLocationEXT[] handJointLocation)
+        {
+            return GetJointLocations(isLeft, out handJointLocation, out XrTime timestamp);
         }
     }
 }

@@ -21,11 +21,11 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 			if (m_DevicePose == null) { return; }
 
 			string msg = "";
-			if (Utils.GetPosePosition(m_DevicePose, out Vector3 pos, out msg))
+			if (CommonHelper.GetPosePosition(m_DevicePose, out Vector3 pos, out msg))
 			{
 				transform.localPosition = pos;
 			}
-			if (Utils.GetPoseRotation(m_DevicePose, out Quaternion rot, out msg))
+			if (CommonHelper.GetPoseRotation(m_DevicePose, out Quaternion rot, out msg))
 			{
 				transform.localRotation = rot;
 			}

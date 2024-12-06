@@ -99,6 +99,12 @@ namespace VIVE.OpenXR.CompositionLayer
 		[SerializeField]
 		public bool isExternalSurface = false;
 
+		[SerializeField]
+		public bool isCustomRects = false;
+
+		[SerializeField]
+		public CustomRectsType customRects = CustomRectsType.TopDown;
+
 		[Tooltip("Width of external surface in pixels.")]
 		[SerializeField]
 		public uint externalSurfaceWidth = 1280;
@@ -122,8 +128,12 @@ namespace VIVE.OpenXR.CompositionLayer
 		[SerializeField]
 		public bool isProtectedSurface = false;
 
-		[SerializeField]
 		public Texture texture = null;
+ 
+		private Texture m_TextureLeft => texture;
+		public Texture textureLeft { get { return m_TextureLeft; } }
+
+		public Texture textureRight = null;
 
 		[SerializeField]
 		private uint renderPriority = 0;
@@ -150,7 +160,7 @@ namespace VIVE.OpenXR.CompositionLayer
 		private MeshRenderer generatedFallbackMeshRenderer = null;
 		private MeshFilter generatedFallbackMeshFilter = null;
 
-		private LayerTextures layerTextures;
+		private LayerTextures[] layerTextures = new LayerTextures[] {null, null};
 		private Material texture2DBlitMaterial;
 
 		private GameObject compositionLayerPlaceholderPrefabGO = null;
@@ -165,10 +175,12 @@ namespace VIVE.OpenXR.CompositionLayer
 		private float previousCylinderArcLength = 1f;
 		private float previousCylinderRadius = 1f;
 		private float previousAngleOfArc = 180f;
-		private Texture previousTexture = null;
+		private Texture previousTextureLeft = null;
+		private Texture previousTextureRight = null;
 		private bool previousIsDynamicLayer = false;
 
 		private int layerID; //For native
+		private int layerIDRight; //For native
 		private bool isHeadLock = false;
 		private bool InitStatus = false;
 		private bool isInitializationComplete = false;
@@ -232,8 +244,25 @@ namespace VIVE.OpenXR.CompositionLayer
 							if (layerID != 0)
 							{
 								DEBUG("Init completed, ID: " + layerID);
-								layerTextures = new LayerTextures(imageCount);
+								layerTextures[0] = new LayerTextures(imageCount);
 								InitStatus = true;
+							}
+
+							if (textureRight != null && textureLeft != textureRight) {
+							    layerIDRight = compositionLayerFeature.CompositionLayer_Init(externalSurfaceWidth, externalSurfaceHeight, graphicsAPI, isDynamicLayer, isProtectedSurface, out imageCount, true);
+								if (layerIDRight != 0)
+							    {
+								    DEBUG("Init completed, ID right: " + layerIDRight);
+								    layerTextures[1] = new LayerTextures(imageCount);
+							    }
+							}
+							else if (isCustomRects) {
+							    layerIDRight = compositionLayerFeature.CompositionLayer_Init(externalSurfaceWidth, externalSurfaceHeight, graphicsAPI, isDynamicLayer, isProtectedSurface, out imageCount, true);
+								if (layerIDRight != 0)
+							    {
+								    DEBUG("Init completed, ID right: " + layerIDRight);
+								    layerTextures[1] = new LayerTextures(imageCount);
+							    }
 							}
 
 							taskQueue.Release(task);
@@ -243,6 +272,7 @@ namespace VIVE.OpenXR.CompositionLayer
 				CompositionLayerRenderThreadTask.IssueObtainSwapchainEvent(SetupExternalAndroidSurfaceSyncObjects);
 
 				texture = new Texture2D((int)externalSurfaceWidth, (int)externalSurfaceHeight, TextureFormat.RGBA32, false, isLinear);
+				textureRight = new Texture2D((int)externalSurfaceWidth, (int)externalSurfaceHeight, TextureFormat.RGBA32, false, isLinear);
 
 
 				DEBUG("CompositionLayerInit Ext Surf");
@@ -250,16 +280,23 @@ namespace VIVE.OpenXR.CompositionLayer
 				return true;
 			}
 
-			if (texture == null)
+			if (textureLeft == null)
 			{
 				ERROR("CompositionLayerInit: Source Texture not found, abort init.");
 				return false;
 			}
+			if (textureLeft != null && textureRight == null)
+			{
+				DEBUG("CompositionLayerInit: Using Left Texture as Right Texture.");
+				textureRight = textureLeft;
+			}
 
 			DEBUG("CompositionLayerInit");
 
-			uint textureWidth = (uint)texture.width;
-			uint textureHeight = (uint)texture.height;
+			uint textureWidth = (uint)textureLeft.width;
+			uint textureHeight = (uint)textureLeft.height;
+
+            DEBUG("Init : textureWidth = " + textureWidth + " textureHeight = " + textureHeight);
 
 			CompositionLayerRenderThreadSyncObject ObtainLayerSwapchainSyncObject = new CompositionLayerRenderThreadSyncObject(
 				(taskQueue) =>
@@ -293,8 +330,27 @@ namespace VIVE.OpenXR.CompositionLayer
 						if (layerID != 0)
 						{
 							DEBUG("Init completed, ID: " + layerID + ", Image Count: " + imageCount);
-							layerTextures = new LayerTextures(imageCount);
+							layerTextures[0] = new LayerTextures(imageCount);
 							InitStatus = true;
+						}
+						if (textureRight != null && textureLeft != textureRight) {
+						    layerIDRight = compositionLayerFeature.CompositionLayer_Init(textureWidth, textureHeight, graphicsAPI, isDynamicLayer, isProtectedSurface, out imageCount);
+
+						    if (layerIDRight != 0)
+						    {
+							    DEBUG("Init completed, ID Right: " + layerIDRight + ", Image Count: " + imageCount);
+							    layerTextures[1] = new LayerTextures(imageCount);
+						    }
+						}
+						else if (isCustomRects)
+						{
+						    layerIDRight = compositionLayerFeature.CompositionLayer_Init(textureWidth, textureHeight, graphicsAPI, isDynamicLayer, isProtectedSurface, out imageCount);
+
+						    if (layerIDRight != 0)
+						    {
+							    DEBUG("Init completed, ID Right: " + layerIDRight + ", Image Count: " + imageCount);
+							    layerTextures[1] = new LayerTextures(imageCount);
+						    }
 						}
 
 						taskQueue.Release(task);
@@ -310,18 +366,20 @@ namespace VIVE.OpenXR.CompositionLayer
 			previousCylinderArcLength = m_CylinderArcLength;
 			previousCylinderRadius = m_CylinderRadius;
 			previousAngleOfArc = m_CylinderAngleOfArc;
-			previousTexture = texture;
+			previousTextureLeft = textureLeft;
+			previousTextureRight = textureRight;
 			previousIsDynamicLayer = isDynamicLayer;
 
 			return true;
 		}
 
-		private bool textureAcquired = false;
-		private bool textureAcquiredOnce = false;
+		private bool[] textureAcquired = new bool[] {false, false};
+		private bool[] textureAcquiredOnce = new bool[] {false, false};
 		XrOffset2Di offset = new XrOffset2Di();
 		XrExtent2Di extent = new XrExtent2Di();
 		XrRect2Di rect = new XrRect2Di();
-		private bool SetLayerTexture()
+
+		private bool SetLayerTexture(int eyeid)
 		{
 			if (!isInitializationComplete || !isSynchronized) return false;
 
@@ -332,10 +390,24 @@ namespace VIVE.OpenXR.CompositionLayer
 				offset.y = (int)externalSurfaceHeight;
 				extent.width = (int)externalSurfaceWidth;
 				extent.height = (int)-externalSurfaceHeight;
+
+				if (isCustomRects && customRects == CustomRectsType.TopDown)
+			    {
+			        extent.height = (int)-externalSurfaceHeight/2;
+				    if (eyeid == 0)
+				        offset.y = (int)(externalSurfaceHeight-externalSurfaceHeight/2);
+			    }
+			    else if (isCustomRects && customRects == CustomRectsType.LeftRight)
+			    {
+			        extent.width = (int)externalSurfaceWidth/2;
+				    if (eyeid != 0)
+				        offset.x = extent.width;
+			    }
+
 				rect.offset = offset;
 				rect.extent = extent;
 
-				layerTextures.textureLayout = rect;
+				layerTextures[eyeid].textureLayout = rect;
 
 				return true; //No need to process texture queues
 			}
@@ -346,63 +418,73 @@ namespace VIVE.OpenXR.CompositionLayer
 				if (TextureParamsChanged())
 				{
 					//Destroy queues
-					DEBUG("SetLayerTexture: Texture params changed, need to re-init queues. layerID: " + layerID);
-					DestroyCompositionLayer();
+					DEBUG("SetLayerTexture: Texture params changed, need to re-init queues. layerID: " + ((eyeid ==0) ? layerID : layerIDRight));
+					if (layerID != 0)
+					{
+						DestroyCompositionLayer(0);
+						layerID = 0;
+					}
+					
+					if (layerIDRight != 0)
+					{
+						DestroyCompositionLayer(1);
+						layerIDRight = 0;
+					}
 					reinitializationNeeded = true;
 					return false;
 				}
 			}
 			else
 			{
-				ERROR("SetLayerTexture: No texture found. layerID: " + layerID);
+				ERROR("SetLayerTexture: No texture found. layerID: " + ((eyeid ==0) ? layerID : layerIDRight));
 				return false;
 			}
 
-			if (isDynamicLayer || (!isDynamicLayer && !textureAcquiredOnce))
+			if (isDynamicLayer || (!isDynamicLayer && !textureAcquiredOnce[eyeid]))
 			{
 				//Get available texture id
 				compositionLayerFeature = OpenXRSettings.Instance.GetFeature<ViveCompositionLayer>();
 				uint currentImageIndex;
 
-				IntPtr newTextureID = compositionLayerFeature.CompositionLayer_GetTexture(layerID, out currentImageIndex);
+				IntPtr newTextureID = compositionLayerFeature.CompositionLayer_GetTexture((eyeid ==0) ? layerID : layerIDRight, out currentImageIndex);
 
-				textureAcquired = true;
-				textureAcquiredOnce = true;
+				textureAcquired[eyeid] = true;
+				textureAcquiredOnce[eyeid] = true;
 
 				if (newTextureID == IntPtr.Zero)
 				{
 					ERROR("SetLayerTexture: Invalid Texture ID");
-					if (compositionLayerFeature.CompositionLayer_ReleaseTexture(layerID))
+					if (compositionLayerFeature.CompositionLayer_ReleaseTexture((eyeid ==0) ? layerID : layerIDRight))
 					{
-						textureAcquired = false;
+						textureAcquired[eyeid] = false;
 					}
 					return false;
 				}
 
 				bool textureIDUpdated = false;
-				layerTextures.currentAvailableTextureIndex = currentImageIndex;
-				IntPtr currentTextureID = layerTextures.GetCurrentAvailableTextureID();
+				layerTextures[eyeid].currentAvailableTextureIndex = currentImageIndex;
+				IntPtr currentTextureID = layerTextures[eyeid].GetCurrentAvailableTextureID();
 				if (currentTextureID == IntPtr.Zero || currentTextureID != newTextureID)
 				{
-					DEBUG("SetLayerTexture: Update Texture ID. layerID: " + layerID);
-					layerTextures.SetCurrentAvailableTextureID(newTextureID);
+					DEBUG("SetLayerTexture: Update Texture ID. layerID: " + ((eyeid ==0) ? layerID : layerIDRight));
+					layerTextures[eyeid].SetCurrentAvailableTextureID(newTextureID);
 					textureIDUpdated = true;
 				}
 
-				if (layerTextures.GetCurrentAvailableTextureID() == IntPtr.Zero)
+				if (layerTextures[eyeid].GetCurrentAvailableTextureID() == IntPtr.Zero)
 				{
 					ERROR("SetLayerTexture: Failed to get texture.");
 					return false;
 				}
 
 				// Create external texture
-				if (layerTextures.GetCurrentAvailableExternalTexture() == null || textureIDUpdated)
+				if (layerTextures[eyeid].GetCurrentAvailableExternalTexture() == null || textureIDUpdated)
 				{
 					DEBUG("SetLayerTexture: Create External Texture.");
-					layerTextures.SetCurrentAvailableExternalTexture(Texture2D.CreateExternalTexture(texture.width, texture.height, TextureFormat.RGBA32, false, isLinear, layerTextures.GetCurrentAvailableTextureID()));
+					layerTextures[eyeid].SetCurrentAvailableExternalTexture(Texture2D.CreateExternalTexture(texture.width, texture.height, TextureFormat.RGBA32, false, isLinear, layerTextures[eyeid].GetCurrentAvailableTextureID()));
 				}
 
-				if (layerTextures.externalTextures[layerTextures.currentAvailableTextureIndex] == null)
+				if (layerTextures[eyeid].externalTextures[layerTextures[eyeid].currentAvailableTextureIndex] == null)
 				{
 					ERROR("SetLayerTexture: Create External Texture Failed.");
 					return false;
@@ -411,28 +493,40 @@ namespace VIVE.OpenXR.CompositionLayer
 
 			//Set Texture Content
 
-			bool isContentSet = layerTextures.textureContentSet[layerTextures.currentAvailableTextureIndex];
+			bool isContentSet = layerTextures[eyeid].textureContentSet[layerTextures[eyeid].currentAvailableTextureIndex];
 
 			if (!isDynamicLayer && isContentSet)
 			{
 				return true;
 			}
-
-			int currentTextureWidth = layerTextures.GetCurrentAvailableExternalTexture().width;
-			int currentTextureHeight = layerTextures.GetCurrentAvailableExternalTexture().height;
+			int currentTextureWidth = layerTextures[eyeid].GetCurrentAvailableExternalTexture().width;
+			int currentTextureHeight = layerTextures[eyeid].GetCurrentAvailableExternalTexture().height;
 
 			//Set Texture Layout
 			offset.x = 0;
 			offset.y = 0;
 			extent.width = (int)currentTextureWidth;
 			extent.height = (int)currentTextureHeight;
+
+
+			if (isCustomRects && customRects == CustomRectsType.TopDown)
+			{
+			    extent.height = (int)currentTextureHeight/2;
+				if (eyeid == 0)
+				    offset.y = extent.height;
+			}
+			else if (isCustomRects && customRects == CustomRectsType.LeftRight)
+			{
+			    extent.width = (int)currentTextureWidth/2;
+				if (eyeid != 0)
+				    offset.x = extent.width;
+			}
+
 			rect.offset = offset;
 			rect.extent = extent;
+			layerTextures[eyeid].textureLayout = rect;
 
-			layerTextures.textureLayout = rect;
-
-			//Blit and copy texture
-			RenderTexture srcTexture = texture as RenderTexture;
+			RenderTexture srcTexture = ((eyeid == 0 || isCustomRects) ? textureLeft : textureRight) as RenderTexture;
 			int msaaSamples = 1;
 			if (srcTexture != null)
 			{
@@ -440,6 +534,8 @@ namespace VIVE.OpenXR.CompositionLayer
 			}
 
 			Material currentBlitMat = texture2DBlitMaterial;
+
+			DEBUG("RenderTextureDescriptor currentTextureWidth = " + currentTextureWidth + " currentTextureHeight = " + currentTextureHeight);
 
 			RenderTextureDescriptor rtDescriptor = new RenderTextureDescriptor(currentTextureWidth, currentTextureHeight, RenderTextureFormat.ARGB32, 0);
 			rtDescriptor.msaaSamples = msaaSamples;
@@ -454,8 +550,10 @@ namespace VIVE.OpenXR.CompositionLayer
 			}
 			blitTempRT.DiscardContents();
 
-			Texture dstTexture = layerTextures.GetCurrentAvailableExternalTexture();
-			Graphics.Blit(texture, blitTempRT, currentBlitMat);
+			Texture dstTexture = layerTextures[eyeid].GetCurrentAvailableExternalTexture();
+
+		    Graphics.Blit((eyeid == 0) ? textureLeft : textureRight, blitTempRT, currentBlitMat);
+
 			Graphics.CopyTexture(blitTempRT, 0, 0, dstTexture, 0, 0);
 
 			//DEBUG("Blit and CopyTexture complete.");
@@ -470,12 +568,12 @@ namespace VIVE.OpenXR.CompositionLayer
 				return false;
 			}
 
-			layerTextures.textureContentSet[layerTextures.currentAvailableTextureIndex] = true;
+			layerTextures[eyeid].textureContentSet[layerTextures[eyeid].currentAvailableTextureIndex] = true;
 
-			bool releaseTextureResult = compositionLayerFeature.CompositionLayer_ReleaseTexture(layerID);
+			bool releaseTextureResult = compositionLayerFeature.CompositionLayer_ReleaseTexture((eyeid == 0) ? layerID : layerIDRight);
 			if (releaseTextureResult)
 			{
-				textureAcquired = false;
+				textureAcquired[eyeid] = false;
 			}
 
 			return releaseTextureResult;
@@ -527,7 +625,7 @@ namespace VIVE.OpenXR.CompositionLayer
 
 		bool enabledColorScaleBiasInShader = false;
 		XrCompositionLayerColorScaleBiasKHR CompositionLayerParamsColorScaleBias = new XrCompositionLayerColorScaleBiasKHR();
-		private void SubmitCompositionLayer() //Call at onBeforeRender
+		private void SubmitCompositionLayer(int eyeid, bool botheye) //Call at onBeforeRender
 		{
 			if (!isInitializationComplete && !isLayerReadyForSubmit) return;
 			compositionLayerFeature = OpenXRSettings.Instance.GetFeature<ViveCompositionLayer>();
@@ -570,7 +668,7 @@ namespace VIVE.OpenXR.CompositionLayer
 						CompositionLayerParamsColorScaleBias.colorBias.a = 0.0f;
 					}
 
-					compositionLayerColorScaleBias.Submit_CompositionLayerColorBias(CompositionLayerParamsColorScaleBias, layerID);
+					compositionLayerColorScaleBias.Submit_CompositionLayerColorBias(CompositionLayerParamsColorScaleBias, (eyeid == 0) ? layerID : layerIDRight);
 				}
 				else if (enabledColorScaleBiasInShader) //Disable if color scale bias is no longer active
 				{
@@ -583,13 +681,13 @@ namespace VIVE.OpenXR.CompositionLayer
 				{
 					default:
 					case LayerShape.Quad:
-						compositionLayerFeature.Submit_CompositionLayerQuad(AssignCompositionLayerParamsQuad(), (OpenXR.CompositionLayer.LayerType)layerType, compositionDepth, layerID);
+						compositionLayerFeature.Submit_CompositionLayerQuad(AssignCompositionLayerParamsQuad(eyeid, botheye), (OpenXR.CompositionLayer.LayerType)layerType, compositionDepth, (eyeid == 0) ? layerID : layerIDRight);
 						break;
 					case LayerShape.Cylinder:
 						ViveCompositionLayerCylinder compositionLayerCylinderFeature = OpenXRSettings.Instance.GetFeature<ViveCompositionLayerCylinder>();
 						if (compositionLayerCylinderFeature != null && compositionLayerCylinderFeature.CylinderExtensionEnabled)
 						{
-							compositionLayerCylinderFeature.Submit_CompositionLayerCylinder(AssignCompositionLayerParamsCylinder(), (OpenXR.CompositionLayer.LayerType)layerType, compositionDepth, layerID);
+							compositionLayerCylinderFeature.Submit_CompositionLayerCylinder(AssignCompositionLayerParamsCylinder(eyeid, botheye), (OpenXR.CompositionLayer.LayerType)layerType, compositionDepth, (eyeid == 0) ? layerID : layerIDRight);
 						}
 						break;
 				}
@@ -601,22 +699,22 @@ namespace VIVE.OpenXR.CompositionLayer
 		public delegate void OnDestroyCompositionLayer();
 		public event OnDestroyCompositionLayer OnDestroyCompositionLayerDelegate = null;
 
-		private void DestroyCompositionLayer()
+		private void DestroyCompositionLayer(int eyeid)
 		{
-			if (!isInitializationComplete || layerTextures == null)
+			if (layerTextures[eyeid] == null)
 			{
 				DEBUG("DestroyCompositionLayer: Layer already destroyed/not initialized.");
 				return;
 			}
 
-			DEBUG("DestroyCompositionLayer");
+
 
 			compositionLayerFeature = OpenXRSettings.Instance.GetFeature<ViveCompositionLayer>();
 
-			if (textureAcquired)
+			if (textureAcquired[eyeid])
 			{
 				DEBUG("DestroyCompositionLayer: textureAcquired, releasing.");
-				textureAcquired = !compositionLayerFeature.CompositionLayer_ReleaseTexture(layerID);
+				textureAcquired[eyeid] = !compositionLayerFeature.CompositionLayer_ReleaseTexture((eyeid == 0) ? layerID : layerIDRight);
 			}
 
 			CompositionLayerRenderThreadSyncObject DestroyLayerSwapchainSyncObject = new CompositionLayerRenderThreadSyncObject(
@@ -631,26 +729,26 @@ namespace VIVE.OpenXR.CompositionLayer
 
 						if (!compositionLayerFeature.CompositionLayer_Destroy(task.layerID))
 						{
-							ERROR("estroyCompositionLayer: CompositionLayer_Destroy failed.");
+							ERROR("DestroyCompositionLayer: CompositionLayer_Destroy failed : " + task.layerID);
 						}
 
 						taskQueue.Release(task);
 					}
 				});
 
-			CompositionLayerRenderThreadTask.IssueDestroySwapchainEvent(DestroyLayerSwapchainSyncObject, layerID);
+			CompositionLayerRenderThreadTask.IssueDestroySwapchainEvent(DestroyLayerSwapchainSyncObject, (eyeid == 0) ? layerID : layerIDRight);
 
 			InitStatus = false;
 			isLayerReadyForSubmit = false;
 			isInitializationComplete = false;
-			textureAcquiredOnce = false;
+			textureAcquiredOnce[eyeid] = false;
 
-			foreach (Texture externalTexture in layerTextures.externalTextures)
+			foreach (Texture externalTexture in layerTextures[eyeid].externalTextures)
 			{
 				DEBUG("DestroyCompositionLayer: External textures");
 				if (externalTexture != null) Destroy(externalTexture);
 			}
-			layerTextures = null;
+			layerTextures[eyeid] = null;
 
 			if (generatedFallbackMeshFilter != null && generatedFallbackMeshFilter.mesh != null)
 			{
@@ -696,7 +794,7 @@ namespace VIVE.OpenXR.CompositionLayer
 		private List<XRInputSubsystem> inputSubsystems = new List<XRInputSubsystem>();
 		XrCompositionLayerQuad CompositionLayerParamsQuad = new XrCompositionLayerQuad();
 		XrExtent2Df quadSize = new XrExtent2Df();
-		private XrCompositionLayerQuad AssignCompositionLayerParamsQuad()
+		private XrCompositionLayerQuad AssignCompositionLayerParamsQuad(int eyeid, bool botheye)
 		{
 			compositionLayerFeature = OpenXRSettings.Instance.GetFeature<ViveCompositionLayer>();
 
@@ -722,7 +820,14 @@ namespace VIVE.OpenXR.CompositionLayer
 					break;
 			}
 
-			CompositionLayerParamsQuad.subImage.imageRect = layerTextures.textureLayout;
+			if (!botheye) {
+				if (eyeid == 0)
+				    CompositionLayerParamsQuad.eyeVisibility = XrEyeVisibility.XR_EYE_VISIBILITY_LEFT;
+			    else
+				    CompositionLayerParamsQuad.eyeVisibility = XrEyeVisibility.XR_EYE_VISIBILITY_RIGHT;
+			}
+
+			CompositionLayerParamsQuad.subImage.imageRect = layerTextures[eyeid].textureLayout;
 			CompositionLayerParamsQuad.subImage.imageArrayIndex = 0;
 			GetCompositionLayerPose(ref CompositionLayerParamsQuad.pose); //Update isHeadLock
 
@@ -762,13 +867,14 @@ namespace VIVE.OpenXR.CompositionLayer
 
 			quadSize.width = m_QuadWidth;
 			quadSize.height = m_QuadHeight;
+
 			CompositionLayerParamsQuad.size = quadSize;
 
 			return CompositionLayerParamsQuad;
 		}
 
 		XrCompositionLayerCylinderKHR CompositionLayerParamsCylinder = new XrCompositionLayerCylinderKHR();
-		private XrCompositionLayerCylinderKHR AssignCompositionLayerParamsCylinder()
+		private XrCompositionLayerCylinderKHR AssignCompositionLayerParamsCylinder(int eyeid, bool botheye)
 		{
 			compositionLayerFeature = OpenXRSettings.Instance.GetFeature<ViveCompositionLayer>();
 
@@ -830,7 +936,14 @@ namespace VIVE.OpenXR.CompositionLayer
 					break;
 			}
 
-			CompositionLayerParamsCylinder.subImage.imageRect = layerTextures.textureLayout;
+			if (!botheye) {
+				if (eyeid == 0)
+				    CompositionLayerParamsQuad.eyeVisibility = XrEyeVisibility.XR_EYE_VISIBILITY_LEFT;
+			    else
+				    CompositionLayerParamsQuad.eyeVisibility = XrEyeVisibility.XR_EYE_VISIBILITY_RIGHT;
+			}
+
+			CompositionLayerParamsCylinder.subImage.imageRect = layerTextures[eyeid].textureLayout;
 			CompositionLayerParamsCylinder.subImage.imageArrayIndex = 0;
 			GetCompositionLayerPose(ref CompositionLayerParamsCylinder.pose);
 			CompositionLayerParamsCylinder.radius = m_CylinderRadius;
@@ -960,8 +1073,20 @@ namespace VIVE.OpenXR.CompositionLayer
 
 		public void TerminateLayer()
 		{
-			DEBUG("TerminateLayer: layerID: " + layerID);
-			DestroyCompositionLayer();
+			if (layerID != 0)
+			{
+				DEBUG("TerminateLayer: layerID: " + layerID);
+				DestroyCompositionLayer(0);
+				layerID = 0;
+			}
+			
+			if (layerIDRight != 0)
+			{
+				DEBUG("TerminateLayer: layerIDRight: " + layerIDRight);
+				DestroyCompositionLayer(1);
+				layerIDRight = 0;
+			}
+			    
 
 			if (placeholderGenerated && compositionLayerPlaceholderPrefabGO != null)
 			{
@@ -977,9 +1102,10 @@ namespace VIVE.OpenXR.CompositionLayer
 
 		public bool TextureParamsChanged()
 		{
-			if (previousTexture != texture)
+			if (previousTextureLeft != textureLeft || previousTextureRight != textureRight)
 			{
-				previousTexture = texture;
+			    previousTextureLeft = textureLeft;
+				previousTextureRight = textureRight;
 				return true;
 			}
 
@@ -1395,7 +1521,14 @@ namespace VIVE.OpenXR.CompositionLayer
 				return;
 			}
 
-			if (SetLayerTexture())
+			bool isBotheye = (textureRight == null || textureLeft == textureRight);
+
+			if (isCustomRects)
+			{
+			    isBotheye = false;
+			}
+
+			if (SetLayerTexture(0))
 			{
 				isLayerReadyForSubmit = true;
 			}
@@ -1405,7 +1538,22 @@ namespace VIVE.OpenXR.CompositionLayer
 				DEBUG("Composition Layer Lifecycle OnBeforeRender: Layer not ready for submit.");
 				return;
 			}
-			SubmitCompositionLayer();
+
+			if (!isBotheye) {
+				if (SetLayerTexture(1))
+			    {
+				    isLayerReadyForSubmit = true;
+			    }
+			    if (!isLayerReadyForSubmit)
+			    {
+				    DEBUG("Composition Layer Lifecycle OnBeforeRender: Layer not ready for submit.");
+				    return;
+			    }
+			}
+
+			SubmitCompositionLayer(0, isBotheye);
+			if (!isBotheye)
+			    SubmitCompositionLayer(1, isBotheye);
 
 			isLayerReadyForSubmit = false; //reset flag after submit
 		}
@@ -1633,6 +1781,12 @@ namespace VIVE.OpenXR.CompositionLayer
 			Both = 0,
 			Left = 1,
 			Right = 2,
+		}
+
+		public enum CustomRectsType
+		{
+			LeftRight = 1,
+			TopDown = 2,
 		}
 
 #if UNITY_EDITOR
@@ -1950,6 +2104,7 @@ namespace VIVE.OpenXR.CompositionLayer
 				return radius;
 			}
 		}
+
 		#endregion
 	}
 }

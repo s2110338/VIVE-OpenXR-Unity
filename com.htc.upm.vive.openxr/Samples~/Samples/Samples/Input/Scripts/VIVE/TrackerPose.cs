@@ -172,16 +172,20 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
             if (getButton(m_Menu))
                 DEBUG("Update() " + m_Menu.name + " is pressed.");
 
-            if (tracked)
+#if !UNITY_XR_OPENXR_1_6_0
+            if (tracked) // The isTracked value of Pose will always be flase in OpenXR 1.6.0
+#endif
             {
                 transform.localPosition = position;
                 transform.localRotation = rotation;
             }
+#if !UNITY_XR_OPENXR_1_6_0
             else
             {
                 if (printIntervalLog)
                     DEBUG("Update() Tracker is not tracked.");
             }
+#endif
         }
     }
 }
