@@ -281,7 +281,8 @@ namespace VIVE.OpenXR.Editor
 					}
 				}
 
-				foreach (var feature in settings.GetFeatures<OpenXRFeature>())
+				var features = settings.GetFeatures<OpenXRFeature>();
+				foreach (var feature in features)
 				{
 					if (!feature.enabled) { continue; }
 
@@ -307,6 +308,17 @@ namespace VIVE.OpenXR.Editor
 							{
 								enableEyetracking = true;
 								enableLipexpression = true;
+							}
+						}
+					}
+
+					if (feature is VIVEFocus3Feature)
+					{
+						for (int i = 0; i < features.Length; i++)
+						{
+							if (features[i] is Enterprise.ViveEnterpriseCommand)
+							{
+								features[i].enabled = true;
 							}
 						}
 					}

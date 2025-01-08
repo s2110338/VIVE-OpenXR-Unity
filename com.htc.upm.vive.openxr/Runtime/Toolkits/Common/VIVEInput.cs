@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.OpenXR;
@@ -107,6 +106,12 @@ namespace VIVE.OpenXR.Toolkits.Common
 
     public static class VIVEInput
     {
+        private const string kFloatType = "float";
+        private const string kVector2Type = "Vector2";
+        private const string kVector3Type = "Vector3";
+        private const string kQuaternionType = "Quaternion";
+        private const string kPoseType = "Pose";
+
         private struct InputActionMapping
         {
             public DeviceCategory device;
@@ -115,15 +120,18 @@ namespace VIVE.OpenXR.Toolkits.Common
             public HandEvent handEvent;
             public InputAction inputAction { get; private set; }
 
-            public InputActionMapping(string bindingPath, DeviceCategory device,
-                                      PoseState poseState = PoseState.None, ButtonEvent buttonEvent = ButtonEvent.None, HandEvent handEvent = HandEvent.None)
+            public InputActionMapping(string in_BindingPath, DeviceCategory in_Device,
+                                      PoseState in_PoseState = PoseState.None,
+                                      ButtonEvent in_ButtonEvent = ButtonEvent.None,
+                                      HandEvent in_HandEvent = HandEvent.None,
+                                      string in_Type = "")
             {
-                inputAction = new InputAction(binding: bindingPath);
+                inputAction = new InputAction(binding: in_BindingPath, expectedControlType: in_Type);
                 inputAction.Enable();
-                this.device = device;
-                this.poseState = poseState;
-                this.buttonEvent = buttonEvent;
-                this.handEvent = handEvent;
+                this.device = in_Device;
+                this.poseState = in_PoseState;
+                this.buttonEvent = in_ButtonEvent;
+                this.handEvent = in_HandEvent;
             }
 
             public static InputActionMapping Identify => new InputActionMapping("", DeviceCategory.None);
@@ -150,11 +158,11 @@ namespace VIVE.OpenXR.Toolkits.Common
             public Vector3 position { get; private set; }
             public Quaternion rotation { get; private set; }
 
-            public JointData(bool isValid, Vector3 position, Quaternion rotation)
+            public JointData(bool in_IsValid, Vector3 in_Position, Quaternion in_Rotation)
             {
-                this.isValid = isValid;
-                this.position = position;
-                this.rotation = rotation;
+                this.isValid = in_IsValid;
+                this.position = in_Position;
+                this.rotation = in_Rotation;
             }
 
             public static JointData Identify => new JointData(false, Vector3.zero, Quaternion.identity);
@@ -164,18 +172,44 @@ namespace VIVE.OpenXR.Toolkits.Common
             public bool isTracked { get; private set; }
             public int updateTime { get; private set; }
             public JointData[] joints { get; private set; }
+            private JointData[] jointBuffer;
 
-            public HandData(JointData[] joints)
+            public HandData(JointData[] in_Joints)
             {
-                this.joints = joints;
-                isTracked = !this.joints.Any(x => x.isValid == false);
+                jointBuffer = new JointData[(int)HandJointType.Count];
+                for (int i = 0; i < in_Joints.Length; i++)
+                {
+                    jointBuffer[i] = in_Joints[i];
+                }
+                this.joints = jointBuffer;
+                isTracked = true;
+                for (int i = 0; i < this.joints.Length; i++)
+                {
+                    if (!this.joints[i].isValid)
+                    {
+                        isTracked = false;
+                        break;
+                    }
+                }
                 updateTime = Time.frameCount;
             }
 
-            public void Update(JointData[] joints)
+            public void Update(JointData[] in_Joints)
             {
-                this.joints = joints;
-                isTracked = !this.joints.Any(x => x.isValid == false);
+                for (int i = 0; i < in_Joints.Length; i++)
+                {
+                    jointBuffer[i] = in_Joints[i];
+                }
+                this.joints = jointBuffer;
+                isTracked = true;
+                for (int i = 0; i < this.joints.Length; i++)
+                {
+                    if (!this.joints[i].isValid)
+                    {
+                        isTracked = false;
+                        break;
+                    }
+                }
                 updateTime = Time.frameCount;
             }
 
@@ -193,12 +227,16 @@ namespace VIVE.OpenXR.Toolkits.Common
             }
         }
 
-        private static bool isInitInputActions = false;
-        private static List<InputActionMapping> inputActions = new List<InputActionMapping>();
-        private static HandData leftHand = HandData.Identify;
-        private static HandData rightHand = HandData.Identify;
+        private static bool m_IsInitInputActions = false;
+        private static bool m_IsSupportViveHand = false;
+        private static bool m_IsSupportXrHand = false;
+        private static List<InputActionMapping> s_InputActions = new List<InputActionMapping>();
+        private static HandData m_LeftHand = HandData.Identify;
+        private static HandData m_RightHand = HandData.Identify;
+        private static JointData[] m_JointBuffer = new JointData[(int)HandJointType.Count];
 #if UNITY_XR_HANDS
-        private static XRHandSubsystem handSubsystem = null;
+        private static XRHandSubsystem m_HandSubsystem = null;
+        private static List<XRHandSubsystem> m_HandSubsystems = new List<XRHandSubsystem>();
 #endif
 
         #region Public Interface
@@ -221,18 +259,16 @@ namespace VIVE.OpenXR.Toolkits.Common
             }
             else
             {
-                InputActionMapping inputActionMapping = inputActions.FirstOrDefault(x => x.device == device && x.poseState == poseState);
-				if (inputActionMapping == null) { return false; }
-
-				try
+                if (GetInputActionMapping(device, poseState, out InputActionMapping inputActionMapping))
                 {
-                    eventResult = inputActionMapping.inputAction.ReadValue<float>() > 0;
-                    return true;
+                    var inputAction = inputActionMapping.inputAction;
+                    if (inputAction != null && inputAction.enabled && inputAction.expectedControlType == kFloatType)
+                    {
+                        eventResult = inputActionMapping.inputAction.ReadValue<float>() > 0;
+                        return true;
+                    }
                 }
-                catch (InvalidOperationException)
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -255,18 +291,16 @@ namespace VIVE.OpenXR.Toolkits.Common
             }
             else
             {
-                InputActionMapping inputActionMapping = inputActions.FirstOrDefault(x => x.device == device && x.poseState == poseState);
-				if (inputActionMapping == null) { return false; }
-
-				try
+                if (GetInputActionMapping(device, poseState, out InputActionMapping inputActionMapping))
                 {
-                    eventResult = inputActionMapping.inputAction.ReadValue<Vector3>();
-                    return true;
+                    var inputAction = inputActionMapping.inputAction;
+                    if (inputAction != null && inputAction.enabled && inputAction.expectedControlType == kVector3Type)
+                    {
+                        eventResult = inputActionMapping.inputAction.ReadValue<Vector3>();
+                        return true;
+                    }
                 }
-                catch (InvalidOperationException)
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -289,18 +323,16 @@ namespace VIVE.OpenXR.Toolkits.Common
             }
             else
             {
-                InputActionMapping inputActionMapping = inputActions.FirstOrDefault(x => x.device == device && x.poseState == poseState);
-                if (inputActionMapping == null) { return false; }
-
-                try
+                if (GetInputActionMapping(device, poseState, out InputActionMapping inputActionMapping))
                 {
-                    eventResult = inputActionMapping.inputAction.ReadValue<Quaternion>();
-                    return true;
+                    var inputAction = inputActionMapping.inputAction;
+                    if (inputAction != null && inputAction.enabled && inputAction.expectedControlType == kQuaternionType)
+                    {
+                        eventResult = inputActionMapping.inputAction.ReadValue<Quaternion>();
+                        return true;
+                    }
                 }
-                catch (InvalidOperationException)
-                {
-                    return false;
-                }
+                return false;
             }
         }
 
@@ -315,11 +347,14 @@ namespace VIVE.OpenXR.Toolkits.Common
         {
             CheckInitialize();
             eventResult = false;
-            InputActionMapping inputActionMapping = inputActions.FirstOrDefault(x => x.device == GetController(handedness) && x.buttonEvent == buttonEvent);
-            if (inputActionMapping != null)
+            if (GetInputActionMapping(GetController(handedness), buttonEvent, out InputActionMapping inputActionMapping))
             {
-                eventResult = inputActionMapping.inputAction.WasPressedThisFrame();
-                return true;
+                var inputAction = inputActionMapping.inputAction;
+                if (inputAction != null && inputAction.enabled && inputAction.expectedControlType == kFloatType)
+                {
+                    eventResult = inputActionMapping.inputAction.WasPressedThisFrame();
+                    return true;
+                }
             }
             return false;
         }
@@ -335,11 +370,14 @@ namespace VIVE.OpenXR.Toolkits.Common
         {
             CheckInitialize();
             eventResult = false;
-            InputActionMapping inputActionMapping = inputActions.FirstOrDefault(x => x.device == GetController(handedness) && x.buttonEvent == buttonEvent);
-            if (inputActionMapping != null)
+            if (GetInputActionMapping(GetController(handedness), buttonEvent, out InputActionMapping inputActionMapping))
             {
-                eventResult = inputActionMapping.inputAction.WasReleasedThisFrame();
-                return true;
+                var inputAction = inputActionMapping.inputAction;
+                if (inputAction != null && inputAction.enabled && inputAction.expectedControlType == kFloatType)
+                {
+                    eventResult = inputActionMapping.inputAction.WasReleasedThisFrame();
+                    return true;
+                }
             }
             return false;
         }
@@ -355,21 +393,16 @@ namespace VIVE.OpenXR.Toolkits.Common
         {
             CheckInitialize();
             eventResult = false;
-            InputActionMapping inputActionMapping = inputActions.FirstOrDefault(x => x.device == GetController(handedness) && x.buttonEvent == buttonEvent);
-            if (inputActionMapping != null)
+            if (GetInputActionMapping(GetController(handedness), buttonEvent, out InputActionMapping inputActionMapping))
             {
-                try
+                var inputAction = inputActionMapping.inputAction;
+                if (inputAction != null && inputAction.enabled && inputAction.expectedControlType == kFloatType)
                 {
                     eventResult = inputActionMapping.inputAction.ReadValue<float>() == 1;
                     return true;
                 }
-                catch (InvalidOperationException)
-                {
-                    return false;
-                }
             }
             return false;
-
         }
 
         /// <summary>
@@ -383,21 +416,16 @@ namespace VIVE.OpenXR.Toolkits.Common
         {
             CheckInitialize();
             eventResult = 0f;
-            InputActionMapping inputActionMapping = inputActions.FirstOrDefault(x => x.device == GetController(handedness) && x.buttonEvent == buttonEvent);
-            if (inputActionMapping != null)
+            if (GetInputActionMapping(GetController(handedness), buttonEvent, out InputActionMapping inputActionMapping))
             {
-                try
+                var inputAction = inputActionMapping.inputAction;
+                if (inputAction != null && inputAction.enabled && inputAction.expectedControlType == kFloatType)
                 {
                     eventResult = inputActionMapping.inputAction.ReadValue<float>();
                     return true;
                 }
-                catch (InvalidOperationException)
-                {
-                    return false;
-                }
             }
             return false;
-
         }
 
         /// <summary>
@@ -411,17 +439,13 @@ namespace VIVE.OpenXR.Toolkits.Common
         {
             CheckInitialize();
             eventResult = Vector2.zero;
-            InputActionMapping inputActionMapping = inputActions.FirstOrDefault(x => x.device == GetController(handedness) && x.buttonEvent == buttonEvent);
-            if (inputActionMapping != null)
+            if (GetInputActionMapping(GetController(handedness), buttonEvent, out InputActionMapping inputActionMapping))
             {
-                try
+                var inputAction = inputActionMapping.inputAction;
+                if (inputAction != null && inputAction.enabled && inputAction.expectedControlType == kVector2Type)
                 {
                     eventResult = inputActionMapping.inputAction.ReadValue<Vector2>();
                     return true;
-                }
-                catch (InvalidOperationException)
-                {
-                    return false;
                 }
             }
             return false;
@@ -438,17 +462,13 @@ namespace VIVE.OpenXR.Toolkits.Common
         {
             CheckInitialize();
             eventResult = 0;
-            InputActionMapping inputActionMapping = inputActions.FirstOrDefault(x => x.device == GetHand(handedness) && x.handEvent == handEvent);
-            if (inputActionMapping != null)
+            if (GetInputActionMapping(GetHand(handedness), handEvent, out InputActionMapping inputActionMapping))
             {
-                try
+                var inputAction = inputActionMapping.inputAction;
+                if (inputAction != null && inputAction.enabled && inputAction.expectedControlType == kFloatType)
                 {
                     eventResult = inputActionMapping.inputAction.ReadValue<float>();
                     return true;
-                }
-                catch (InvalidOperationException)
-                {
-                    return false;
                 }
             }
             return false;
@@ -465,18 +485,18 @@ namespace VIVE.OpenXR.Toolkits.Common
         {
             CheckInitialize();
             eventResult = Pose.identity;
-            InputActionMapping inputActionMapping = inputActions.FirstOrDefault(x => x.device == GetHand(handedness) && x.handEvent == handEvent);
-            if (inputActionMapping != null)
+            if (GetInputActionMapping(GetHand(handedness), handEvent, out InputActionMapping inputActionMapping))
             {
-                try
+                var inputAction = inputActionMapping.inputAction;
+                if (inputAction != null && inputAction.enabled && inputAction.expectedControlType == kPoseType)
                 {
+# if USE_INPUT_SYSTEM_POSE_CONTROL
+                    UnityEngine.InputSystem.XR.PoseState pose = inputActionMapping.inputAction.ReadValue<UnityEngine.InputSystem.XR.PoseState>();
+#else
                     UnityEngine.XR.OpenXR.Input.Pose pose = inputActionMapping.inputAction.ReadValue<UnityEngine.XR.OpenXR.Input.Pose>();
+#endif
                     eventResult = new Pose(pose.position, pose.rotation);
                     return true;
-                }
-                catch (InvalidOperationException)
-                {
-                    return false;
                 }
             }
             return false;
@@ -495,13 +515,13 @@ namespace VIVE.OpenXR.Toolkits.Common
             jointPose = Pose.identity;
             if (handedness == Handedness.Left)
             {
-                jointPose = new Pose(leftHand.joints[(int)joint].position, leftHand.joints[(int)joint].rotation);
-                return leftHand.joints[(int)joint].isValid;
+                jointPose = new Pose(m_LeftHand.joints[(int)joint].position, m_LeftHand.joints[(int)joint].rotation);
+                return m_LeftHand.joints[(int)joint].isValid;
             }
             else
             {
-                jointPose = new Pose(rightHand.joints[(int)joint].position, rightHand.joints[(int)joint].rotation);
-                return rightHand.joints[(int)joint].isValid;
+                jointPose = new Pose(m_RightHand.joints[(int)joint].position, m_RightHand.joints[(int)joint].rotation);
+                return m_RightHand.joints[(int)joint].isValid;
             }
         }
 
@@ -513,24 +533,27 @@ namespace VIVE.OpenXR.Toolkits.Common
         public static bool IsHandTracked(Handedness handedness)
         {
             CheckHandUpdated();
-            return handedness == Handedness.Left ? leftHand.isTracked : rightHand.isTracked;
+            return handedness == Handedness.Left ? m_LeftHand.isTracked : m_RightHand.isTracked;
         }
 
         public static bool IsHandValidate()
         {
-            ViveHandTracking viveHand = OpenXRSettings.Instance.GetFeature<ViveHandTracking>();
-            if (viveHand)
+            if (!m_IsInitInputActions)
             {
-                return true;
-            }
+                ViveHandTracking viveHand = OpenXRSettings.Instance.GetFeature<ViveHandTracking>();
+                if (viveHand)
+                {
+                    m_IsSupportViveHand = true;
+                }
 #if UNITY_XR_HANDS
-            HandTracking xrHand = OpenXRSettings.Instance.GetFeature<HandTracking>();
-            if (xrHand)
-            {
-                return true;
-            }
+                HandTracking xrHand = OpenXRSettings.Instance.GetFeature<HandTracking>();
+                if (xrHand)
+                {
+                    m_IsSupportXrHand = true;
+                }
 #endif
-            return false;
+            }
+            return m_IsSupportViveHand || m_IsSupportXrHand;
         }
 
         #endregion
@@ -538,192 +561,233 @@ namespace VIVE.OpenXR.Toolkits.Common
         [RuntimeInitializeOnLoadMethod]
         private static bool CheckInitialize()
         {
-            if (!isInitInputActions)
+            if (!m_IsInitInputActions)
             {
                 Initialized();
-                isInitInputActions = true;
+                IsHandValidate();
+                m_IsInitInputActions = true;
             }
-            return isInitInputActions;
+            return m_IsInitInputActions;
         }
 
         private static void Initialized()
         {
             #region Head
-            inputActions.Add(new InputActionMapping("<XRHMD>/isTracked", DeviceCategory.HMD, poseState: PoseState.IsTracked));
-            inputActions.Add(new InputActionMapping("<XRHMD>/centerEyePosition", DeviceCategory.HMD, poseState: PoseState.Position));
-            inputActions.Add(new InputActionMapping("<XRHMD>/centerEyeRotation", DeviceCategory.HMD, poseState: PoseState.Rotation));
-            inputActions.Add(new InputActionMapping("<XRHMD>/centerEyeVelocity", DeviceCategory.HMD, poseState: PoseState.Velocity));
-            inputActions.Add(new InputActionMapping("<XRHMD>/centerEyeAngularVelocity", DeviceCategory.HMD, poseState: PoseState.AngularVelocity));
-            inputActions.Add(new InputActionMapping("<XRHMD>/centerEyeAcceleration", DeviceCategory.HMD, poseState: PoseState.Acceleration));
-            inputActions.Add(new InputActionMapping("<XRHMD>/centerEyeAngularAcceleration", DeviceCategory.HMD, poseState: PoseState.AngularAcceleration));
+            s_InputActions.Add(new InputActionMapping("<XRHMD>/isTracked", DeviceCategory.HMD, in_PoseState: PoseState.IsTracked, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRHMD>/centerEyePosition", DeviceCategory.HMD, in_PoseState: PoseState.Position, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRHMD>/centerEyeRotation", DeviceCategory.HMD, in_PoseState: PoseState.Rotation, in_Type: kQuaternionType));
+            s_InputActions.Add(new InputActionMapping("<XRHMD>/centerEyeVelocity", DeviceCategory.HMD, in_PoseState: PoseState.Velocity, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRHMD>/centerEyeAngularVelocity", DeviceCategory.HMD, in_PoseState: PoseState.AngularVelocity, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRHMD>/centerEyeAcceleration", DeviceCategory.HMD, in_PoseState: PoseState.Acceleration, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRHMD>/centerEyeAngularAcceleration", DeviceCategory.HMD, in_PoseState: PoseState.AngularAcceleration, in_Type: kVector3Type));
             #endregion
             #region Eye
-            inputActions.Add(new InputActionMapping("<EyeGaze>/pose/isTracked", DeviceCategory.CenterEye, poseState: PoseState.IsTracked));
-            inputActions.Add(new InputActionMapping("<EyeGaze>/pose/position", DeviceCategory.CenterEye, poseState: PoseState.Position));
-            inputActions.Add(new InputActionMapping("<EyeGaze>/pose/rotation", DeviceCategory.CenterEye, poseState: PoseState.Rotation));
-            inputActions.Add(new InputActionMapping("<EyeGaze>/pose/velocity", DeviceCategory.CenterEye, poseState: PoseState.Velocity));
-            inputActions.Add(new InputActionMapping("<EyeGaze>/pose/angularVelocity", DeviceCategory.CenterEye, poseState: PoseState.AngularVelocity));
+            s_InputActions.Add(new InputActionMapping("<EyeGaze>/pose/isTracked", DeviceCategory.CenterEye, in_PoseState: PoseState.IsTracked, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<EyeGaze>/pose/position", DeviceCategory.CenterEye, in_PoseState: PoseState.Position, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<EyeGaze>/pose/rotation", DeviceCategory.CenterEye, in_PoseState: PoseState.Rotation, in_Type: kQuaternionType));
+            s_InputActions.Add(new InputActionMapping("<EyeGaze>/pose/velocity", DeviceCategory.CenterEye, in_PoseState: PoseState.Velocity, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<EyeGaze>/pose/angularVelocity", DeviceCategory.CenterEye, in_PoseState: PoseState.AngularVelocity, in_Type: kVector3Type));
             #endregion
             #region Controller
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/isTracked", DeviceCategory.LeftController, poseState: PoseState.IsTracked));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/pointerPosition", DeviceCategory.LeftController, poseState: PoseState.Position));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/pointerRotation", DeviceCategory.LeftController, poseState: PoseState.Rotation));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/deviceVelocity", DeviceCategory.LeftController, poseState: PoseState.Velocity));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/deviceAngularVelocity", DeviceCategory.LeftController, poseState: PoseState.AngularVelocity));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/deviceAcceleration", DeviceCategory.LeftController, poseState: PoseState.Acceleration));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/deviceAngularAcceleration", DeviceCategory.LeftController, poseState: PoseState.AngularAcceleration));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{grip}", DeviceCategory.LeftController, buttonEvent: ButtonEvent.GripValue));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{gripButton}", DeviceCategory.LeftController, buttonEvent: ButtonEvent.GripPress));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{trigger}", DeviceCategory.LeftController, buttonEvent: ButtonEvent.TriggerValue));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/triggerTouched", DeviceCategory.LeftController, buttonEvent: ButtonEvent.TriggerTouch));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{triggerButton}", DeviceCategory.LeftController, buttonEvent: ButtonEvent.TriggerPress));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{primary2DAxis}", DeviceCategory.LeftController, buttonEvent: ButtonEvent.Primary2DAxisValue));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{primary2DAxisTouch}", DeviceCategory.LeftController, buttonEvent: ButtonEvent.Primary2DAxisTouch));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{primary2DAxisClick}", DeviceCategory.LeftController, buttonEvent: ButtonEvent.Primary2DAxisPress));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{secondary2DAxis}", DeviceCategory.LeftController, buttonEvent: ButtonEvent.Secondary2DAxisValue));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{secondary2DAxisTouch}", DeviceCategory.LeftController, buttonEvent: ButtonEvent.Secondary2DAxisTouch));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{secondary2DAxisClick}", DeviceCategory.LeftController, buttonEvent: ButtonEvent.Secondary2DAxisPress));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{primaryButton}", DeviceCategory.LeftController, buttonEvent: ButtonEvent.PrimaryButton));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{secondaryButton}", DeviceCategory.LeftController, buttonEvent: ButtonEvent.SecondaryButton));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/parkingTouched", DeviceCategory.LeftController, buttonEvent: ButtonEvent.ParkingTouch));
-            inputActions.Add(new InputActionMapping("<XRController>{LeftHand}/menu", DeviceCategory.LeftController, buttonEvent: ButtonEvent.Menu));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/isTracked", DeviceCategory.LeftController, in_PoseState: PoseState.IsTracked, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/pointerPosition", DeviceCategory.LeftController, in_PoseState: PoseState.Position, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/pointerRotation", DeviceCategory.LeftController, in_PoseState: PoseState.Rotation, in_Type: kQuaternionType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/deviceVelocity", DeviceCategory.LeftController, in_PoseState: PoseState.Velocity, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/deviceAngularVelocity", DeviceCategory.LeftController, in_PoseState: PoseState.AngularVelocity, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/deviceAcceleration", DeviceCategory.LeftController, in_PoseState: PoseState.Acceleration, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/deviceAngularAcceleration", DeviceCategory.LeftController, in_PoseState: PoseState.AngularAcceleration, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{grip}", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.GripValue, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{gripButton}", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.GripPress, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{trigger}", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.TriggerValue, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/triggerTouched", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.TriggerTouch, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{triggerButton}", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.TriggerPress, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{primary2DAxis}", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.Primary2DAxisValue, in_Type: kVector2Type));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{primary2DAxisTouch}", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.Primary2DAxisTouch, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{primary2DAxisClick}", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.Primary2DAxisPress, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{secondary2DAxis}", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.Secondary2DAxisValue, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{secondary2DAxisTouch}", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.Secondary2DAxisTouch, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{secondary2DAxisClick}", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.Secondary2DAxisPress, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{primaryButton}", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.PrimaryButton, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/{secondaryButton}", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.SecondaryButton, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/parkingTouched", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.ParkingTouch, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{LeftHand}/menu", DeviceCategory.LeftController, in_ButtonEvent: ButtonEvent.Menu, in_Type: kFloatType));
 
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/isTracked", DeviceCategory.RightController, poseState: PoseState.IsTracked));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/pointerPosition", DeviceCategory.RightController, poseState: PoseState.Position));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/pointerRotation", DeviceCategory.RightController, poseState: PoseState.Rotation));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/deviceVelocity", DeviceCategory.RightController, poseState: PoseState.Velocity));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/deviceAngularVelocity", DeviceCategory.RightController, poseState: PoseState.AngularVelocity));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/deviceAcceleration", DeviceCategory.RightController, poseState: PoseState.Acceleration));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/deviceAngularAcceleration", DeviceCategory.RightController, poseState: PoseState.AngularAcceleration));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/{grip}", DeviceCategory.RightController, buttonEvent: ButtonEvent.GripValue));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/{gripButton}", DeviceCategory.RightController, buttonEvent: ButtonEvent.GripPress));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/{trigger}", DeviceCategory.RightController, buttonEvent: ButtonEvent.TriggerValue));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/triggerTouched", DeviceCategory.RightController, buttonEvent: ButtonEvent.TriggerTouch));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/{triggerButton}", DeviceCategory.RightController, buttonEvent: ButtonEvent.TriggerPress));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/{primary2DAxis}", DeviceCategory.RightController, buttonEvent: ButtonEvent.Primary2DAxisValue));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/{primary2DAxisTouch}", DeviceCategory.RightController, buttonEvent: ButtonEvent.Primary2DAxisTouch));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/{primary2DAxisClick}", DeviceCategory.RightController, buttonEvent: ButtonEvent.Primary2DAxisPress));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/{secondary2DAxis}", DeviceCategory.RightController, buttonEvent: ButtonEvent.Secondary2DAxisValue));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/{secondary2DAxisTouch}", DeviceCategory.RightController, buttonEvent: ButtonEvent.Secondary2DAxisTouch));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/{secondary2DAxisClick}", DeviceCategory.RightController, buttonEvent: ButtonEvent.Secondary2DAxisPress));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/{primaryButton}", DeviceCategory.RightController, buttonEvent: ButtonEvent.PrimaryButton));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/{secondaryButton}", DeviceCategory.RightController, buttonEvent: ButtonEvent.SecondaryButton));
-            inputActions.Add(new InputActionMapping("<XRController>{RightHand}/parkingTouched", DeviceCategory.RightController, buttonEvent: ButtonEvent.ParkingTouch));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/isTracked", DeviceCategory.RightController, in_PoseState: PoseState.IsTracked, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/pointerPosition", DeviceCategory.RightController, in_PoseState: PoseState.Position, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/pointerRotation", DeviceCategory.RightController, in_PoseState: PoseState.Rotation, in_Type: kQuaternionType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/deviceVelocity", DeviceCategory.RightController, in_PoseState: PoseState.Velocity, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/deviceAngularVelocity", DeviceCategory.RightController, in_PoseState: PoseState.AngularVelocity, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/deviceAcceleration", DeviceCategory.RightController, in_PoseState: PoseState.Acceleration, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/deviceAngularAcceleration", DeviceCategory.RightController, in_PoseState: PoseState.AngularAcceleration, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/{grip}", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.GripValue, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/{gripButton}", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.GripPress, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/{trigger}", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.TriggerValue, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/triggerTouched", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.TriggerTouch, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/{triggerButton}", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.TriggerPress, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/{primary2DAxis}", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.Primary2DAxisValue, in_Type: kVector2Type));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/{primary2DAxisTouch}", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.Primary2DAxisTouch, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/{primary2DAxisClick}", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.Primary2DAxisPress, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/{secondary2DAxis}", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.Secondary2DAxisValue, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/{secondary2DAxisTouch}", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.Secondary2DAxisTouch, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/{secondary2DAxisClick}", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.Secondary2DAxisPress, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/{primaryButton}", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.PrimaryButton, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/{secondaryButton}", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.SecondaryButton, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<XRController>{RightHand}/parkingTouched", DeviceCategory.RightController, in_ButtonEvent: ButtonEvent.ParkingTouch, in_Type: kFloatType));
             #endregion
             #region Hand
-            inputActions.Add(new InputActionMapping("<ViveHandInteraction>{LeftHand}/selectValue", DeviceCategory.LeftHand, handEvent: HandEvent.PinchValue));
-            inputActions.Add(new InputActionMapping("<ViveHandInteraction>{LeftHand}/pointerPose", DeviceCategory.LeftHand, handEvent: HandEvent.PinchPose));
-            inputActions.Add(new InputActionMapping("<ViveHandInteraction>{LeftHand}/gripValue", DeviceCategory.LeftHand, handEvent: HandEvent.GraspValue));
-            inputActions.Add(new InputActionMapping("<ViveHandInteraction>{LeftHand}/devicePose", DeviceCategory.LeftHand, handEvent: HandEvent.GraspPose));
+            s_InputActions.Add(new InputActionMapping("<ViveHandInteraction>{LeftHand}/selectValue", DeviceCategory.LeftHand, in_HandEvent: HandEvent.PinchValue, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<ViveHandInteraction>{LeftHand}/pointerPose", DeviceCategory.LeftHand, in_HandEvent: HandEvent.PinchPose, in_Type: kPoseType));
+            s_InputActions.Add(new InputActionMapping("<ViveHandInteraction>{LeftHand}/gripValue", DeviceCategory.LeftHand, in_HandEvent: HandEvent.GraspValue, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<ViveHandInteraction>{LeftHand}/devicePose", DeviceCategory.LeftHand, in_HandEvent: HandEvent.GraspPose, in_Type: kPoseType));
 
-            inputActions.Add(new InputActionMapping("<ViveHandInteraction>{RightHand}/selectValue", DeviceCategory.RightHand, handEvent: HandEvent.PinchValue));
-            inputActions.Add(new InputActionMapping("<ViveHandInteraction>{RightHand}/pointerPose", DeviceCategory.RightHand, handEvent: HandEvent.PinchPose));
-            inputActions.Add(new InputActionMapping("<ViveHandInteraction>{RightHand}/gripValue", DeviceCategory.RightHand, handEvent: HandEvent.GraspValue));
-            inputActions.Add(new InputActionMapping("<ViveHandInteraction>{RightHand}/devicePose", DeviceCategory.RightHand, handEvent: HandEvent.GraspPose));
+            s_InputActions.Add(new InputActionMapping("<ViveHandInteraction>{RightHand}/selectValue", DeviceCategory.RightHand, in_HandEvent: HandEvent.PinchValue, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<ViveHandInteraction>{RightHand}/pointerPose", DeviceCategory.RightHand, in_HandEvent: HandEvent.PinchPose, in_Type: kPoseType));
+            s_InputActions.Add(new InputActionMapping("<ViveHandInteraction>{RightHand}/gripValue", DeviceCategory.RightHand, in_HandEvent: HandEvent.GraspValue, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<ViveHandInteraction>{RightHand}/devicePose", DeviceCategory.RightHand, in_HandEvent: HandEvent.GraspPose, in_Type: kPoseType));
             #endregion
             #region Tracker
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 0}/devicePose/isTracked", DeviceCategory.Tracker0, poseState: PoseState.IsTracked));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 0}/devicePosition", DeviceCategory.Tracker0, poseState: PoseState.Position));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 0}/deviceRotation", DeviceCategory.Tracker0, poseState: PoseState.Rotation));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 0}/devicePose/velocity", DeviceCategory.Tracker0, poseState: PoseState.Velocity));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 0}/devicePose/angularVelocity", DeviceCategory.Tracker0, poseState: PoseState.AngularVelocity));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 0}/devicePose/isTracked", DeviceCategory.Tracker0, in_PoseState: PoseState.IsTracked, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 0}/devicePosition", DeviceCategory.Tracker0, in_PoseState: PoseState.Position, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 0}/deviceRotation", DeviceCategory.Tracker0, in_PoseState: PoseState.Rotation, in_Type: kQuaternionType));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 0}/devicePose/velocity", DeviceCategory.Tracker0, in_PoseState: PoseState.Velocity, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 0}/devicePose/angularVelocity", DeviceCategory.Tracker0, in_PoseState: PoseState.AngularVelocity, in_Type: kVector3Type));
 
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 1}/devicePose/isTracked", DeviceCategory.Tracker1, poseState: PoseState.IsTracked));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 1}/devicePosition", DeviceCategory.Tracker1, poseState: PoseState.Position));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 1}/deviceRotation", DeviceCategory.Tracker1, poseState: PoseState.Rotation));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 1}/devicePose/velocity", DeviceCategory.Tracker1, poseState: PoseState.Velocity));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 1}/devicePose/angularVelocity", DeviceCategory.Tracker1, poseState: PoseState.AngularVelocity));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 1}/devicePose/isTracked", DeviceCategory.Tracker1, in_PoseState: PoseState.IsTracked, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 1}/devicePosition", DeviceCategory.Tracker1, in_PoseState: PoseState.Position, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 1}/deviceRotation", DeviceCategory.Tracker1, in_PoseState: PoseState.Rotation, in_Type: kQuaternionType));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 1}/devicePose/velocity", DeviceCategory.Tracker1, in_PoseState: PoseState.Velocity, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 1}/devicePose/angularVelocity", DeviceCategory.Tracker1, in_PoseState: PoseState.AngularVelocity, in_Type: kVector3Type));
 
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 2}/devicePose/isTracked", DeviceCategory.Tracker2, poseState: PoseState.IsTracked));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 2}/devicePosition", DeviceCategory.Tracker2, poseState: PoseState.Position));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 2}/deviceRotation", DeviceCategory.Tracker2, poseState: PoseState.Rotation));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 2}/devicePose/velocity", DeviceCategory.Tracker2, poseState: PoseState.Velocity));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 2}/devicePose/angularVelocity", DeviceCategory.Tracker2, poseState: PoseState.AngularVelocity));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 2}/devicePose/isTracked", DeviceCategory.Tracker2, in_PoseState: PoseState.IsTracked, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 2}/devicePosition", DeviceCategory.Tracker2, in_PoseState: PoseState.Position, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 2}/deviceRotation", DeviceCategory.Tracker2, in_PoseState: PoseState.Rotation, in_Type: kQuaternionType));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 2}/devicePose/velocity", DeviceCategory.Tracker2, in_PoseState: PoseState.Velocity, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 2}/devicePose/angularVelocity", DeviceCategory.Tracker2, in_PoseState: PoseState.AngularVelocity, in_Type: kVector3Type));
 
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 3}/devicePose/isTracked", DeviceCategory.Tracker3, poseState: PoseState.IsTracked));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 3}/devicePosition", DeviceCategory.Tracker3, poseState: PoseState.Position));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 3}/deviceRotation", DeviceCategory.Tracker3, poseState: PoseState.Rotation));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 3}/devicePose/velocity", DeviceCategory.Tracker3, poseState: PoseState.Velocity));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 3}/devicePose/angularVelocity", DeviceCategory.Tracker3, poseState: PoseState.AngularVelocity));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 3}/devicePose/isTracked", DeviceCategory.Tracker3, in_PoseState: PoseState.IsTracked, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 3}/devicePosition", DeviceCategory.Tracker3, in_PoseState: PoseState.Position, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 3}/deviceRotation", DeviceCategory.Tracker3, in_PoseState: PoseState.Rotation, in_Type: kQuaternionType));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 3}/devicePose/velocity", DeviceCategory.Tracker3, in_PoseState: PoseState.Velocity, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 3}/devicePose/angularVelocity", DeviceCategory.Tracker3, in_PoseState: PoseState.AngularVelocity, in_Type: kVector3Type));
 
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 4}/devicePose/isTracked", DeviceCategory.Tracker4, poseState: PoseState.IsTracked));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 4}/devicePosition", DeviceCategory.Tracker4, poseState: PoseState.Position));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 4}/deviceRotation", DeviceCategory.Tracker4, poseState: PoseState.Rotation));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 4}/devicePose/velocity", DeviceCategory.Tracker4, poseState: PoseState.Velocity));
-            inputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 4}/devicePose/angularVelocity", DeviceCategory.Tracker4, poseState: PoseState.AngularVelocity));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 4}/devicePose/isTracked", DeviceCategory.Tracker4, in_PoseState: PoseState.IsTracked, in_Type: kFloatType));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 4}/devicePosition", DeviceCategory.Tracker4, in_PoseState: PoseState.Position, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 4}/deviceRotation", DeviceCategory.Tracker4, in_PoseState: PoseState.Rotation, in_Type: kQuaternionType));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 4}/devicePose/velocity", DeviceCategory.Tracker4, in_PoseState: PoseState.Velocity, in_Type: kVector3Type));
+            s_InputActions.Add(new InputActionMapping("<ViveXRTracker>{Ultimate Tracker 4}/devicePose/angularVelocity", DeviceCategory.Tracker4, in_PoseState: PoseState.AngularVelocity, in_Type: kVector3Type));
             #endregion
+        }
+
+        private static bool GetInputActionMapping(DeviceCategory device, PoseState poseState, out InputActionMapping inputActionMapping)
+        {
+            inputActionMapping = default;
+            for (int i = 0; i < s_InputActions.Count; i++)
+            {
+                var action = s_InputActions[i];
+                if (action.device == device && action.poseState == poseState)
+                {
+                    inputActionMapping = action;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool GetInputActionMapping(DeviceCategory device, ButtonEvent buttonEvent, out InputActionMapping inputActionMapping)
+        {
+            inputActionMapping = default;
+            for (int i = 0; i < s_InputActions.Count; i++)
+            {
+                var action = s_InputActions[i];
+                if (action.device == device && action.buttonEvent == buttonEvent)
+                {
+                    inputActionMapping = action;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool GetInputActionMapping(DeviceCategory device, HandEvent handEvent, out InputActionMapping inputActionMapping)
+        {
+            inputActionMapping = default;
+            for (int i = 0; i < s_InputActions.Count; i++)
+            {
+                var action = s_InputActions[i];
+                if (action.device == device && action.handEvent == handEvent)
+                {
+                    inputActionMapping = action;
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static void CheckHandUpdated()
         {
-            if (Time.frameCount > leftHand.updateTime ||
-                Time.frameCount > rightHand.updateTime)
+            int frameCount = Time.frameCount;
+            if (frameCount > m_LeftHand.updateTime ||
+                frameCount > m_RightHand.updateTime)
             {
-                ViveHandTracking viveHand = OpenXRSettings.Instance.GetFeature<ViveHandTracking>();
-                if (viveHand)
-                {
-                    UpdateViveHand(true, viveHand);
-                    UpdateViveHand(false, viveHand);
-                }
-
 #if UNITY_XR_HANDS
-                HandTracking xrHand = OpenXRSettings.Instance.GetFeature<HandTracking>();
-                if (xrHand)
+                if (m_IsSupportViveHand || m_IsSupportXrHand)
                 {
-                    if (handSubsystem == null || !handSubsystem.running)
+                    if (m_HandSubsystem == null || !m_HandSubsystem.running)
                     {
-                        if (handSubsystem != null && !handSubsystem.running)
+                        if (m_HandSubsystem != null)
                         {
-                            handSubsystem.updatedHands -= OnUpdatedHands;
-                            handSubsystem = null;
+                            m_HandSubsystem.updatedHands -= OnUpdatedHands;
+                            m_HandSubsystem = null;
                         }
 
-                        var handSubsystems = new List<XRHandSubsystem>();
-                        SubsystemManager.GetSubsystems(handSubsystems);
-                        for (var i = 0; i < handSubsystems.Count; ++i)
+                        m_HandSubsystems.Clear();
+                        SubsystemManager.GetSubsystems(m_HandSubsystems);
+                        for (var i = 0; i < m_HandSubsystems.Count; ++i)
                         {
-                            var xrHnad = handSubsystems[i];
-                            if (xrHnad.running)
+                            var xrHand = m_HandSubsystems[i];
+                            if (xrHand.running)
                             {
-                                handSubsystem = xrHnad;
+                                m_HandSubsystem = xrHand;
+                                m_HandSubsystem.updatedHands += OnUpdatedHands;
                                 break;
                             }
                         }
-                        if (handSubsystem != null && handSubsystem.running)
-                        {
-                            handSubsystem.updatedHands += OnUpdatedHands;
-                        }
                     }
+                }
+#else
+                if (m_IsSupportViveHand)
+                {
+                    UpdateViveHand(true);
+                    UpdateViveHand(false);
                 }
 #endif
             }
         }
 
-        private static void UpdateViveHand(bool isLeft, ViveHandTracking viveHand)
+        private static void UpdateViveHand(bool isLeft)
         {
-            bool isUpdated = viveHand.GetJointLocations(isLeft, out XrHandJointLocationEXT[] viveJoints);
-            JointData[] joints = new JointData[viveJoints.Length];
-            for (int i = 0; i < joints.Length; i++)
+            bool isUpdated = XR_EXT_hand_tracking.Interop.GetJointLocations(isLeft, out XrHandJointLocationEXT[] viveJoints);
+            for (int i = 0; i < m_JointBuffer.Length; i++)
             {
                 bool isValid = isUpdated &&
                                viveJoints[i].locationFlags.HasFlag(XrSpaceLocationFlags.XR_SPACE_LOCATION_POSITION_TRACKED_BIT) &&
                                viveJoints[i].locationFlags.HasFlag(XrSpaceLocationFlags.XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT);
                 Vector3 position = viveJoints[i].pose.position.ToUnityVector();
                 Quaternion rotation = viveJoints[i].pose.orientation.ToUnityQuaternion();
-                joints[i] = new JointData(isValid, position, rotation);
+                m_JointBuffer[i] = new JointData(isValid, position, rotation);
             }
             if (isLeft)
             {
-                leftHand.Update(joints);
+                m_LeftHand.Update(m_JointBuffer);
             }
             else
             {
-                rightHand.Update(joints);
+                m_RightHand.Update(m_JointBuffer);
             }
         }
 
 #if UNITY_XR_HANDS
-		private static void OnUpdatedHands(XRHandSubsystem xrHnad, XRHandSubsystem.UpdateSuccessFlags flags, XRHandSubsystem.UpdateType type)
+        private static void OnUpdatedHands(XRHandSubsystem xrHnad, XRHandSubsystem.UpdateSuccessFlags flags, XRHandSubsystem.UpdateType type)
         {
             if (xrHnad != null && xrHnad.running)
             {
@@ -732,42 +796,48 @@ namespace VIVE.OpenXR.Toolkits.Common
             }
         }
 
-        private static void UpdateXRHand(bool isLeft, XRHandSubsystem xrHnad, bool isUpdated)
+        private static void UpdateXRHand(bool isLeft, XRHandSubsystem xrHand, bool isUpdated)
         {
-            JointData[] joints = new JointData[(int)HandJointType.Count];
-            for (int i = 0; i < joints.Length; i++)
+            for (int i = 0; i < m_JointBuffer.Length; i++)
             {
                 XRHandJointID jointId = JointTypeToXRId(i);
-                XRHandJoint joint = (isLeft ? xrHnad.leftHand : xrHnad.rightHand).GetJoint(jointId);
-				bool isValid = isUpdated && joint.trackingState.HasFlag(XRHandJointTrackingState.Pose);
-				joint.TryGetPose(out Pose pose);
-				joints[i] = new JointData(isValid, pose.position, pose.rotation);
-			}
-			if (isLeft)
-			{
-				leftHand.Update(joints);
-			}
-			else
-			{
-				rightHand.Update(joints);
-			}
-		}
+                XRHandJoint joint = (isLeft ? xrHand.leftHand : xrHand.rightHand).GetJoint(jointId);
 
-		private static XRHandJointID JointTypeToXRId(int id)
-		{
-			switch (id)
-			{
-				case 0:
-					return XRHandJointID.Palm;
-				case 1:
-					return XRHandJointID.Wrist;
-				default:
-					return (XRHandJointID)(id + 1);
-			}
-		}
+                if (isUpdated && joint.trackingState.HasFlag(XRHandJointTrackingState.Pose))
+                {
+                    joint.TryGetPose(out Pose pose);
+                    m_JointBuffer[i] = new JointData(true, pose.position, pose.rotation);
+                }
+                else
+                {
+                    m_JointBuffer[i] = new JointData(false, Vector3.zero, Quaternion.identity);
+                }
+            }
+            if (isLeft)
+            {
+                m_LeftHand.Update(m_JointBuffer);
+            }
+            else
+            {
+                m_RightHand.Update(m_JointBuffer);
+            }
+        }
+
+        private static XRHandJointID JointTypeToXRId(int id)
+        {
+            switch (id)
+            {
+                case 0:
+                    return XRHandJointID.Palm;
+                case 1:
+                    return XRHandJointID.Wrist;
+                default:
+                    return (XRHandJointID)(id + 1);
+            }
+        }
 #endif
 
-		private static DeviceCategory GetController(Handedness handedness)
+        private static DeviceCategory GetController(Handedness handedness)
         {
             DeviceCategory device = DeviceCategory.None;
             switch (handedness)

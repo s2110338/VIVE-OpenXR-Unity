@@ -26,7 +26,7 @@ namespace UnityEngine.XR.OpenXR.Features.Interactions
     /// </summary>
 #if UNITY_EDITOR
     [UnityEditor.XR.OpenXR.Features.OpenXRFeature(
-        UiName = "HTC Vive Tracker Profile",
+        UiName = "HTC VIVE Tracker Profile",
         BuildTargetGroups = new[] { BuildTargetGroup.Standalone, BuildTargetGroup.WSA },
         Company = "MASSIVE",
         Desc = "Allows for mapping input to the HTC Vive Tracker interaction profile.",

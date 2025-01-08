@@ -5,8 +5,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.XR.OpenXR;
-using System.Threading.Tasks;
-using VIVE.OpenXR;
+using System.Linq;
 
 namespace VIVE.OpenXR.Passthrough
 {
@@ -27,13 +26,7 @@ namespace VIVE.OpenXR.Passthrough
 			return false;
 		}
 
-#if UNITY_STANDALONE
-		private static Dictionary<XrPassthroughHTC, XrCompositionLayerPassthroughHTC> passthrough2Layer = new Dictionary<XrPassthroughHTC, XrCompositionLayerPassthroughHTC>();
-		private static Dictionary<XrPassthroughHTC, IntPtr> passthrough2LayerPtr = new Dictionary<XrPassthroughHTC, IntPtr>();
-		private static Dictionary<XrPassthroughHTC, bool> passthrough2IsUnderLay= new Dictionary<XrPassthroughHTC, bool>();
-		private static Dictionary<XrPassthroughHTC, XrPassthroughMeshTransformInfoHTC> passthrough2meshTransform = new Dictionary<XrPassthroughHTC, XrPassthroughMeshTransformInfoHTC>();
-		private static Dictionary<XrPassthroughHTC, IntPtr> passthrough2meshTransformInfoPtr = new Dictionary<XrPassthroughHTC, IntPtr>();
-#endif
+		private static Dictionary<XrPassthroughHTC, PassthroughLayer> layersDict = new Dictionary<XrPassthroughHTC, PassthroughLayer>();
 
 		#region Public APIs
 		/// <summary>
@@ -58,42 +51,32 @@ namespace VIVE.OpenXR.Passthrough
 			}
 			XrPassthroughCreateInfoHTC createInfo = new XrPassthroughCreateInfoHTC(
 				XrStructureType.XR_TYPE_PASSTHROUGH_CREATE_INFO_HTC,
+#if UNITY_ANDROID
+                IntPtr.Zero,
+#else
 				new IntPtr(6), //Enter IntPtr(0) for backward compatibility (using createPassthrough to enable the passthrough feature), or enter IntPtr(6) to enable the passthrough feature based on the layer submitted to endframe.
+#endif
 				XrPassthroughFormHTC.XR_PASSTHROUGH_FORM_PLANAR_HTC
 			);
 
-#if UNITY_ANDROID
-			res = passthroughFeature.CreatePassthroughHTC(createInfo, out passthrough, layerType, compositionDepth, onDestroyPassthroughSessionHandler);
-			DEBUG("CreatePlanarPassthrough() CreatePassthroughHTC result: " + res + ", passthrough: " + passthrough);
-#endif
-#if UNITY_STANDALONE
 			res = XR_HTC_passthrough.xrCreatePassthroughHTC(createInfo, out passthrough);
 			if(res == XrResult.XR_SUCCESS)
-            {
-				XrPassthroughColorHTC passthroughColor = new XrPassthroughColorHTC(
-						in_type: XrStructureType.XR_TYPE_PASSTHROUGH_COLOR_HTC,
-						in_next: IntPtr.Zero,
-						in_alpha: alpha);
-				XrCompositionLayerPassthroughHTC compositionLayerPassthrough = new XrCompositionLayerPassthroughHTC(
-						in_type: XrStructureType.XR_TYPE_COMPOSITION_LAYER_PASSTHROUGH_HTC,
-						in_next: IntPtr.Zero,
-						in_layerFlags: (UInt64)XrCompositionLayerFlagBits.XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT,
-						in_space: 0,
-						in_passthrough: passthrough,
-						in_color: passthroughColor);
-				passthrough2Layer.Add(passthrough, compositionLayerPassthrough);
-				IntPtr layerPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(XrCompositionLayerPassthroughHTC)));
-				passthrough2LayerPtr.Add(passthrough, layerPtr);
-				if (layerType == CompositionLayer.LayerType.Underlay)
-					passthrough2IsUnderLay.Add(passthrough, true);
-				if (layerType == CompositionLayer.LayerType.Overlay)
-					passthrough2IsUnderLay.Add(passthrough, false);
+			{
+				PassthroughLayer layer = new PassthroughLayer(passthrough, layerType);
+				var xrLayer = PassthroughLayer.MakeEmptyLayer();
+                xrLayer.passthrough = passthrough;
+				xrLayer.layerFlags = (UInt64)XrCompositionLayerFlagBits.XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
+                xrLayer.color.alpha = alpha;
+				layer.SetLayer(xrLayer);
+
+				layersDict.Add(passthrough, layer);
 			}
-#endif
+
 			if (res == XrResult.XR_SUCCESS)
 			{
 				SetPassthroughAlpha(passthrough, alpha);
 			}
+
 			return res;
 		}
 
@@ -138,54 +121,34 @@ namespace VIVE.OpenXR.Passthrough
 
 			XrPassthroughCreateInfoHTC createInfo = new XrPassthroughCreateInfoHTC(
 				XrStructureType.XR_TYPE_PASSTHROUGH_CREATE_INFO_HTC,
+#if UNITY_ANDROID
+				IntPtr.Zero,
+#else
 				new IntPtr(6), //Enter IntPtr(0) for backward compatibility (using createPassthrough to enable the passthrough feature), or enter IntPtr(6) to enable the passthrough feature based on the layer submitted to endframe.
+#endif
 				XrPassthroughFormHTC.XR_PASSTHROUGH_FORM_PROJECTED_HTC
 			);
 
-#if UNITY_STANDALONE
 			res = XR_HTC_passthrough.xrCreatePassthroughHTC(createInfo, out passthrough);
 			if (res == XrResult.XR_SUCCESS)
 			{
-				XrPassthroughMeshTransformInfoHTC PassthroughMeshTransformInfo = new XrPassthroughMeshTransformInfoHTC(
-						in_type: XrStructureType.XR_TYPE_PASSTHROUGH_MESH_TRANSFORM_INFO_HTC,
-						in_next: IntPtr.Zero,
-						in_vertexCount: 0,
-						in_vertices: new XrVector3f[0],
-						in_indexCount: 0,
-						in_indices: new UInt32[0],
-						in_baseSpace: XR_HTC_passthrough.Interop.GetTrackingSpace(),
-						in_time: XR_HTC_passthrough.Interop.GetFrameState().predictedDisplayTime,
-						in_pose: new XrPosef(),
-						in_scale: new XrVector3f()
-						);
-				IntPtr meshTransformInfoPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(XrPassthroughMeshTransformInfoHTC)));
-				Marshal.StructureToPtr(PassthroughMeshTransformInfo, meshTransformInfoPtr, false);
-				XrPassthroughColorHTC passthroughColor = new XrPassthroughColorHTC(
-						in_type: XrStructureType.XR_TYPE_PASSTHROUGH_COLOR_HTC,
-						in_next: IntPtr.Zero,
-						in_alpha: alpha);
-				XrCompositionLayerPassthroughHTC compositionLayerPassthrough = new XrCompositionLayerPassthroughHTC(
-						in_type: XrStructureType.XR_TYPE_COMPOSITION_LAYER_PASSTHROUGH_HTC,
-						in_next: meshTransformInfoPtr,
-						in_layerFlags: (UInt64)XrCompositionLayerFlagBits.XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT,
-						in_space: 0,
-						in_passthrough: passthrough,
-						in_color: passthroughColor);
-				passthrough2meshTransform.Add(passthrough, PassthroughMeshTransformInfo);
-				passthrough2meshTransformInfoPtr.Add(passthrough, meshTransformInfoPtr);
-				passthrough2Layer.Add(passthrough, compositionLayerPassthrough);
-				IntPtr layerPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(XrCompositionLayerPassthroughHTC)));
-				passthrough2LayerPtr.Add(passthrough, layerPtr);
-				if (layerType == CompositionLayer.LayerType.Underlay)
-					passthrough2IsUnderLay.Add(passthrough, true);
-				if (layerType == CompositionLayer.LayerType.Overlay)
-					passthrough2IsUnderLay.Add(passthrough, false);
+				var layer = new PassthroughLayer(passthrough, layerType);
+				var xrLayer = PassthroughLayer.MakeEmptyLayer();
+				xrLayer.passthrough = passthrough;
+				xrLayer.layerFlags = (UInt64)XrCompositionLayerFlagBits.XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
+                xrLayer.space = 0;
+				xrLayer.color.alpha = alpha;
+                layer.SetLayer(xrLayer);
+                var xrMesh = PassthroughLayer.MakeMeshTransform();
+
+                xrMesh.time = XR_HTC_passthrough.Interop.GetFrameState().predictedDisplayTime;
+                xrMesh.baseSpace = XR_HTC_passthrough.Interop.GetTrackingSpace();
+                xrMesh.scale = new XrVector3f(meshScale.x, meshScale.y, meshScale.z);
+				layer.SetMeshTransform(xrMesh);
+
+				layersDict.Add(passthrough, layer);
 			}
-#endif
-#if UNITY_ANDROID
-			res = passthroughFeature.CreatePassthroughHTC(createInfo, out passthrough, layerType, compositionDepth, onDestroyPassthroughSessionHandler);
-			DEBUG("CreateProjectedPassthrough() CreatePassthroughHTC result: " + res + ", passthrough: " + passthrough);
-#endif
+
 			if (res == XrResult.XR_SUCCESS)
 			{
 				SetPassthroughAlpha(passthrough, alpha);
@@ -219,54 +182,30 @@ namespace VIVE.OpenXR.Passthrough
 
 			XrPassthroughCreateInfoHTC createInfo = new XrPassthroughCreateInfoHTC(
 				XrStructureType.XR_TYPE_PASSTHROUGH_CREATE_INFO_HTC,
+#if UNITY_ANDROID
+                IntPtr.Zero,
+#else
 				new IntPtr(6), //Enter IntPtr(0) for backward compatibility (using createPassthrough to enable the passthrough feature), or enter IntPtr(6) to enable the passthrough feature based on the layer submitted to endframe.
+#endif
 				XrPassthroughFormHTC.XR_PASSTHROUGH_FORM_PROJECTED_HTC
-			);
+            );
 
-#if UNITY_STANDALONE
 			res = XR_HTC_passthrough.xrCreatePassthroughHTC(createInfo, out passthrough);
 			if (res == XrResult.XR_SUCCESS)
 			{
-				XrPassthroughMeshTransformInfoHTC PassthroughMeshTransformInfo = new XrPassthroughMeshTransformInfoHTC(
-						in_type: XrStructureType.XR_TYPE_PASSTHROUGH_MESH_TRANSFORM_INFO_HTC,
-						in_next: IntPtr.Zero,
-						in_vertexCount: 0,
-						in_vertices: new XrVector3f[0],
-						in_indexCount: 0,
-						in_indices: new UInt32[0],
-						in_baseSpace: XR_HTC_passthrough.Interop.GetTrackingSpace(),
-						in_time: XR_HTC_passthrough.Interop.GetFrameState().predictedDisplayTime,
-						in_pose: new XrPosef(),
-						in_scale: new XrVector3f()
-						);
-				IntPtr meshTransformInfoPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(XrPassthroughMeshTransformInfoHTC)));
-				Marshal.StructureToPtr(PassthroughMeshTransformInfo, meshTransformInfoPtr, false);
-				XrPassthroughColorHTC passthroughColor = new XrPassthroughColorHTC(
-						in_type: XrStructureType.XR_TYPE_PASSTHROUGH_COLOR_HTC,
-						in_next: IntPtr.Zero,
-						in_alpha: alpha);
-				XrCompositionLayerPassthroughHTC compositionLayerPassthrough = new XrCompositionLayerPassthroughHTC(
-						in_type: XrStructureType.XR_TYPE_COMPOSITION_LAYER_PASSTHROUGH_HTC,
-						in_next: meshTransformInfoPtr,
-						in_layerFlags: (UInt64)XrCompositionLayerFlagBits.XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT,
-						in_space: 0,
-						in_passthrough: passthrough,
-						in_color: passthroughColor);
-				passthrough2meshTransform.Add(passthrough, PassthroughMeshTransformInfo);
-				passthrough2meshTransformInfoPtr.Add(passthrough, meshTransformInfoPtr);
-				passthrough2Layer.Add(passthrough, compositionLayerPassthrough);
-				IntPtr layerPtr = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(XrCompositionLayerPassthroughHTC)));
-				passthrough2LayerPtr.Add(passthrough, layerPtr);
-				if (layerType == CompositionLayer.LayerType.Underlay)
-					passthrough2IsUnderLay.Add(passthrough, true);
-				if (layerType == CompositionLayer.LayerType.Overlay)
-					passthrough2IsUnderLay.Add(passthrough, false);
+				var layer = new PassthroughLayer(passthrough, layerType);
+				var xrLayer = PassthroughLayer.MakeEmptyLayer();
+				xrLayer.passthrough = passthrough;
+				xrLayer.layerFlags = (UInt64)XrCompositionLayerFlagBits.XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
+				xrLayer.color.alpha = alpha;
+				layer.SetLayer(xrLayer);
+
+				var xrMesh = PassthroughLayer.MakeMeshTransform();
+				layer.SetMeshTransform(xrMesh, true);
+
+				layersDict.Add(passthrough, layer);
 			}
-#endif
-#if UNITY_ANDROID
-			res = passthroughFeature.CreatePassthroughHTC(createInfo, out passthrough, layerType, onDestroyPassthroughSessionHandler);
-			DEBUG("CreateProjectedPassthrough() CreatePassthroughHTC result: " + res + ", passthrough: " + passthrough);
-#endif
+
 			if (res == XrResult.XR_SUCCESS)
 			{
 				SetPassthroughAlpha(passthrough, alpha);
@@ -275,43 +214,18 @@ namespace VIVE.OpenXR.Passthrough
 			return res;
 		}
 
-#if UNITY_STANDALONE
-		private static async void SubmitLayer()
-        {
-			await Task.Run(() => {
-				int layerListCount = 0;
-				while(layerListCount == 0)
-                {
-					System.Threading.Thread.Sleep(1);
-					XR_HTC_passthrough.Interop.GetOriginEndFrameLayerList(out List<IntPtr> layerList);//GetOriginEndFrameLayers
-					layerListCount = layerList.Count;
-					foreach (var passthrough in passthrough2IsUnderLay.Keys)
-					{
-						//Get and submit layer list
-						if (layerListCount != 0)
-						{
-							Marshal.StructureToPtr(passthrough2Layer[passthrough], passthrough2LayerPtr[passthrough], false);
-							if (passthrough2IsUnderLay[passthrough])
-								layerList.Insert(0, passthrough2LayerPtr[passthrough]);
-							else
-								layerList.Insert(1, passthrough2LayerPtr[passthrough]);
-						}
-					}
-					if(layerListCount != 0)
-						XR_HTC_passthrough.Interop.SubmitLayers(layerList);
-				}
-			});
-			
-		}
-#endif
+		private static void SubmitLayer()
+		{
+            passthroughFeature.SubmitLayers(layersDict.Values.ToList());
+        }
 
-		/// <summary>
-		/// To Destroying a passthrough.
-		/// You should call this function when the <see cref="VivePassthrough.OnPassthroughSessionDestroyDelegate">delegate</see> is invoked.
-		/// </summary>
-		/// <param name="passthrough">The created <see cref="XrPassthroughHTC"/></param>
-		/// <returns>XR_SUCCESS for success.</returns>
-		public static XrResult DestroyPassthrough(XrPassthroughHTC passthrough)
+        /// <summary>
+        /// To Destroying a passthrough.
+        /// You should call this function when the <see cref="VivePassthrough.OnPassthroughSessionDestroyDelegate">delegate</see> is invoked.
+        /// </summary>
+        /// <param name="passthrough">The created <see cref="XrPassthroughHTC"/></param>
+        /// <returns>XR_SUCCESS for success.</returns>
+        public static XrResult DestroyPassthrough(XrPassthroughHTC passthrough)
 		{
 			XrResult res = XrResult.XR_ERROR_RUNTIME_FAILURE;
 
@@ -326,23 +240,17 @@ namespace VIVE.OpenXR.Passthrough
 				return res;
 			}
 
-#if UNITY_STANDALONE
-            XrPassthroughHTC pt = passthrough2Layer[passthrough].passthrough;
-			XR_HTC_passthrough.xrDestroyPassthroughHTC(pt);
-			passthrough2IsUnderLay.Remove(passthrough);
+			if (layersDict.ContainsKey(passthrough))
+			{
+                XR_HTC_passthrough.xrDestroyPassthroughHTC(passthrough);
+				var layer = layersDict[passthrough];
+                layer.Dispose();
+                layersDict.Remove(passthrough);
+			}
+
 			SubmitLayer();
-			passthrough2Layer.Remove(pt);
-			if(passthrough2LayerPtr.ContainsKey(passthrough)) Marshal.FreeHGlobal(passthrough2LayerPtr[passthrough]);
-			passthrough2LayerPtr.Remove(passthrough);
-			if(passthrough2meshTransformInfoPtr.ContainsKey(passthrough)) Marshal.FreeHGlobal(passthrough2meshTransformInfoPtr[passthrough]);
-			passthrough2meshTransformInfoPtr.Remove(passthrough);
-			passthrough2meshTransform.Remove(passthrough);
 			
 			res = XrResult.XR_SUCCESS;
-#elif UNITY_ANDROID
-			res = passthroughFeature.DestroyPassthroughHTC(passthrough);
-			DEBUG("DestroyPassthrough() DestroyPassthroughHTC result: " + res + ", passthrough: " + passthrough);
-#endif
 			return res;
 		}
 
@@ -368,36 +276,18 @@ namespace VIVE.OpenXR.Passthrough
 				return ret;
 			}
 
-#if UNITY_ANDROID
-			if (autoClamp)
+			if (layersDict.ContainsKey(passthrough))
 			{
-				ret = passthroughFeature.SetAlpha(passthrough, Mathf.Clamp01(alpha));
-			}
-			else
-			{
-				if (alpha < 0f || alpha > 1f)
-				{
-					ERROR("SetPassthroughAlpha: Alpha out of range");
-					return ret;
-				}
-
-				ret = passthroughFeature.SetAlpha(passthrough, alpha);
-			}
-			DEBUG("SetPassthroughAlpha() SetAlpha result: " + ret + ", passthrough: " + passthrough);
-#endif
-
-#if UNITY_STANDALONE
-			if (passthrough2Layer.ContainsKey(passthrough))
-			{
-				XrCompositionLayerPassthroughHTC layer = passthrough2Layer[passthrough];
-				layer.color.alpha = alpha;
-				passthrough2Layer[passthrough] = layer;
+				var layer = layersDict[passthrough];
+				var xrLayer = layer.GetLayer();
+				xrLayer.color.alpha = alpha;
+				layer.SetLayer(xrLayer);
+				
 				SubmitLayer();
 				ret = true;
 			}
 			else
 				ret = false;
-#endif
 			return ret;
 		}
 
@@ -425,45 +315,18 @@ namespace VIVE.OpenXR.Passthrough
 				return ret;
 			}
 
-			XrVector3f[] vertexBufferXrVector = new XrVector3f[vertexBuffer.Length];
+			if (layersDict[passthrough] == null)
+            {
+                ERROR("Passthrough layer not found.");
+                return ret;
+            }
 
-			for (int i = 0; i < vertexBuffer.Length; i++)
-			{
-				vertexBufferXrVector[i] = OpenXRHelper.ToOpenXRVector(vertexBuffer[i], convertFromUnityToOpenXR);
-			}
-
-			uint[] indexBufferUint = new uint[indexBuffer.Length];
-
-			for (int i = 0; i < indexBuffer.Length; i++)
-			{
-				indexBufferUint[i] = (uint)indexBuffer[i];
-			}
-
-#if UNITY_STANDALONE
-			if (passthrough2meshTransformInfoPtr.ContainsKey(passthrough))
-			{
-				XrPassthroughMeshTransformInfoHTC MeshTransformInfo = passthrough2meshTransform[passthrough];
-				MeshTransformInfo.vertexCount = (uint)vertexBuffer.Length;
-				MeshTransformInfo.vertices = vertexBufferXrVector;
-				MeshTransformInfo.indexCount = (uint)indexBuffer.Length;
-				MeshTransformInfo.indices = indexBufferUint;
-				passthrough2meshTransform[passthrough] = MeshTransformInfo;
-				Marshal.StructureToPtr(MeshTransformInfo, passthrough2meshTransformInfoPtr[passthrough], false);
-				XrCompositionLayerPassthroughHTC layer = passthrough2Layer[passthrough];
-				layer.next = passthrough2meshTransformInfoPtr[passthrough];
-				passthrough2Layer[passthrough] = layer;
-				SubmitLayer();
-				ret = true;
-			}
-			else
-				ret = false;
-#endif
-			//Note: Ignore Clock-Wise definition of index buffer for now as passthrough extension does not have back-face culling
-#if UNITY_ANDROID
-			ret = passthroughFeature.SetMesh(passthrough, (uint)vertexBuffer.Length, vertexBufferXrVector, (uint)indexBuffer.Length, indexBufferUint); ;
-			DEBUG("SetProjectedPassthroughMesh() SetMesh result: " + ret + ", passthrough: " + passthrough);
-#endif
-			return ret;
+			var layer = layersDict[passthrough];
+			var xrMesh = layer.GetMesh();
+			layer.SetMeshData(ref xrMesh, vertexBuffer, indexBuffer, convertFromUnityToOpenXR);
+			layer.SetMeshTransform(xrMesh);
+			SubmitLayer();
+			return true;
 		}
 
 		/// <summary>
@@ -508,29 +371,22 @@ namespace VIVE.OpenXR.Passthrough
 
 			XrVector3f meshXrScale = OpenXRHelper.ToOpenXRVector(meshScale, false);
 
-#if UNITY_STANDALONE
-			if (passthrough2meshTransformInfoPtr.ContainsKey(passthrough))
-			{
-				XrPassthroughMeshTransformInfoHTC MeshTransformInfo = passthrough2meshTransform[passthrough];
-				MeshTransformInfo.pose = meshXrPose;
-				MeshTransformInfo.scale = meshXrScale;
-				passthrough2meshTransform[passthrough] = MeshTransformInfo;
-				Marshal.StructureToPtr(MeshTransformInfo, passthrough2meshTransformInfoPtr[passthrough], false);
-				XrCompositionLayerPassthroughHTC layer = passthrough2Layer[passthrough];
-				layer.next = passthrough2meshTransformInfoPtr[passthrough];
-				passthrough2Layer[passthrough] = layer;
-				SubmitLayer();
-				ret = true;
-			}
-			else
-				ret = false;
-#endif
+			if (layersDict[passthrough] == null)
+            {
+                ERROR("Passthrough layer not found.");
+                return ret;
+            }
 
-#if UNITY_ANDROID
-			ret = passthroughFeature.SetMeshTransform(passthrough, passthroughFeature.GetXrSpaceFromSpaceType(spaceType), meshXrPose, meshXrScale);
-			DEBUG("SetProjectedPassthroughMeshTransform() SetMeshTransform result: " + ret + ", passthrough: " + passthrough);
-#endif
-			return ret;
+			var layer = layersDict[passthrough];
+			var xrMesh = layer.GetMesh();
+			xrMesh.pose = meshXrPose;
+			xrMesh.scale = meshXrScale;
+			xrMesh.time = XR_HTC_passthrough.Interop.GetFrameState().predictedDisplayTime;
+			xrMesh.baseSpace = passthroughFeature.GetXrSpaceFromSpaceType(spaceType);
+
+			layer.SetMeshTransform(xrMesh);
+			SubmitLayer();
+			return true;
 		}
 
 		/// <summary>
@@ -550,22 +406,18 @@ namespace VIVE.OpenXR.Passthrough
 				return ret;
 			}
 
-#if UNITY_STANDALONE
-			if (passthrough2IsUnderLay.ContainsKey(passthrough))
-			{
-				passthrough2IsUnderLay[passthrough] = layerType == CompositionLayer.LayerType.Underlay ? true : false;
-				SubmitLayer();
-				ret = true;
-			}
-			else
-				ret = false;
-#endif
+			if (layersDict[passthrough] == null)
+            {
+                ERROR("Passthrough layer not found.");
+                return ret;
+            }
 
-#if UNITY_ANDROID
-			ret = passthroughFeature.SetLayerType(passthrough, layerType, compositionDepth);
-			DEBUG("SetPassthroughLayerType() SetLayerType result: " + ret + ", passthrough: " + passthrough);
-#endif
-			return ret;
+			var layer = layersDict[passthrough];
+			layer.LayerType = layerType;
+			layer.Depth = (int)compositionDepth;
+
+			SubmitLayer();
+			return true;
 		}
 
 		/// <summary>
@@ -584,28 +436,18 @@ namespace VIVE.OpenXR.Passthrough
 				return ret;
 			}
 
-#if UNITY_STANDALONE
-			if (passthrough2meshTransformInfoPtr.ContainsKey(passthrough))
-			{
-				XrPassthroughMeshTransformInfoHTC MeshTransformInfo = passthrough2meshTransform[passthrough];
-				MeshTransformInfo.baseSpace = passthroughFeature.GetXrSpaceFromSpaceType(spaceType);
-				passthrough2meshTransform[passthrough] = MeshTransformInfo;
-				Marshal.StructureToPtr(MeshTransformInfo, passthrough2meshTransformInfoPtr[passthrough], false);
-				XrCompositionLayerPassthroughHTC layer = passthrough2Layer[passthrough];
-				layer.next = passthrough2meshTransformInfoPtr[passthrough];
-				passthrough2Layer[passthrough] = layer;
-				SubmitLayer();
-				ret = true;
-			}
-			else
-				ret = false;
-#endif
+			if (layersDict[passthrough] == null)
+            {
+                ERROR("Passthrough layer not found.");
+                return ret;
+            }
 
-#if UNITY_ANDROID
-			ret = passthroughFeature.SetMeshTransformSpace(passthrough, passthroughFeature.GetXrSpaceFromSpaceType(spaceType));
-			DEBUG("SetProjectedPassthroughSpaceType() SetMeshTransformSpace result: " + ret + ", passthrough: " + passthrough);
-#endif
-			return ret;
+			var layer = layersDict[passthrough];
+			var xrMesh = layer.GetMesh();
+			xrMesh.baseSpace = passthroughFeature.GetXrSpaceFromSpaceType(spaceType);
+			layer.SetMeshTransform(xrMesh);
+			SubmitLayer();
+			return true;
 		}
 
 		/// <summary>
@@ -639,30 +481,18 @@ namespace VIVE.OpenXR.Passthrough
 				trackingSpaceMeshPosition = trackingSpaceLayerPoseTRS.GetColumn(3); //4th Column of TRS Matrix is the position
 			}
 
-#if UNITY_STANDALONE
-			if (passthrough2meshTransformInfoPtr.ContainsKey(passthrough))
-			{
-				XrPassthroughMeshTransformInfoHTC MeshTransformInfo = passthrough2meshTransform[passthrough];
-				XrPosef meshXrPose = MeshTransformInfo.pose;
-				meshXrPose.position = OpenXRHelper.ToOpenXRVector(trackingSpaceMeshPosition, convertFromUnityToOpenXR); ;
-				MeshTransformInfo.pose = meshXrPose;
-				passthrough2meshTransform[passthrough] = MeshTransformInfo;
-				Marshal.StructureToPtr(MeshTransformInfo, passthrough2meshTransformInfoPtr[passthrough], false);
-				XrCompositionLayerPassthroughHTC layer = passthrough2Layer[passthrough];
-				layer.next = passthrough2meshTransformInfoPtr[passthrough];
-				passthrough2Layer[passthrough] = layer;
-				SubmitLayer();
-				ret = true;
-			}
-			else
-				ret = false;
-#endif
+			if (layersDict[passthrough] == null)
+            {
+                ERROR("Passthrough layer not found.");
+                return ret;
+            }
 
-#if UNITY_ANDROID
-			ret = passthroughFeature.SetMeshTransformPosition(passthrough, OpenXRHelper.ToOpenXRVector(trackingSpaceMeshPosition, convertFromUnityToOpenXR));
-			DEBUG("SetProjectedPassthroughMeshPosition() SetMeshTransformPosition result: " + ret + ", passthrough: " + passthrough);
-#endif
-			return ret;
+			var layer = layersDict[passthrough];
+			var xrMesh = layer.GetMesh();
+			xrMesh.pose.position = OpenXRHelper.ToOpenXRVector(trackingSpaceMeshPosition, convertFromUnityToOpenXR);
+			layer.SetMeshTransform(xrMesh);
+			SubmitLayer();
+			return true;
 		}
 
 		/// <summary>
@@ -696,30 +526,18 @@ namespace VIVE.OpenXR.Passthrough
 				trackingSpaceMeshRotation = Quaternion.LookRotation(trackingSpaceLayerPoseTRS.GetColumn(2), trackingSpaceLayerPoseTRS.GetColumn(1));
 			}
 
-#if UNITY_STANDALONE
-			if (passthrough2meshTransformInfoPtr.ContainsKey(passthrough))
-			{
-				XrPassthroughMeshTransformInfoHTC MeshTransformInfo = passthrough2meshTransform[passthrough];
-				XrPosef meshXrPose = MeshTransformInfo.pose;
-				meshXrPose.orientation = OpenXRHelper.ToOpenXRQuaternion(trackingSpaceMeshRotation, convertFromUnityToOpenXR);
-				MeshTransformInfo.pose = meshXrPose;
-				passthrough2meshTransform[passthrough] = MeshTransformInfo;
-				Marshal.StructureToPtr(MeshTransformInfo, passthrough2meshTransformInfoPtr[passthrough], false);
-				XrCompositionLayerPassthroughHTC layer = passthrough2Layer[passthrough];
-				layer.next = passthrough2meshTransformInfoPtr[passthrough];
-				passthrough2Layer[passthrough] = layer;
-				SubmitLayer();
-				ret = true;
-			}
-			else
-				ret = false;
-#endif
+			if (layersDict[passthrough] == null)
+            {
+                ERROR("Passthrough layer not found.");
+                return ret;
+            }
 
-#if UNITY_ANDROID
-			ret = passthroughFeature.SetMeshTransformOrientation(passthrough, OpenXRHelper.ToOpenXRQuaternion(trackingSpaceMeshRotation, convertFromUnityToOpenXR));
-			DEBUG("SetProjectedPassthroughMeshOrientation() SetMeshTransformOrientation result: " + ret + ", passthrough: " + passthrough);
-#endif
-			return ret;
+			var layer = layersDict[passthrough];
+			var xrMesh = layer.GetMesh();
+			xrMesh.pose.orientation = OpenXRHelper.ToOpenXRQuaternion(trackingSpaceMeshRotation, convertFromUnityToOpenXR);
+			layer.SetMeshTransform(xrMesh);
+			SubmitLayer();
+			return true;
 		}
 
 		/// <summary>
@@ -738,28 +556,18 @@ namespace VIVE.OpenXR.Passthrough
 				return ret;
 			}
 
-#if UNITY_STANDALONE
-			if (passthrough2meshTransformInfoPtr.ContainsKey(passthrough))
-			{
-				XrPassthroughMeshTransformInfoHTC MeshTransformInfo = passthrough2meshTransform[passthrough];
-				MeshTransformInfo.scale = OpenXRHelper.ToOpenXRVector(meshScale, false);
-				passthrough2meshTransform[passthrough] = MeshTransformInfo;
-				Marshal.StructureToPtr(MeshTransformInfo, passthrough2meshTransformInfoPtr[passthrough], false);
-				XrCompositionLayerPassthroughHTC layer = passthrough2Layer[passthrough];
-				layer.next = passthrough2meshTransformInfoPtr[passthrough];
-				passthrough2Layer[passthrough] = layer;
-				SubmitLayer();
-				ret = true;
-			}
-			else
-				ret = false;
-#endif
+			if (layersDict[passthrough] == null)
+            {
+                ERROR("Passthrough layer not found.");
+                return ret;
+            }
 
-#if UNITY_ANDROID
-			ret = passthroughFeature.SetMeshTransformScale(passthrough, OpenXRHelper.ToOpenXRVector(meshScale, false));
-			DEBUG("SetProjectedPassthroughScale() SetMeshTransformScale result: " + ret + ", passthrough: " + passthrough);
-#endif
-			return ret;
+			var layer = layersDict[passthrough];
+			var xrMesh = layer.GetMesh();
+			xrMesh.scale = OpenXRHelper.ToOpenXRVector(meshScale, false);
+			layer.SetMeshTransform(xrMesh);
+			SubmitLayer();
+			return true;
 		}
 
 		/// <summary>

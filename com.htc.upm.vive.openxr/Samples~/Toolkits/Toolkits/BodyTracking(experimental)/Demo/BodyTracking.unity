@@ -23034,7 +23034,7 @@ GameObject:
   - component: {fileID: 785420544}
   - component: {fileID: 785420543}
   - component: {fileID: 785420542}
-  - component: {fileID: 785420541}
+  - component: {fileID: 785420545}
   m_Layer: 5
   m_Name: QuitBtn
   m_TagString: Untagged
@@ -23063,18 +23063,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: -96}
   m_SizeDelta: {x: 86.2, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &785420541
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 785420539}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b661f25ed5b57874290a0bafb5ad8234, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &785420542
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -23119,8 +23107,8 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 785420541}
-        m_TargetAssemblyTypeName: Wave.Essence.Extra.QuitApplication, Wave.Essence
+      - m_Target: {fileID: 785420545}
+        m_TargetAssemblyTypeName: VIVE.OpenXR.Toolkits.Common.LeaveScene, VIVE.OpenXR.Toolkits
         m_MethodName: ExitGame
         m_Mode: 1
         m_Arguments:
@@ -23169,6 +23157,18 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 785420539}
   m_CullTransparentMesh: 1
+--- !u!114 &785420545
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 785420539}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 46285a19de0bb1b4f849a4b0bcfc5c0f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &792366970
 GameObject:
   m_ObjectHideFlags: 0
@@ -68792,6 +68792,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 1
     m_Action:
@@ -68816,6 +68817,18 @@ MonoBehaviour:
       m_SingletonActionBindings: []
       m_Flags: 0
     m_Reference: {fileID: 3113219943245244623, guid: 7731a6c81e069424eb7df31b19b84b41, type: 3}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 49637aaa-d811-48fe-9f86-4076b1bbf006
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: 
     m_Type: 0
@@ -68834,7 +68847,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!4 &2336634745151424894
 Transform:
   m_ObjectHideFlags: 0
@@ -68947,6 +68959,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 1
     m_Action:
@@ -68971,6 +68984,18 @@ MonoBehaviour:
       m_SingletonActionBindings: []
       m_Flags: 0
     m_Reference: {fileID: -5246335118593862002, guid: 7731a6c81e069424eb7df31b19b84b41, type: 3}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 49846443-d944-470e-969c-29e6fe616f69
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: 
     m_Type: 0
@@ -68989,7 +69014,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &2336634745461817778
 GameObject:
   m_ObjectHideFlags: 0
@@ -69698,6 +69722,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 1
     m_Action:
@@ -69722,6 +69747,18 @@ MonoBehaviour:
       m_SingletonActionBindings: []
       m_Flags: 0
     m_Reference: {fileID: -3341103204585363708, guid: 7731a6c81e069424eb7df31b19b84b41, type: 3}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: 
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 346b5aa3-6f99-4b26-847e-776c912c914e
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: 
     m_Type: 0
@@ -69740,7 +69777,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &2336634746049650654
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,13 +1,13 @@
 // Copyright HTC Corporation All Rights Reserved.
 
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.XR;
-using System.Text;
+
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
-
 namespace VIVE.OpenXR
 {
 	[DisallowMultipleComponent]
@@ -43,12 +43,6 @@ namespace VIVE.OpenXR
 		private float m_CameraHeight = 1.5f;
 		public float CameraHeight { get { return m_CameraHeight; } set { m_CameraHeight = value; } }
 
-		[System.Obsolete("This variable is deprecated. Please use CameraHeight instead.")]
-		[SerializeField]
-		private float m_CameraYOffset = 1;
-		[System.Obsolete("This variable is deprecated. Please use CameraHeight instead.")]
-		public float CameraYOffset { get { return m_CameraYOffset; } set { m_CameraYOffset = value; } }
-
 #if ENABLE_INPUT_SYSTEM
 		[SerializeField]
 		private InputActionAsset m_ActionAsset;
@@ -56,10 +50,14 @@ namespace VIVE.OpenXR
 #endif
 		#endregion
 
-		static List<XRInputSubsystem> s_InputSubsystems = new List<XRInputSubsystem>();
+		private static readonly List<XRInputSubsystem> s_InputSubsystems = new List<XRInputSubsystem>();
+		private static readonly object lockObj = new object(); 
+		private float m_LastRecenteredTime = 0.0f;
+
+		#region MonoBehaviour
 		private void OnEnable()
 		{
-			SubsystemManager.GetInstances(s_InputSubsystems);
+			UpdateInputSubsystems();
 			for (int i = 0; i < s_InputSubsystems.Count; i++)
 			{
 				s_InputSubsystems[i].trackingOriginUpdated += TrackingOriginUpdated;
@@ -74,27 +72,10 @@ namespace VIVE.OpenXR
 		}
 		private void OnDisable()
 		{
-			SubsystemManager.GetInstances(s_InputSubsystems);
+			UpdateInputSubsystems();
 			for (int i = 0; i < s_InputSubsystems.Count; i++)
 			{
 				s_InputSubsystems[i].trackingOriginUpdated -= TrackingOriginUpdated;
-			}
-		}
-
-		float m_LastRecenteredTime = 0.0f;
-		private void TrackingOriginUpdated(XRInputSubsystem obj)
-		{
-			m_LastRecenteredTime = Time.time;
-			sb.Clear().Append("TrackingOriginUpdated() m_LastRecenteredTime: ").Append(m_LastRecenteredTime); DEBUG(sb);
-		}
-
-		XRInputSubsystem m_InputSystem = null;
-		void UpdateInputSystem()
-		{
-			SubsystemManager.GetInstances(s_InputSubsystems);
-			if (s_InputSubsystems.Count > 0)
-			{
-				m_InputSystem = s_InputSubsystems[0];
 			}
 		}
 		private void Awake()
@@ -107,37 +88,17 @@ namespace VIVE.OpenXR
 			{
 				Destroy(this);
 			}
-
-			UpdateInputSystem();
-			if (m_InputSystem != null)
-			{
-				sb.Clear().Append("Awake() TrySetTrackingOriginMode ").Append(m_TrackingOrigin); DEBUG(sb);
-				m_InputSystem.TrySetTrackingOriginMode(m_TrackingOrigin);
-
-				TrackingOriginModeFlags mode = m_InputSystem.GetTrackingOriginMode();
-				sb.Clear().Append("Awake() Tracking mode is set to ").Append(mode); DEBUG(sb);
-			}
-			else
-			{
-				sb.Clear().Append("Awake() no XRInputSubsystem."); DEBUG(sb);
-			}
-			m_TrackingOriginEx = m_TrackingOrigin;
 		}
-
 		private void Update()
 		{
-			UpdateInputSystem();
-			if (m_InputSystem != null)
+			TrackingOriginModeFlags mode = GetTrackingOriginMode();
+			if ((mode != m_TrackingOrigin || m_TrackingOriginEx != m_TrackingOrigin) &&
+				m_TrackingOrigin != TrackingOriginModeFlags.Unknown &&
+				SetTrackingOriginMode(m_TrackingOrigin))
 			{
-				TrackingOriginModeFlags mode = m_InputSystem.GetTrackingOriginMode();
-				if ((mode != m_TrackingOrigin || m_TrackingOriginEx != m_TrackingOrigin) && m_TrackingOrigin != TrackingOriginModeFlags.Unknown)
-				{
-					m_InputSystem.TrySetTrackingOriginMode(m_TrackingOrigin);
-
-					mode = m_InputSystem.GetTrackingOriginMode();
-					sb.Clear().Append("Update() Tracking mode is set to " + mode);
-					m_TrackingOriginEx = m_TrackingOrigin;
-				}
+				mode = GetTrackingOriginMode();
+				sb.Clear().Append("Update() Tracking mode is set to " + mode);
+				m_TrackingOriginEx = m_TrackingOrigin;
 			}
 
 			if (m_CameraOffset != null && m_TrackingOrigin == TrackingOriginModeFlags.Device)
@@ -148,6 +109,67 @@ namespace VIVE.OpenXR
 
 				m_CameraOffset.transform.localPosition = cameraPosOffset;
 			}
+		}
+		#endregion
+
+		private bool SetTrackingOriginMode(TrackingOriginModeFlags value)
+		{
+			lock (lockObj)
+			{
+				UpdateInputSubsystems();
+
+				for (int i = 0; i < s_InputSubsystems.Count; i++)
+				{
+					var subsys = s_InputSubsystems[i]; 
+					if (!subsys.running)
+					{
+						continue;
+					}
+
+					if (subsys.TrySetTrackingOriginMode(value))
+					{
+						return true;
+					}
+					Debug.LogWarning($"Failed to set TrackingOriginModeFlags({value}) to XRInputSubsystem: {subsys.subsystemDescriptor?.id ?? "Unknown"}");
+				}
+				return false;
+			}
+		}
+
+		private TrackingOriginModeFlags GetTrackingOriginMode()
+		{
+			lock (lockObj)
+			{
+				UpdateInputSubsystems();
+
+				for(int i=0; i< s_InputSubsystems.Count; i++)
+				{
+					var subsys = s_InputSubsystems[i];
+					if (!subsys.running)
+					{
+						continue;
+					}
+					return subsys.GetTrackingOriginMode();
+				}
+				return TrackingOriginModeFlags.Unknown;
+			}
+		}
+
+		private void UpdateInputSubsystems()
+		{
+			s_InputSubsystems.Clear();
+
+#if UNITY_6000_0_OR_NEWER
+			SubsystemManager.GetSubsystems(s_InputSubsystems);
+#else
+			SubsystemManager.GetInstances(s_InputSubsystems);
+#endif
+		}
+
+		private void TrackingOriginUpdated(XRInputSubsystem obj)
+		{
+			m_LastRecenteredTime = Time.time;
+			sb.Clear().Append("TrackingOriginUpdated() m_LastRecenteredTime: ").Append(m_LastRecenteredTime); DEBUG(sb);
 		}
 	}
 }

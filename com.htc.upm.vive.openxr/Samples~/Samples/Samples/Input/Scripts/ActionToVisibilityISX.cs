@@ -27,7 +27,7 @@ namespace UnityEngine.XR.OpenXR.Samples.ControllerSample
 
             if (m_ActionReference != null
                 && m_ActionReference.action != null
-                && m_ActionReference.action.controls.Count > 0
+                //&& m_ActionReference.action.controls.Count > 0 // The Count of InputActionProperty will become 0 after switching interaction profiles.
                 && m_ActionReference.action.enabled == true)
             {
                 m_TargetGameobject.SetActive(true);

@@ -1,7 +1,6 @@
 # 12.1. XR_HTC_frame_synchronization
 ## Overview
-Traditional, runtime will use the latest frame which will cost jitter. With Frame Synchronization, the render frame will not be discarded for smooth gameplay experience.
-However, if the GPU cannot consistently finish rendering on time (rendering more than one vsync at a time), jitter will still occur. Therefore, reducing GPU load is key to smooth gameplay.
+The application frame loop relies on xrWaitFrame throttling to synchronize application frame submissions with the display. This extension allows the application to set the frame synchronization mode to adjust the interval between the application frame submission time and the corresponding display time according to the demand of the application. The runtime will return the appropriate XrFrameState::predictedDisplayTime returned by xrWaitFrame to throttle the frame loop approaching to the frame rendering time of the application with the consistent good user experience throughout the session.
 ## Name String
     XR_HTC_frame_synchronization
 ## Revision

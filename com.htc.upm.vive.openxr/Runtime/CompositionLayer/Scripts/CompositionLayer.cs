@@ -8,6 +8,7 @@ using UnityEngine.XR.OpenXR;
 using System.Collections.Generic;
 using System.Linq;
 using VIVE.OpenXR.CompositionLayer;
+using System.Runtime.CompilerServices;
 
 namespace VIVE.OpenXR.CompositionLayer
 {
@@ -16,15 +17,18 @@ namespace VIVE.OpenXR.CompositionLayer
 #if UNITY_EDITOR
 		[SerializeField]
 		public bool isPreviewingCylinder = false;
+		public bool isPreviewingEquirect = false;
 		[SerializeField]
 		public bool isPreviewingQuad = false;
 		[SerializeField]
 		public GameObject generatedPreview = null;
 
 		public const string CylinderPreviewName = "CylinderPreview";
+		public const string EquirectPreviewName = "EquirectPreview";
 		public const string QuadPreviewName = "QuadPreview";
 #endif
 		public const string CylinderUnderlayMeshName = "Underlay Alpha Mesh (Cylinder)";
+		public const string EquirectUnderlayMeshName = "Underlay Alpha Mesh (Equirect)";
 		public const string QuadUnderlayMeshName = "Underlay Alpha Mesh (Quad)";
 		public const string FallbackMeshName = "FallbackMeshGO";
 
@@ -58,6 +62,15 @@ namespace VIVE.OpenXR.CompositionLayer
 
 		[SerializeField]
 		[Min(0.001f)]
+		private float m_CylinderRadius = 1f;
+		public float cylinderRadius { get { return m_CylinderRadius; } }
+#if UNITY_EDITOR
+		public float CylinderRadius { get { return m_CylinderRadius; } set { m_CylinderRadius = value; } }
+#endif
+
+
+		[SerializeField]
+		[Min(0.001f)]
 		private float m_CylinderHeight = 1f;
 		public float cylinderHeight { get { return m_CylinderHeight; } }
 #if UNITY_EDITOR
@@ -74,10 +87,66 @@ namespace VIVE.OpenXR.CompositionLayer
 
 		[SerializeField]
 		[Min(0.001f)]
-		private float m_CylinderRadius = 1f;
-		public float cylinderRadius { get { return m_CylinderRadius; } }
+		private float m_EquirectRadius = 1f;
+		public float equirectRadius { get { return m_EquirectRadius; } }
 #if UNITY_EDITOR
-		public float CylinderRadius { get { return m_CylinderRadius; } set { m_CylinderRadius = value; } }
+		public float EquirectRadius { get { return m_EquirectRadius; } set { m_EquirectRadius = value; } }
+#endif
+
+		[SerializeField]
+		[Range(0.0f, 1.0f)]
+		private float m_EquirectScaleX = 1.0f;
+		public float equirectScaleX { get { return m_EquirectScaleX; } }
+#if UNITY_EDITOR
+		public float EquirectScaleX { get { return m_EquirectScaleX; } set { m_EquirectScaleX = value; } }
+#endif
+
+		[SerializeField]
+		[Range(0.0f, 1.0f)]
+		private float m_EquirectScaleY = 1.0f;
+		public float equirectScaleY { get { return m_EquirectScaleY; } }
+#if UNITY_EDITOR
+		public float EquirectScaleY { get { return m_EquirectScaleY; } set { m_EquirectScaleY = value; } }
+#endif
+
+		[SerializeField]
+		[Range(0.0f, 1.0f)]
+		private float m_EquirectBiasX = 0.0f;
+		public float equirectBiasX { get { return m_EquirectBiasX; } }
+#if UNITY_EDITOR
+		public float EquirectBiasX { get { return m_EquirectBiasX; } set { m_EquirectBiasX = value; } }
+#endif
+
+		[SerializeField]
+		[Range(0.0f, 1.0f)]
+		private float m_EquirectBiasY = 0.0f;
+		public float equirectBiasY { get { return m_EquirectBiasY; } }
+#if UNITY_EDITOR
+		public float EquirectBiasY { get { return m_EquirectBiasY; } set { m_EquirectBiasY = value; } }
+#endif
+
+		[SerializeField]
+		[Range(0f, 360f)]
+		private float m_EquirectCentralHorizontalAngle = 360f;
+		public float equirectCentralHorizontalAngle { get { return m_EquirectCentralHorizontalAngle; } }
+#if UNITY_EDITOR
+		public float EquirectCentralHorizontalAngle { get { return m_EquirectCentralHorizontalAngle; } set { m_EquirectCentralHorizontalAngle = value; } }
+#endif
+
+		[SerializeField]
+		[Range(-90f, 90f)]
+		private float m_EquirectUpperVerticalAngle = 90f;
+		public float equirectUpperVerticalAngle { get { return m_EquirectUpperVerticalAngle; } }
+#if UNITY_EDITOR
+		public float EquirectUpperVerticalAngle { get { return m_EquirectUpperVerticalAngle; } set { m_EquirectUpperVerticalAngle = value; } }
+#endif
+
+		[SerializeField]
+		[Range(-90f, 90f)]
+		private float m_EquirectLowerVerticalAngle = -90f;
+		public float equirectLowerVerticalAngle { get { return m_EquirectLowerVerticalAngle; } }
+#if UNITY_EDITOR
+		public float EquirectLowerVerticalAngle { get { return m_EquirectLowerVerticalAngle; } set { m_EquirectLowerVerticalAngle = value; } }
 #endif
 
 		[SerializeField]
@@ -171,6 +240,7 @@ namespace VIVE.OpenXR.CompositionLayer
 		private LayerShape previousLayerShape = LayerShape.Quad;
 		private float previousQuadWidth = 1f;
 		private float previousQuadHeight = 1f;
+		private float previousEquirectRadius = 1f;
 		private float previousCylinderHeight = 1f;
 		private float previousCylinderArcLength = 1f;
 		private float previousCylinderRadius = 1f;
@@ -192,7 +262,7 @@ namespace VIVE.OpenXR.CompositionLayer
 		private bool placeholderGenerated = false;
 		private static bool isSynchronized = false;
 		private static RenderThreadSynchronizer synchronizer;
-		private Camera hmd;
+		public Camera hmd;
 
 		private ViveCompositionLayer compositionLayerFeature = null;
 
@@ -362,6 +432,7 @@ namespace VIVE.OpenXR.CompositionLayer
 			previousLayerShape = layerShape;
 			previousQuadWidth = m_QuadWidth;
 			previousQuadHeight = m_QuadHeight;
+			previousEquirectRadius = m_EquirectRadius;
 			previousCylinderHeight = m_CylinderHeight;
 			previousCylinderArcLength = m_CylinderArcLength;
 			previousCylinderRadius = m_CylinderRadius;
@@ -690,6 +761,20 @@ namespace VIVE.OpenXR.CompositionLayer
 							compositionLayerCylinderFeature.Submit_CompositionLayerCylinder(AssignCompositionLayerParamsCylinder(eyeid, botheye), (OpenXR.CompositionLayer.LayerType)layerType, compositionDepth, (eyeid == 0) ? layerID : layerIDRight);
 						}
 						break;
+					case LayerShape.Equirect:// TODO added code to submit
+						ViveCompositionLayerEquirect compositionLayerEquicrectFeature = OpenXRSettings.Instance.GetFeature<ViveCompositionLayerEquirect>();
+						if (compositionLayerEquicrectFeature != null && compositionLayerEquicrectFeature.EquirectExtensionEnabled)
+						{
+							compositionLayerEquicrectFeature.Submit_CompositionLayerEquirect(AssignCompositionLayerParamsEquirect(eyeid), (OpenXR.CompositionLayer.LayerType)layerType, compositionDepth, (eyeid == 0) ? layerID : layerIDRight);
+						}
+						break;
+					case LayerShape.Equirect2:// TODO added code to submit
+						compositionLayerEquicrectFeature = OpenXRSettings.Instance.GetFeature<ViveCompositionLayerEquirect>();
+						if (compositionLayerEquicrectFeature != null && compositionLayerEquicrectFeature.Equirect2ExtensionEnabled)
+						{
+							compositionLayerEquicrectFeature.Submit_CompositionLayerEquirect2(AssignCompositionLayerParamsEquirect2(eyeid), (OpenXR.CompositionLayer.LayerType)layerType, compositionDepth, (eyeid == 0) ? layerID : layerIDRight);
+						}
+						break;
 				}
 			}
 
@@ -838,7 +923,7 @@ namespace VIVE.OpenXR.CompositionLayer
 			else
 			{
 				XRInputSubsystem subsystem = null;
-				SubsystemManager.GetInstances(inputSubsystems);
+				SubsystemManager.GetSubsystems(inputSubsystems);
 				if (inputSubsystems.Count > 0)
 				{
 					subsystem = inputSubsystems[0];
@@ -873,6 +958,97 @@ namespace VIVE.OpenXR.CompositionLayer
 			return CompositionLayerParamsQuad;
 		}
 
+		XrCompositionLayerEquirectKHR CompositionLayerParamsEquirect = new XrCompositionLayerEquirectKHR();
+		private XrCompositionLayerEquirectKHR AssignCompositionLayerParamsEquirect(int eyeid)
+		{
+			compositionLayerFeature = OpenXRSettings.Instance.GetFeature<ViveCompositionLayer>();
+
+			CompositionLayerParamsEquirect.type = XrStructureType.XR_TYPE_COMPOSITION_LAYER_EQUIRECT_KHR;
+			CompositionLayerParamsEquirect.layerFlags = ViveCompositionLayerHelper.XR_COMPOSITION_LAYER_CORRECT_CHROMATIC_ABERRATION_BIT | ViveCompositionLayerHelper.XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+
+			if (!enabledColorScaleBiasInShader)
+			{
+				CompositionLayerParamsEquirect.layerFlags |= ViveCompositionLayerHelper.XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
+			}
+
+			CompositionLayerParamsEquirect.subImage.imageRect = layerTextures[eyeid].textureLayout;
+			CompositionLayerParamsEquirect.subImage.imageArrayIndex = 0;
+			GetCompositionLayerPose(ref CompositionLayerParamsEquirect.pose); //Update isHeadLock
+																		  
+			// HeadLock
+			CompositionLayerParamsEquirect.space = compositionLayerFeature.HeadLockSpace;
+
+			switch (layerVisibility)
+			{
+				default:
+				case Visibility.Both:
+					CompositionLayerParamsEquirect.eyeVisibility = XrEyeVisibility.XR_EYE_VISIBILITY_BOTH;
+					break;
+				case Visibility.Left:
+					CompositionLayerParamsEquirect.eyeVisibility = XrEyeVisibility.XR_EYE_VISIBILITY_LEFT;
+					break;
+				case Visibility.Right:
+					CompositionLayerParamsEquirect.eyeVisibility = XrEyeVisibility.XR_EYE_VISIBILITY_RIGHT;
+					break;
+			}
+
+			CompositionLayerParamsEquirect.subImage.imageRect = layerTextures[eyeid].textureLayout;
+			CompositionLayerParamsEquirect.subImage.imageArrayIndex = 0;
+			GetCompositionLayerPose(ref CompositionLayerParamsEquirect.pose);
+			CompositionLayerParamsEquirect.radius = m_EquirectRadius;
+			CompositionLayerParamsEquirect.scale.x = m_EquirectScaleX;
+			CompositionLayerParamsEquirect.scale.y = m_EquirectScaleY;
+			CompositionLayerParamsEquirect.bias.x = m_EquirectBiasX;
+			CompositionLayerParamsEquirect.bias.y = m_EquirectBiasY;
+
+			return CompositionLayerParamsEquirect;
+		}
+
+		XrCompositionLayerEquirect2KHR CompositionLayerParamsEquirect2 = new XrCompositionLayerEquirect2KHR();
+		private XrCompositionLayerEquirect2KHR AssignCompositionLayerParamsEquirect2(int eyeid)
+		{
+			compositionLayerFeature = OpenXRSettings.Instance.GetFeature<ViveCompositionLayer>();
+
+			CompositionLayerParamsEquirect2.type = XrStructureType.XR_TYPE_COMPOSITION_LAYER_EQUIRECT2_KHR;
+			CompositionLayerParamsEquirect2.layerFlags = ViveCompositionLayerHelper.XR_COMPOSITION_LAYER_CORRECT_CHROMATIC_ABERRATION_BIT | ViveCompositionLayerHelper.XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+
+			if (!enabledColorScaleBiasInShader)
+			{
+				CompositionLayerParamsEquirect2.layerFlags |= ViveCompositionLayerHelper.XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
+			}
+
+			CompositionLayerParamsEquirect2.subImage.imageRect = layerTextures[eyeid].textureLayout;
+			CompositionLayerParamsEquirect2.subImage.imageArrayIndex = 0;
+			GetCompositionLayerPose(ref CompositionLayerParamsEquirect2.pose); //Update isHeadLock
+
+			// HeadLock
+			CompositionLayerParamsEquirect2.space = compositionLayerFeature.HeadLockSpace;
+
+			switch (layerVisibility)
+			{
+				default:
+				case Visibility.Both:
+					CompositionLayerParamsEquirect2.eyeVisibility = XrEyeVisibility.XR_EYE_VISIBILITY_BOTH;
+					break;
+				case Visibility.Left:
+					CompositionLayerParamsEquirect2.eyeVisibility = XrEyeVisibility.XR_EYE_VISIBILITY_LEFT;
+					break;
+				case Visibility.Right:
+					CompositionLayerParamsEquirect2.eyeVisibility = XrEyeVisibility.XR_EYE_VISIBILITY_RIGHT;
+					break;
+			}
+
+			CompositionLayerParamsEquirect2.subImage.imageRect = layerTextures[eyeid].textureLayout;
+			CompositionLayerParamsEquirect2.subImage.imageArrayIndex = 0;
+			GetCompositionLayerPose(ref CompositionLayerParamsEquirect2.pose);
+			CompositionLayerParamsEquirect2.radius = m_EquirectRadius;
+			CompositionLayerParamsEquirect2.centralHorizontalAngle = Mathf.Deg2Rad * m_EquirectCentralHorizontalAngle;
+			CompositionLayerParamsEquirect2.upperVerticalAngle = Mathf.Deg2Rad * m_EquirectUpperVerticalAngle;
+			CompositionLayerParamsEquirect2.lowerVerticalAngle = Mathf.Deg2Rad * m_EquirectLowerVerticalAngle;
+
+			return CompositionLayerParamsEquirect2;
+		}
+
 		XrCompositionLayerCylinderKHR CompositionLayerParamsCylinder = new XrCompositionLayerCylinderKHR();
 		private XrCompositionLayerCylinderKHR AssignCompositionLayerParamsCylinder(int eyeid, bool botheye)
 		{
@@ -893,7 +1069,7 @@ namespace VIVE.OpenXR.CompositionLayer
 			else
 			{
 				XRInputSubsystem subsystem = null;
-				SubsystemManager.GetInstances(inputSubsystems);
+				SubsystemManager.GetSubsystems(inputSubsystems);
 				if (inputSubsystems.Count > 0)
 				{
 					subsystem = inputSubsystems[0];
@@ -1122,7 +1298,15 @@ namespace VIVE.OpenXR.CompositionLayer
 		{
 			bool isChanged = false;
 
-			if (layerShape == LayerShape.Cylinder)
+			if (layerShape == LayerShape.Equirect)
+			{
+				if (previousEquirectRadius != m_EquirectRadius)
+				{
+					previousEquirectRadius = m_EquirectRadius;
+					isChanged = true;
+				}
+			}
+			else if (layerShape == LayerShape.Cylinder)
 			{
 				if (previousAngleOfArc != m_CylinderAngleOfArc ||
 					previousCylinderArcLength != m_CylinderArcLength ||
@@ -1583,6 +1767,9 @@ namespace VIVE.OpenXR.CompositionLayer
 				case LayerShape.Cylinder:
 					generatedMesh = MeshGenerationHelper.GenerateCylinderMesh(m_CylinderAngleOfArc, MeshGenerationHelper.GenerateCylinderVertex(m_CylinderAngleOfArc, m_CylinderRadius, m_CylinderHeight));
 					break;
+				case LayerShape.Equirect:
+					generatedMesh = MeshGenerationHelper.GenerateEquirectMesh(hmd, m_EquirectRadius);
+					break;
 			}
 
 			generatedFallbackMesh = new GameObject();
@@ -1622,6 +1809,9 @@ namespace VIVE.OpenXR.CompositionLayer
 				case LayerShape.Cylinder:
 					generatedMesh = MeshGenerationHelper.GenerateCylinderMesh(m_CylinderAngleOfArc, MeshGenerationHelper.GenerateCylinderVertex(m_CylinderAngleOfArc, m_CylinderRadius, m_CylinderHeight));
 					break;
+				case LayerShape.Equirect:
+					generatedMesh = MeshGenerationHelper.GenerateEquirectMesh(hmd, m_EquirectRadius);
+					break;
 			}
 
 			generatedFallbackMesh.transform.localScale = GetNormalizedLocalScale(transform, Vector3.one);
@@ -1657,6 +1847,26 @@ namespace VIVE.OpenXR.CompositionLayer
 
 			switch (layerShape)
 			{
+				case LayerShape.Equirect:
+					generatedUnderlayMesh = new GameObject();
+					generatedUnderlayMesh.name = EquirectUnderlayMeshName;
+					generatedUnderlayMesh.transform.SetParent(transform);
+					generatedUnderlayMesh.transform.localPosition = Vector3.zero;
+					generatedUnderlayMesh.transform.localRotation = Quaternion.identity;
+
+					generatedUnderlayMesh.transform.localScale = GetNormalizedLocalScale(transform, Vector3.one);
+
+					generatedUnderlayMeshRenderer = generatedUnderlayMesh.AddComponent<MeshRenderer>();
+					generatedUnderlayMeshFilter = generatedUnderlayMesh.AddComponent<MeshFilter>();
+					if (solidEffect)
+						generatedUnderlayMeshRenderer.sharedMaterial = new Material(Shader.Find("VIVE/OpenXR/CompositionLayer/UnderlayAlphaZeroSolid"));
+					else
+						generatedUnderlayMeshRenderer.sharedMaterial = new Material(Shader.Find("VIVE/OpenXR/CompositionLayer/UnderlayAlphaZero"));
+					generatedUnderlayMeshRenderer.material.mainTexture = texture;
+
+					//Generate Mesh
+					generatedUnderlayMeshFilter.mesh = MeshGenerationHelper.GenerateEquirectMesh(hmd, m_EquirectRadius);
+					break;
 				case LayerShape.Cylinder:
 					//Generate vertices
 					Vector3[] cylinderVertices = MeshGenerationHelper.GenerateCylinderVertex(m_CylinderAngleOfArc, m_CylinderRadius, m_CylinderHeight);
@@ -1718,6 +1928,10 @@ namespace VIVE.OpenXR.CompositionLayer
 
 			switch (layerShape)
 			{
+				case LayerShape.Equirect:
+					Destroy(generatedUnderlayMeshFilter.mesh);
+					generatedUnderlayMeshFilter.mesh = MeshGenerationHelper.GenerateEquirectMesh(hmd, m_EquirectRadius);
+					break;
 				case LayerShape.Cylinder:
 					//Generate vertices
 					Vector3[] cylinderVertices = MeshGenerationHelper.GenerateCylinderVertex(m_CylinderAngleOfArc, m_CylinderRadius, m_CylinderHeight);
@@ -1774,6 +1988,8 @@ namespace VIVE.OpenXR.CompositionLayer
 		{
 			Quad = 0,
 			Cylinder = 1,
+			Equirect = 2,
+			Equirect2 = 3,
 		}
 
 		public enum Visibility
@@ -2038,6 +2254,92 @@ namespace VIVE.OpenXR.CompositionLayer
 				}
 
 				return vertices;
+			}
+
+			[MethodImpl(MethodImplOptions.AggressiveInlining)]
+			private static Vector3 InverseTransformVert(in Vector3 vert, in Vector3 position, in Vector3 scale, float worldScale)
+			{
+				return new Vector3(
+					(worldScale * vert.x - position.x) / scale.x,
+					(worldScale * vert.y - position.y) / scale.y,
+					(worldScale * vert.z - position.z) / scale.z);
+			}
+
+			[MethodImpl(MethodImplOptions.AggressiveInlining)]
+			private static Vector2 GetSphereUV(float theta, float phi, float expandScale)
+			{
+				float thetaU = expandScale * (theta / (2 * Mathf.PI) - 0.5f) + 0.5f;
+				float phiV = expandScale * phi / Mathf.PI + 0.5f;
+
+				return new Vector2(thetaU, phiV);
+			}
+
+			[MethodImpl(MethodImplOptions.AggressiveInlining)]
+			private static Vector3 GetSphereVert(float theta, float phi)
+			{
+				return new Vector3(-Mathf.Sin(theta) * Mathf.Cos(phi), Mathf.Sin(phi), -Mathf.Cos(theta) * Mathf.Cos(phi));
+			}
+
+			public static void BuildSphere(List<Vector3> verts, List<Vector2> uv, List<int> triangles, Vector3 position,
+				Quaternion rotation, Vector3 scale, Rect rect, float worldScale = 800, int latitudes = 128,
+				int longitudes = 128, float expandCoefficient = 1.0f)
+			{
+				position = Quaternion.Inverse(rotation) * position;
+
+				latitudes = Mathf.CeilToInt(latitudes * rect.height);
+				longitudes = Mathf.CeilToInt(longitudes * rect.width);
+
+				float minTheta = Mathf.PI * 2.0f * rect.x;
+				float minPhi = Mathf.PI * (0.5f - rect.y - rect.height);
+
+				float thetaScale = Mathf.PI * 2.0f * rect.width / longitudes;
+				float phiScale = Mathf.PI * rect.height / latitudes;
+
+				float expandScale = 1.0f / expandCoefficient;
+
+				for (int j = 0; j < latitudes + 1; j += 1)
+				{
+					for (int k = 0; k < longitudes + 1; k++)
+					{
+						float theta = minTheta + k * thetaScale;
+						float phi = minPhi + j * phiScale;
+
+						Vector2 suv = GetSphereUV(theta, phi, expandScale);
+						uv.Add(new Vector2((suv.x - rect.x) / rect.width, (suv.y - rect.y) / rect.height));
+						Vector3 vert = GetSphereVert(theta, phi);
+						verts.Add(InverseTransformVert(in vert, in position, in scale, worldScale));
+					}
+				}
+
+				for (int j = 0; j < latitudes; j++)
+				{
+					for (int k = 0; k < longitudes; k++)
+					{
+						triangles.Add(j * (longitudes + 1) + k);
+						triangles.Add((j + 1) * (longitudes + 1) + k);
+						triangles.Add((j + 1) * (longitudes + 1) + k + 1);
+						triangles.Add((j + 1) * (longitudes + 1) + k + 1);
+						triangles.Add(j * (longitudes + 1) + k + 1);
+						triangles.Add(j * (longitudes + 1) + k);
+					}
+				}
+			}
+
+			public static Mesh GenerateEquirectMesh(Camera hmd, float equirectRadius)
+			{
+				Mesh eqicrectMesh = new Mesh();
+				List<int> _Tris = new List<int>();
+ 			    List<Vector2> _UV = new List<Vector2>();
+			    List<Vector3> _Verts = new List<Vector3>();
+			    Rect _Rect = new Rect(0, 0, 1, 1);
+
+			    BuildSphere(_Verts, _UV, _Tris, Camera.main.transform.position, Camera.main.transform.rotation, equirectRadius* Vector3.one, _Rect);
+
+				eqicrectMesh.SetVertices(_Verts);
+				eqicrectMesh.SetTriangles(_Tris, 0);
+				eqicrectMesh.SetUVs(0, _UV);
+				eqicrectMesh.UploadMeshData(false);
+				return eqicrectMesh;
 			}
 
 			public static Mesh GenerateCylinderMesh(float cylinderAngleOfArc, Vector3[] vertices)

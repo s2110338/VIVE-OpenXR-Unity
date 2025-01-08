@@ -9,7 +9,20 @@ namespace VIVE.OpenXR
 {
     partial class ViveInterceptors
     {
-        #region XRWaitFrame
+        [HookHandler("xrWaitFrame")]
+        private static XrResult OnHookXrWaitFrame(XrInstance instance, string name, out IntPtr function)
+        {
+            if (XrWaitFrameOriginal == null)
+            {
+                var ret = XrGetInstanceProcAddrOriginal(instance, name, out function);
+                if (ret != XrResult.XR_SUCCESS)
+                    return ret;
+                XrWaitFrameOriginal = Marshal.GetDelegateForFunctionPointer<DelegateXrWaitFrame>(function);
+            }
+            function = xrWaitFrameInterceptorPtr;
+            return XrResult.XR_SUCCESS;
+        }
+
         public struct XrFrameWaitInfo
         {
             public XrStructureType type;
@@ -103,6 +116,5 @@ namespace VIVE.OpenXR
         /// Use this to intercept the original function.  This will be called after the original function.
         /// </summary>
         public DelegateXrWaitFrameInterceptor AfterOriginalWaitFrame;
-        #endregion XRWaitFrame
     }
 }

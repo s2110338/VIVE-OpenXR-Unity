@@ -12,6 +12,21 @@ namespace VIVE.OpenXR
 {
 	partial class ViveInterceptors
 	{
+		[HookHandler("xrBeginSession")]
+		private static XrResult OnHookXrBeginSession(XrInstance instance, string name, out IntPtr function)
+        {
+            if (xrBeginSessionOrigin == null)
+            {
+                var ret = XrGetInstanceProcAddrOriginal(instance, name, out function);
+                if (ret != XrResult.XR_SUCCESS)
+                    return ret;
+                xrBeginSessionOrigin = Marshal.GetDelegateForFunctionPointer<xrBeginSessionDelegate>(function);
+            }
+            function = xrBeginSessionPtr;
+            return XrResult.XR_SUCCESS;
+        }
+
+
 		#region xrBeginSession
 		public delegate XrResult xrBeginSessionDelegate(XrSession session, ref XrSessionBeginInfo beginInfo);
 		private static xrBeginSessionDelegate xrBeginSessionOrigin = null;
@@ -19,7 +34,7 @@ namespace VIVE.OpenXR
 		[MonoPInvokeCallback(typeof(xrBeginSessionDelegate))]
 		private static XrResult xrBeginSessionInterceptor(XrSession session, ref XrSessionBeginInfo beginInfo)
 		{
-			Profiler.BeginSample("ViveInterceptors:BeginSession");
+			Profiler.BeginSample("VI:BeginSession");
 			XrResult result = XrResult.XR_ERROR_FUNCTION_UNSUPPORTED;
 
 			if (xrBeginSessionOrigin != null)
@@ -48,7 +63,8 @@ namespace VIVE.OpenXR
 					IntPtr fs_begin_info_ptr = new IntPtr(offset);
 					XrFrameSynchronizationSessionBeginInfoHTC fsBeginInfo = (XrFrameSynchronizationSessionBeginInfoHTC)Marshal.PtrToStructure(fs_begin_info_ptr, typeof(XrFrameSynchronizationSessionBeginInfoHTC));
 
-					sb.Clear().Append("xrBeginSessionInterceptor() beginInfo.next = (").Append(fsBeginInfo.type).Append(", ").Append(fsBeginInfo.mode).Append(")"); DEBUG(sb);
+					sb.Clear().Append("xrBeginSessionInterceptor() beginInfo.next = (").Append(fsBeginInfo.type).Append(", ").Append(fsBeginInfo.mode).Append(")");
+					Log.D(sb);
 #endif
 				}
 
@@ -56,7 +72,7 @@ namespace VIVE.OpenXR
 			}
 			else
 			{
-				sb.Clear().Append("xrBeginSessionInterceptor() Not assign xrBeginSession!"); ERROR(sb);
+				Log.E("xrBeginSessionInterceptor() Not assign xrBeginSession!");
 			}
 			Profiler.EndSample();
 
@@ -79,7 +95,8 @@ namespace VIVE.OpenXR
 		{
 			m_EnableFrameSynchronization = active;
 			m_FrameSynchronizationMode = mode;
-			sb.Clear().Append("ActivateFrameSynchronization() ").Append(active ? "enable " : "disable ").Append(mode); DEBUG(sb);
+			sb.Clear().Append("ActivateFrameSynchronization() ").Append(active ? "enable " : "disable ").Append(mode);
+			Log.D(sb);
 		}
 	}
 }

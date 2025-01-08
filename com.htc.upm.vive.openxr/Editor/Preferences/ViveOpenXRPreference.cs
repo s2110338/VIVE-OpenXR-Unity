@@ -149,9 +149,14 @@ namespace VIVE.OpenXR.Editor
 			}
 		}
 
+		static int checkPreferenceAssetsFrame = 0;
 		static void OnUpdate()
 		{
 			if (!ViveOpenXRAndroidAssigned) { return; }
+
+			checkPreferenceAssetsFrame++;
+			checkPreferenceAssetsFrame %= 1200; // 10s
+			if (checkPreferenceAssetsFrame != 0) { return; }
 
 			CheckPreferenceAssets();
 

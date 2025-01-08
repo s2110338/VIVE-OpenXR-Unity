@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using UnityEngine.Profiling;
 
 //using VIVE.OpenXR.Utils;
 using VIVE.OpenXR.Hand;
@@ -59,20 +60,7 @@ namespace VIVE.OpenXR
 
             if (m_JointLocations.isActive == 1)
             {
-                long offset = 0;
-                XrHandJointLocationEXT joint_location_ext_type = default(XrHandJointLocationEXT);
-
-                if (IntPtr.Size == 4)
-                    offset = m_JointLocations.jointLocations.ToInt32();
-                else
-                    offset = m_JointLocations.jointLocations.ToInt64();
-
-                for (int i = 0; i < m_JointLocations.jointCount; i++)
-                {
-                    IntPtr joint_location_ext_ptr = new IntPtr(offset);
-                    s_JointLocation[isLeft][i] = (XrHandJointLocationEXT)Marshal.PtrToStructure(joint_location_ext_ptr, typeof(XrHandJointLocationEXT));
-                    offset += Marshal.SizeOf(joint_location_ext_type);
-                }
+                MemoryTools.CopyFromRawMemory(handJointLocation, m_JointLocations.jointLocations, (int)m_JointLocations.jointCount);
 
                 handJointLocation = s_JointLocation[isLeft];
                 return true;

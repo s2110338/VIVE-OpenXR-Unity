@@ -11,7 +11,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using UnityEngine;
 
 namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
@@ -85,7 +84,11 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		private Quaternion lastRotation;
 		private bool isInit = false;
 		private bool isTracked = true;
-		private List<Vector3> collisionDirections = new List<Vector3>();
+		private const int k_MaxCollisionCount = 100;
+		private readonly ContactPoint[] contactPointsBuffer = new ContactPoint[k_MaxCollisionCount];
+		private readonly Vector3[] collisionsDirection = new Vector3[k_MaxCollisionCount];
+		private readonly object collisionLock = new object();
+		private int currentCollisionCount = 0;
 		private bool isGrabbing = false;
 
 		#region MonoBehaviour
@@ -163,7 +166,11 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 
 			if (isGrabbing)
 			{
+#if UNITY_6000_0_OR_NEWER
+				rootJointRigidbody.linearVelocity = Vector3.zero;
+#else
 				rootJointRigidbody.velocity = Vector3.zero;
+#endif
 				rootJointRigidbody.angularVelocity = Vector3.zero;
 				rootJoint.localPosition = lastRootPos;
 				rootJoint.localRotation = lastRotation;
@@ -175,7 +182,7 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			}
 		}
 
-		#endregion
+#endregion
 
 		private IEnumerator WaitForInit()
 		{
@@ -232,33 +239,41 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			Vector3 vel = (lastRootPos - rootJoint.position) / Time.deltaTime;
 			if (IsValidVelocity(vel))
 			{
-				if (collisionDirections.Count > 0)
+				lock (collisionLock)
 				{
-					float minAngle = float.MaxValue;
-					Vector3 closestDirection = Vector3.zero;
-					foreach (Vector3 direction in collisionDirections.ToList())
+					if (currentCollisionCount > 0)
 					{
-						float angle = Mathf.Abs(Vector3.Angle(direction, vel));
-						if (angle < minAngle)
-						{
-							minAngle = angle;
-							closestDirection = direction;
-						}
-					}
-					collisionDirections.Clear();
+						float minAngle = float.MaxValue;
+						Vector3 closestDirection = Vector3.zero;
 
-					Vector3 adjustedDirection = closestDirection;
-					if (Vector3.Dot(vel, closestDirection) > 0)
-					{
-						adjustedDirection *= -1f;
-					}
-					vel = Vector3.ProjectOnPlane(vel, adjustedDirection);
-					if (vel.magnitude > 1)
-					{
-						vel.Normalize();
+						for (int i = 0; i < currentCollisionCount; i++)
+						{
+							Vector3 direction = collisionsDirection[i];
+							float angle = Mathf.Abs(Vector3.Angle(direction, vel));
+							if (angle < minAngle)
+							{
+								minAngle = angle;
+								closestDirection = direction;
+							}
+						}
+						Vector3 adjustedDirection = closestDirection;
+						if (Vector3.Dot(vel, closestDirection) > 0)
+						{
+							adjustedDirection *= -1f;
+						}
+						vel = Vector3.ProjectOnPlane(vel, adjustedDirection);
+						if (vel.magnitude > 1)
+						{
+							vel.Normalize();
+						}
+						currentCollisionCount = 0;
 					}
 				}
+#if UNITY_6000_0_OR_NEWER
+				rootJointRigidbody.linearVelocity = vel;
+#else
 				rootJointRigidbody.velocity = vel;
+#endif
 			}
 		}
 
@@ -287,7 +302,7 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 				&& !float.IsInfinity(vector.x) && !float.IsInfinity(vector.y) && !float.IsInfinity(vector.z);
 		}
 
-		#region Event CallBack
+#region Event CallBack
 
 		/// <summary>
 		/// When tracking state changing, reset the pose and enable/disable collider.
@@ -299,7 +314,11 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			{
 				lastRootPos = Vector3.zero;
 				lastRotation = Quaternion.identity;
+#if UNITY_6000_0_OR_NEWER
+				rootJointRigidbody.linearVelocity = Vector3.zero;
+#else
 				rootJointRigidbody.velocity = Vector3.zero;
+#endif
 				rootJointRigidbody.angularVelocity = Vector3.zero;
 			}
 			foreach (JointCollider jointCollider in jointsCollider)
@@ -355,17 +374,21 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 				case JointCollider.CollisionState.Stay:
 					if (collision.contactCount > 0 && (collision.rigidbody == null || collision.rigidbody.isKinematic))
 					{
-						ContactPoint[] contactPoints = new ContactPoint[collision.contactCount];
-						collision.GetContacts(contactPoints);
-						foreach (ContactPoint contactPoint in contactPoints)
+						lock (collisionLock)
 						{
-							collisionDirections.Add(contactPoint.normal * -1f);
+							currentCollisionCount = Mathf.Min(contactPointsBuffer.Length, collision.contactCount);
+							collision.GetContacts(contactPointsBuffer);
+
+							for (int i = 0; i < currentCollisionCount; i++)
+							{
+								collisionsDirection[i] = contactPointsBuffer[i].normal * -1f;
+							}
 						}
 					}
 					break;
 			}
 		}
 
-		#endregion
+#endregion
 	}
 }

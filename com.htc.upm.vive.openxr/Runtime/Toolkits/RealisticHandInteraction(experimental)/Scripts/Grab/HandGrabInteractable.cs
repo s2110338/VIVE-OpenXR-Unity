@@ -8,7 +8,6 @@
 // conditions signed by you and all SDK and API requirements,
 // specifications, and documentation provided by HTC to You."
 
-using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -87,8 +86,8 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 
 		[SerializeField]
 		private IOneHandContraintMovement m_OneHandContraintMovement;
-        public IOneHandContraintMovement oneHandContraintMovement { get { return m_OneHandContraintMovement; } set { m_OneHandContraintMovement = value; } }
-        public bool isContraint => m_OneHandContraintMovement != null;
+		public IOneHandContraintMovement oneHandContraintMovement { get { return m_OneHandContraintMovement; } set { m_OneHandContraintMovement = value; } }
+		public bool isContraint => m_OneHandContraintMovement != null;
 
 #pragma warning disable
 		[SerializeField]
@@ -183,8 +182,9 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		{
 			if (!isGrabbable || isGrabbed) { return 0; }
 			Vector3 closestPoint = GetClosestPoint(grabberPos);
-			float distacne = Vector3.Distance(grabberPos, closestPoint);
-			return distacne > grabDistance ? 0 : 1 - (distacne / grabDistance);
+			float distanceSqr = (grabberPos - closestPoint).sqrMagnitude;
+			float grabDistSqr = grabDistance * grabDistance;
+			return distanceSqr > grabDistSqr ? 0 : 1 - (distanceSqr / grabDistSqr);
 		}
 
 		/// <summary>
@@ -263,35 +263,41 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		private Vector3 GetClosestPoint(Vector3 sourcePos)
 		{
 			Vector3 closestPoint = Vector3.zero;
-			float shortDistance = float.MaxValue;
+			float shortDistanceSqr = float.MaxValue;
 			for (int i = 0; i < allColliders.Count; i++)
 			{
 				Collider collider = allColliders[i];
 				Vector3 closePoint = collider.ClosestPointOnBounds(sourcePos);
-				float distance = Vector3.Distance(sourcePos, closePoint);
+				float distanceSqr = (sourcePos - closePoint).sqrMagnitude;
+				if (distanceSqr < 0.001f)
+				{
+					return closePoint;
+				}
+
 				if (collider.bounds.Contains(closePoint))
 				{
 					Vector3 direction = closePoint - sourcePos;
 					direction.Normalize();
-					int hitCount = Physics.RaycastNonAlloc(sourcePos, direction, hitResults, distance);
+					int hitCount = Physics.RaycastNonAlloc(sourcePos, direction, hitResults, Mathf.Sqrt(distanceSqr));
+
 					for (int j = 0; j < hitCount; j++)
 					{
 						RaycastHit hit = hitResults[j];
 						if (hit.collider == collider)
 						{
-							float hitDistance = Vector3.Distance(sourcePos, hit.point);
-							if (distance > hitDistance)
+							float hitDistanceSqr = (sourcePos - hit.point).sqrMagnitude;
+							if (distanceSqr > hitDistanceSqr)
 							{
-								distance = hitDistance;
+								distanceSqr = hitDistanceSqr;
 								closePoint = hit.point;
 							}
 						}
 					}
 				}
 
-				if (shortDistance > distance)
+				if (shortDistanceSqr > distanceSqr)
 				{
-					shortDistance = distance;
+					shortDistanceSqr = distanceSqr;
 					closestPoint = closePoint;
 				}
 			}
@@ -361,9 +367,12 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		/// <param name="index">The index of the indicator to show.</param>
 		private void ShowIndicatorByIndex(int index)
 		{
-			foreach (var grabPose in m_GrabPoses)
+			for (int i = 0; i < m_GrabPoses.Count; i++)
 			{
-				grabPose.indicator.SetActive(false);
+				if (index != i)
+				{
+					m_GrabPoses[i].indicator.SetActive(false);
+				}
 			}
 			if (index >= 0 && index < m_GrabPoses.Count &&
 				m_GrabPoses[index].indicator.enableIndicator)
@@ -379,9 +388,9 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		/// <param name="isLeft">Whether the hand side is left.</param>
 		private void ShowAllIndicator(bool isLeft)
 		{
-			foreach (var grabPose in m_GrabPoses)
+			for (int i = 0; i < m_GrabPoses.Count; i++)
 			{
-				grabPose.indicator.SetActive(false);
+				m_GrabPoses[i].indicator.SetActive(false);
 			}
 			foreach (var grabPose in m_GrabPoses)
 			{

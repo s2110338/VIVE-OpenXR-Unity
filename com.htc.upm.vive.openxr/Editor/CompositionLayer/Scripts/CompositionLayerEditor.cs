@@ -51,6 +51,39 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 		static GUIContent Label_QuadHeight = new GUIContent("Height", "Height of a Quad Layer");
 		SerializedProperty Property_QuadHeight;
 
+		static string PropertyName_EquirectRadius = "m_EquirectRadius";
+		static GUIContent Label_EquirectRadius = new GUIContent("Radius", "Radius of Equirect Layer");
+		SerializedProperty Property_EquirectRadius;
+
+		static string PropertyName_EquirectScaleX = "m_EquirectScaleX";
+		static GUIContent Label_EquirectScaleX = new GUIContent("scale.x", "Scale.X of Equirect Layer");
+		SerializedProperty Property_EquirectScaleX;
+
+		static string PropertyName_EquirectScaleY = "m_EquirectScaleY";
+		static GUIContent Label_EquirectScaleY = new GUIContent("scale.y", "Scale.Y of Equirect Layer");
+		SerializedProperty Property_EquirectScaleY;
+
+		static string PropertyName_EquirectBiasX = "m_EquirectBiasX";
+		static GUIContent Label_EquirectBiasX = new GUIContent("bias.x", "Bias.X of Equirect Layer");
+		SerializedProperty Property_EquirectBiasX;
+
+		static string PropertyName_EquirectBiasY = "m_EquirectBiasY";
+		static GUIContent Label_EquirectBiasY = new GUIContent("bias.y", "Bias.Y of Equirect Layer");
+		SerializedProperty Property_EquirectBiasY;
+
+		static string PropertyName_EquirectCentralHorizontalAngle = "m_EquirectCentralHorizontalAngle";
+		static GUIContent Label_EquirectCentralHorizontalAngle = new GUIContent("CentralHorizontalAngle", "Central Horizontal Angle of Equirect Layer");
+		SerializedProperty Property_EquirectCentralHorizontalAngle;
+
+		static string PropertyName_EquirectUpperVerticalAngle = "m_EquirectUpperVerticalAngle";
+		static GUIContent Label_EquirectUpperVerticalAngle = new GUIContent("UpperVerticalAngle", "Upper Vertical Angle of Equirect Layer");
+		SerializedProperty Property_EquirectUpperVerticalAngle;
+
+		static string PropertyName_EquirectLowerVerticalAngle = "m_EquirectLowerVerticalAngle";
+		static GUIContent Label_EquirectLowerVerticalAngle = new GUIContent("LowerVerticalAngle", "Lower Vertical Angle of Equirect Layer");
+		SerializedProperty Property_EquirectLowerVerticalAngle;
+
+
 		static string PropertyName_CylinderHeight = "m_CylinderHeight";
 		static GUIContent Label_CylinderHeight = new GUIContent("Height", "Height of Cylinder Layer");
 		SerializedProperty Property_CylinderHeight;
@@ -138,6 +171,14 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 			if (Property_LockMode == null) Property_LockMode = serializedObject.FindProperty(PropertyName_LockMode);
 			if (Property_QuadWidth == null) Property_QuadWidth = serializedObject.FindProperty(PropertyName_QuadWidth);
 			if (Property_QuadHeight == null) Property_QuadHeight = serializedObject.FindProperty(PropertyName_QuadHeight);
+			if (Property_EquirectRadius == null) Property_EquirectRadius = serializedObject.FindProperty(PropertyName_EquirectRadius);
+			if (Property_EquirectScaleX == null) Property_EquirectScaleX = serializedObject.FindProperty(PropertyName_EquirectScaleX);
+			if (Property_EquirectScaleY == null) Property_EquirectScaleY = serializedObject.FindProperty(PropertyName_EquirectScaleY);
+			if (Property_EquirectBiasX == null) Property_EquirectBiasX = serializedObject.FindProperty(PropertyName_EquirectBiasX);
+			if (Property_EquirectBiasY == null) Property_EquirectBiasY = serializedObject.FindProperty(PropertyName_EquirectBiasY);
+			if (Property_EquirectCentralHorizontalAngle == null) Property_EquirectCentralHorizontalAngle = serializedObject.FindProperty(PropertyName_EquirectCentralHorizontalAngle);
+			if (Property_EquirectUpperVerticalAngle == null) Property_EquirectUpperVerticalAngle = serializedObject.FindProperty(PropertyName_EquirectUpperVerticalAngle);
+			if (Property_EquirectLowerVerticalAngle == null) Property_EquirectLowerVerticalAngle = serializedObject.FindProperty(PropertyName_EquirectLowerVerticalAngle);
 			if (Property_CylinderHeight == null) Property_CylinderHeight = serializedObject.FindProperty(PropertyName_CylinderHeight);
 			if (Property_CylinderArcLength == null) Property_CylinderArcLength = serializedObject.FindProperty(PropertyName_CylinderArcLength);
 			if (Property_CylinderRadius == null) Property_CylinderRadius = serializedObject.FindProperty(PropertyName_CylinderRadius);
@@ -171,6 +212,138 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 			EditorGUILayout.PropertyField(Property_LayerShape, new GUIContent(Label_LayerShape));
 			serializedObject.ApplyModifiedProperties();
 
+			if (Property_LayerShape.intValue == (int)CompositionLayer.LayerShape.Equirect || Property_LayerShape.intValue == (int)CompositionLayer.LayerShape.Equirect2)
+			{
+				if (targetCompositionLayer.isPreviewingQuad)
+				{
+					targetCompositionLayer.isPreviewingQuad = false;
+					if (targetCompositionLayer.generatedPreview != null)
+					{
+						DestroyImmediate(targetCompositionLayer.generatedPreview);
+					}
+				}
+
+				if (targetCompositionLayer.isPreviewingCylinder)
+				{
+					targetCompositionLayer.isPreviewingCylinder = false;
+					if (targetCompositionLayer.generatedPreview != null)
+					{
+						DestroyImmediate(targetCompositionLayer.generatedPreview);
+					}
+				}
+
+				if (!FeatureHelpers.GetFeatureWithIdForBuildTarget(BuildTargetGroup.Android, ViveCompositionLayerEquirect.featureId).enabled)
+				{
+					EditorGUILayout.HelpBox("The Composition Layer Equirect feature is not enabled in OpenXR Settings.\nEnable it to use Equirect layers.", MessageType.Warning);
+				}
+
+				EditorGUI.indentLevel++;
+				showLayerParams = EditorGUILayout.Foldout(showLayerParams, "Equirect Parameters");
+				if (showLayerParams)
+				{
+					EditorGUILayout.PropertyField(Property_EquirectRadius, new GUIContent(Label_EquirectRadius));
+
+					if (Property_LayerShape.intValue == (int)CompositionLayer.LayerShape.Equirect)
+					{
+						EditorGUILayout.PropertyField(Property_EquirectScaleX, new GUIContent(Label_EquirectScaleX));
+						EditorGUILayout.PropertyField(Property_EquirectScaleY, new GUIContent(Label_EquirectScaleY));
+						EditorGUILayout.PropertyField(Property_EquirectBiasX, new GUIContent(Label_EquirectBiasX));
+						EditorGUILayout.PropertyField(Property_EquirectBiasY, new GUIContent(Label_EquirectBiasY));
+					}
+
+					else if (Property_LayerShape.intValue == (int)CompositionLayer.LayerShape.Equirect2)
+					{
+						EditorGUILayout.PropertyField(Property_EquirectCentralHorizontalAngle, new GUIContent(Label_EquirectCentralHorizontalAngle));
+						EditorGUILayout.PropertyField(Property_EquirectUpperVerticalAngle, new GUIContent(Label_EquirectUpperVerticalAngle));
+						EditorGUILayout.PropertyField(Property_EquirectLowerVerticalAngle, new GUIContent(Label_EquirectLowerVerticalAngle));
+					}
+					serializedObject.ApplyModifiedProperties();
+				}
+				EditorGUI.indentLevel--;
+
+				bool EquirectParamsChanged = targetCompositionLayer.LayerDimensionsChanged();
+				if (targetCompositionLayer.isPreviewingEquirect)
+				{
+					Transform generatedPreviewTransform = targetCompositionLayer.transform.Find(CompositionLayer.EquirectPreviewName);
+
+					if (generatedPreviewTransform != null)
+					{
+						targetCompositionLayer.generatedPreview = generatedPreviewTransform.gameObject;
+
+						if (EquirectParamsChanged)
+						{
+							MeshFilter equirectMeshFilter = targetCompositionLayer.generatedPreview.GetComponent<MeshFilter>();
+
+							//Generate vertices
+							equirectMeshFilter.mesh = CompositionLayer.MeshGenerationHelper.GenerateEquirectMesh(targetCompositionLayer.hmd, targetCompositionLayer.EquirectRadius);
+
+							targetCompositionLayer.generatedPreview.transform.localPosition = Vector3.zero;
+							targetCompositionLayer.generatedPreview.transform.localRotation = Quaternion.identity;
+
+							targetCompositionLayer.generatedPreview.transform.localScale = targetCompositionLayer.GetNormalizedLocalScale(targetCompositionLayer.transform, Vector3.one);
+						}
+
+						if (targetCompositionLayer.generatedPreview.GetComponent<MeshRenderer>().sharedMaterial.mainTexture != targetCompositionLayer.texture)
+						{
+							targetCompositionLayer.generatedPreview.GetComponent<MeshRenderer>().sharedMaterial.mainTexture = targetCompositionLayer.texture;
+						}
+
+						if (GUILayout.Button("Hide Equirect Preview"))
+						{
+							targetCompositionLayer.isPreviewingEquirect = false;
+							if (targetCompositionLayer.generatedPreview != null)
+							{
+								DestroyImmediate(targetCompositionLayer.generatedPreview);
+							}
+						}
+					}
+					else
+					{
+						targetCompositionLayer.isPreviewingEquirect = false;
+					}
+				}
+				else
+				{
+					if (GUILayout.Button("Show Equirect Preview"))
+					{
+						Rect srcRectLeft = FullRect;
+						if (targetCompositionLayer.isCustomRects && targetCompositionLayer.customRects == CompositionLayer.CustomRectsType.LeftRight)
+							srcRectLeft = LeftRightRect;
+						if (targetCompositionLayer.isCustomRects && targetCompositionLayer.customRects == CompositionLayer.CustomRectsType.TopDown)
+							srcRectLeft = TopDownRect;
+
+						targetCompositionLayer.isPreviewingEquirect = true;
+						//Vector3[] cylinderVertices = CompositionLayer.MeshGenerationHelper.GenerateCylinderVertex(targetCompositionLayer.CylinderAngleOfArc, targetCompositionLayer.CylinderRadius, targetCompositionLayer.CylinderHeight);
+						//Add components to Game Object
+						targetCompositionLayer.generatedPreview = new GameObject();
+						targetCompositionLayer.generatedPreview.hideFlags = HideFlags.HideAndDontSave;
+						targetCompositionLayer.generatedPreview.name = CompositionLayer.EquirectPreviewName;
+						targetCompositionLayer.generatedPreview.transform.SetParent(targetCompositionLayer.gameObject.transform);
+						targetCompositionLayer.generatedPreview.transform.localPosition = Vector3.zero;
+						targetCompositionLayer.generatedPreview.transform.localRotation = Quaternion.identity;
+
+						targetCompositionLayer.generatedPreview.transform.localScale = targetCompositionLayer.GetNormalizedLocalScale(targetCompositionLayer.transform, Vector3.one);
+
+						MeshRenderer equirectMeshRenderer = targetCompositionLayer.generatedPreview.AddComponent<MeshRenderer>();
+						MeshFilter equirectMeshFilter = targetCompositionLayer.generatedPreview.AddComponent<MeshFilter>();
+						equirectMeshRenderer.sharedMaterial = new Material(Shader.Find("Unlit/Transparent"));
+
+						if (targetCompositionLayer.texture != null)
+						{
+							equirectMeshRenderer.sharedMaterial.mainTexture = targetCompositionLayer.texture;
+							equirectMeshRenderer.sharedMaterial.mainTextureOffset = srcRectLeft.position;
+							equirectMeshRenderer.sharedMaterial.mainTextureScale = srcRectLeft.size;
+						}
+
+						//Generate Mesh
+						equirectMeshFilter.mesh = CompositionLayer.MeshGenerationHelper.GenerateEquirectMesh(targetCompositionLayer.hmd, targetCompositionLayer.EquirectRadius);
+					}
+				}
+
+				EditorGUILayout.Space(10);
+				serializedObject.ApplyModifiedProperties();
+
+			}
 			if (Property_LayerShape.intValue == (int)CompositionLayer.LayerShape.Cylinder)
 			{
 				if (!FeatureHelpers.GetFeatureWithIdForBuildTarget(BuildTargetGroup.Android, ViveCompositionLayerCylinder.featureId).enabled)
@@ -181,6 +354,15 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 				if (targetCompositionLayer.isPreviewingQuad)
 				{
 					targetCompositionLayer.isPreviewingQuad = false;
+					if (targetCompositionLayer.generatedPreview != null)
+					{
+						DestroyImmediate(targetCompositionLayer.generatedPreview);
+					}
+				}
+
+				if (targetCompositionLayer.isPreviewingEquirect)
+				{
+					targetCompositionLayer.isPreviewingEquirect = false;
 					if (targetCompositionLayer.generatedPreview != null)
 					{
 						DestroyImmediate(targetCompositionLayer.generatedPreview);
@@ -280,6 +462,7 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 
 				if (targetCompositionLayer.isPreviewingCylinder)
 				{
+
 					Transform generatedPreviewTransform = targetCompositionLayer.transform.Find(CompositionLayer.CylinderPreviewName);
 
 					if (generatedPreviewTransform != null)
@@ -366,6 +549,15 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 				if (targetCompositionLayer.isPreviewingCylinder)
 				{
 					targetCompositionLayer.isPreviewingCylinder = false;
+					if (targetCompositionLayer.generatedPreview != null)
+					{
+						DestroyImmediate(targetCompositionLayer.generatedPreview);
+					}
+				}
+
+				if (targetCompositionLayer.isPreviewingEquirect)
+				{
+					targetCompositionLayer.isPreviewingEquirect = false;
 					if (targetCompositionLayer.generatedPreview != null)
 					{
 						DestroyImmediate(targetCompositionLayer.generatedPreview);
@@ -507,7 +699,7 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 				EditorGUI.indentLevel--;
 			}*/
 
-			if (targetCompositionLayer.textureLeft == targetCompositionLayer.textureRight || targetCompositionLayer.textureRight == null)
+			if((Property_LayerShape.intValue != (int)CompositionLayer.LayerShape.Equirect && Property_LayerShape.intValue != (int)CompositionLayer.LayerShape.Equirect2) && (targetCompositionLayer.textureLeft == targetCompositionLayer.textureRight || targetCompositionLayer.textureRight == null))
 			{
 			    EditorGUILayout.PropertyField(Property_IsCustomRects, Label_IsCustomRects);
 			    serializedObject.ApplyModifiedProperties();

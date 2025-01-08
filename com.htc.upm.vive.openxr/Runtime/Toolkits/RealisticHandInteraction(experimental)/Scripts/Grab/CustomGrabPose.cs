@@ -8,12 +8,13 @@
 // conditions signed by you and all SDK and API requirements,
 // specifications, and documentation provided by HTC to You."
 
-using System.Collections.Generic;
-using System.Text;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
-using System.Linq;
+using UnityEngine.InputSystem;
 
 namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 {
@@ -129,6 +130,7 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		private HandGrabInteractable candidate = null;
 		private Pose wristPose = Pose.identity;
 		private Quaternion[] fingerJointRotation = new Quaternion[jointsPathMapping.Count];
+		private bool isNewInputSystem = false;
 
 		#region MonoBehaviours
 
@@ -156,6 +158,7 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 				sb.Append("However, you still can record  grab pose if you use direct preview mode.");
 				WARNING(sb);
 			}
+			isNewInputSystem = Keyboard.current != null;
 		}
 
 		private void OnDisable()
@@ -199,7 +202,7 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 				}
 			}
 
-			if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+			if (IsEnterPressed())
 			{
 				FindNearInteractable();
 				SavePoseWithCandidate();
@@ -324,6 +327,19 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 				DEBUG(sb);
 			}
 			return updated;
+		}
+
+		private bool IsEnterPressed()
+		{
+			if (isNewInputSystem)
+			{
+				return (Keyboard.current.enterKey?.wasPressedThisFrame ?? false) ||
+					   (Keyboard.current.numpadEnterKey?.wasPressedThisFrame ?? false);
+			}
+			else
+			{
+				return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
+			}
 		}
 
 		/// <summary>

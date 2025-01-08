@@ -12,6 +12,20 @@ namespace VIVE.OpenXR
 {
 	partial class ViveInterceptors
 	{
+		[HookHandler("xrPollEvent")]
+		private static XrResult OnHookXrPollEvent(XrInstance instance, string name, out IntPtr function)
+        {
+            if (xrPollEventOrigin == null)
+            {
+                var ret = XrGetInstanceProcAddrOriginal(instance, name, out function);
+                if (ret != XrResult.XR_SUCCESS)
+                    return ret;
+                xrPollEventOrigin = Marshal.GetDelegateForFunctionPointer<xrPollEventDelegate>(function);
+            }
+            function = xrPollEventPtr;
+            return XrResult.XR_SUCCESS;
+        }
+
 		#region xrPollEvent
 		public delegate XrResult xrPollEventDelegate(XrInstance instance, ref XrEventDataBuffer eventData);
 		private static xrPollEventDelegate xrPollEventOrigin = null;
@@ -19,7 +33,7 @@ namespace VIVE.OpenXR
 		[MonoPInvokeCallback(typeof(xrPollEventDelegate))]
 		private static XrResult xrPollEventInterceptor(XrInstance instance, ref XrEventDataBuffer eventData)
 		{
-			Profiler.BeginSample("ViveInterceptors:WaitFrame");
+			Profiler.BeginSample("VI:PollEvent");
 			XrResult result = XrResult.XR_SUCCESS;
 
 			if (xrPollEventOrigin != null)
@@ -28,7 +42,7 @@ namespace VIVE.OpenXR
 
 				if (result == XrResult.XR_SUCCESS)
 				{
-					sb.Clear().Append("xrPollEventInterceptor() xrPollEvent ").Append(eventData.type); DEBUG(sb);
+					sb.Clear().Append("xrPollEventInterceptor() xrPollEvent ").Append(eventData.type); Log.D("PollEvent", sb);
 					switch(eventData.type)
 					{
 						case XrStructureType.XR_TYPE_EVENT_DATA_PASSTHROUGH_CONFIGURATION_IMAGE_RATE_CHANGED_HTC:
@@ -41,7 +55,7 @@ namespace VIVE.OpenXR
 									.Append(", fromImageRatesrc.dstImageRate: ").Append(fromImageRate.dstImageRate)
 									.Append(", toImageRate.srcImageRate: ").Append(toImageRate.srcImageRate)
 								.Append(", toImageRate.dstImageRate: ").Append(toImageRate.dstImageRate);
-								DEBUG(sb);
+								Log.D("PollEvent", sb.ToString());
 								VivePassthroughImageRateChanged.Send(fromImageRate.srcImageRate, fromImageRate.dstImageRate, toImageRate.srcImageRate, toImageRate.dstImageRate);
 							}
 							break;
@@ -53,7 +67,7 @@ namespace VIVE.OpenXR
 								sb.Clear().Append("xrPollEventInterceptor() XR_TYPE_EVENT_DATA_PASSTHROUGH_CONFIGURATION_IMAGE_QUALITY_CHANGED_HTC")
 									.Append(", fromImageQuality: ").Append(fromImageQuality.scale)
 									.Append(", toImageQuality: ").Append(toImageQuality.scale);
-								DEBUG(sb);
+								Log.D("PollEvent", sb);
 								VivePassthroughImageQualityChanged.Send(fromImageQuality.scale, toImageQuality.scale);
 							}
 							break;
@@ -65,7 +79,7 @@ namespace VIVE.OpenXR
 								sb.Clear().Append("xrPollEventInterceptor() XR_TYPE_EVENT_DATA_DISPLAY_REFRESH_RATE_CHANGED_FB")
 									.Append(", fromDisplayRefreshRate: ").Append(fromDisplayRefreshRate)
 									.Append(", toDisplayRefreshRate: ").Append(toDisplayRefreshRate);
-								DEBUG(sb);
+								Log.D("PollEvent", sb);
 								ViveDisplayRefreshRateChanged.Send(fromDisplayRefreshRate, toDisplayRefreshRate);
 							}
 							break;
@@ -87,7 +101,7 @@ namespace VIVE.OpenXR
 									.Append(", session: ").Append(eventDataSession.session)
 									.Append(", state: ").Append(eventDataSession.state)
 									.Append(", isUserPresent: ").Append(isUserPresent);
-								DEBUG(sb);
+								Log.D("PollEvent", sb);
 							}
 							break;
 						case XrStructureType.XR_TYPE_EVENT_DATA_USER_PRESENCE_CHANGED_EXT:
@@ -97,7 +111,7 @@ namespace VIVE.OpenXR
 								sb.Clear().Append("xrPollEventInterceptor() XR_TYPE_EVENT_DATA_USER_PRESENCE_CHANGED_EXT")
 									.Append(", session: ").Append(eventDataUserPresence.session)
 									.Append(", isUserPresent: ").Append(isUserPresent);
-								DEBUG(sb);
+								Log.D("PollEvent", sb);
 							}
 							break;
 						default:
@@ -105,7 +119,7 @@ namespace VIVE.OpenXR
 					}
 				}
 
-				//sb.Clear().Append("xrPollEventInterceptor() xrPollEvent result: ").Append(result).Append(", isUserPresent: ").Append(isUserPresent); DEBUG(sb);
+				//sb.Clear().Append("xrPollEventInterceptor() xrPollEvent result: ").Append(result).Append(", isUserPresent: ").Append(isUserPresent); Log.d("PollEvent", sb);
 			}
 			Profiler.EndSample();
 

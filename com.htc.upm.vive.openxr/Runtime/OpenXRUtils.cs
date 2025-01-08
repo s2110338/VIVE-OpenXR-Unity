@@ -127,6 +127,9 @@ namespace VIVE.OpenXR
         XR_TYPE_PASSTHROUGH_CREATE_INFO_HTC = 1000317001,
         XR_TYPE_PASSTHROUGH_COLOR_HTC = 1000317002,
         XR_TYPE_PASSTHROUGH_MESH_TRANSFORM_INFO_HTC = 1000317003,
+        XR_TYPE_PASSTHROUGH_HAND_TRACKER_FRAME_STATE_HTC = 1000317100,
+        XR_TYPE_PASSTHROUGH_VIVE_CONTROLLER_FRAME_STATE_HTC = 1000317101,
+        XR_TYPE_PASSTHROUGH_VIVE_TRACKER_FRAME_STATE_HTC = 1000317102,
         XR_TYPE_COMPOSITION_LAYER_PASSTHROUGH_HTC = 1000317004,
         XR_TYPE_SESSION_CREATE_INFO_OVERLAY_EXTX = 1000033000,
         XR_TYPE_EVENT_DATA_MAIN_SESSION_VISIBILITY_CHANGED_EXTX = 1000033003,
@@ -542,6 +545,24 @@ namespace VIVE.OpenXR
             b = in_b;
             a = in_a;
         }
+    }
+
+    public struct XrBaseStructure
+    {
+        public XrStructureType type;
+        public IntPtr next;
+    }
+
+    public struct XrBaseOutStructure
+    {
+        public XrStructureType type;
+        public IntPtr next;
+    }
+
+    public struct XrBaseInStructure
+    {
+        public XrStructureType type;
+        public IntPtr next;
     }
 
     #region 2.18. Coordinate System
@@ -3243,7 +3264,7 @@ namespace VIVE.OpenXR
             {
                 if (funcPtr != IntPtr.Zero)
                 {
-                    Debug.Log("Get function pointer of " + name);
+                    Log.D("Get function pointer of " + name);
                     func = Marshal.GetDelegateForFunctionPointer<Type>(funcPtr);
                     return true;
                 }

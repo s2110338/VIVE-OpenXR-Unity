@@ -13,7 +13,7 @@
         "WindowsStandalone64"
     ],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
+    "allowUnsafeCode": true,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
@@ -23,6 +23,11 @@
             "name": "com.unity.xr.hands",
             "expression": "1.3.0",
             "define": "UNITY_XR_HANDS"
+        },
+        {
+            "name": "com.unity.xr.hands",
+            "expression": "1.5.0",
+            "define": "UNITY_XR_HANDS_1_5_0"
         },
         {
             "name": "com.unity.xr.interaction.toolkit",

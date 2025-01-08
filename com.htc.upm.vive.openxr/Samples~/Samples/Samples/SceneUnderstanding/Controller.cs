@@ -96,7 +96,11 @@ public class Controller : MonoBehaviour
     {
         GameObject ball = Instantiate(sphere, spawnPoint);
         Rigidbody rb = ball.GetComponent<Rigidbody>();
+#if UNITY_6000_0_OR_NEWER
+        rb.linearVelocity = ball.transform.parent.forward * shootVelocity;
+#else
         rb.velocity = ball.transform.parent.forward * shootVelocity;
+#endif
         rb.isKinematic = false;
         ball.transform.parent = null;
     }

@@ -14,6 +14,7 @@ namespace VIVE.OpenXR
 			"vive.openxr.feature.compositionlayer",
 			"vive.openxr.feature.compositionlayer.cylinder",
 			"vive.openxr.feature.compositionlayer.colorscalebias",
+			CompositionLayer.ViveCompositionLayerEquirect.featureId,
 			Tracker.ViveWristTracker.featureId,
 			Hand.ViveHandInteraction.featureId,
 			"vive.openxr.feature.foveation",

@@ -349,9 +349,9 @@
                 },
                 {
                     "name": "IsTracked",
-                    "type": "Value",
+                    "type": "Button",
                     "id": "384094ab-6290-4de1-9b73-6dd7fae94298",
-                    "expectedControlType": "Analog",
+                    "expectedControlType": "Button",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
@@ -1230,9 +1230,9 @@
                 },
                 {
                     "name": "IsTracked",
-                    "type": "Value",
+                    "type": "Button",
                     "id": "d1478f77-9424-45e1-bbe0-949fcfaec599",
-                    "expectedControlType": "Analog",
+                    "expectedControlType": "Button",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true

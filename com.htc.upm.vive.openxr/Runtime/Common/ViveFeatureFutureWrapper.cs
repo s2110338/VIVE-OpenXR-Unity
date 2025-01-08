@@ -17,6 +17,8 @@ namespace VIVE.OpenXR.Feature
     /// </summary>
     public class FutureWrapper : ViveFeatureWrapperBase<FutureWrapper>, IViveFeatureWrapper
     {
+        const string TAG = "ViveFuture";
+
         public enum XrFutureStateEXT
         {
             None = 0,  // Not defined in extension. A default value.
@@ -76,6 +78,8 @@ namespace VIVE.OpenXR.Feature
         public bool OnInstanceCreate(XrInstance xrInstance, IntPtr xrGetInstanceProcAddrPtr)
         {
             if (IsInited) return true;
+            if (TryInited) return false;
+                TryInited = true;
 
             if (xrInstance == null)
                 throw new Exception("FutureWrapper: xrInstance is null");
@@ -85,12 +89,12 @@ namespace VIVE.OpenXR.Feature
                 throw new Exception("FutureWrapper: xrGetInstanceProcAddr is null");
             SetGetInstanceProcAddrPtr(xrGetInstanceProcAddrPtr);
 
-            Debug.Log("FutureWrapper: OnInstanceCreate()");
+            Log.D(TAG, "OnInstanceCreate()");
 
             bool hasFuture = OpenXRRuntime.IsExtensionEnabled("XR_EXT_future");
             if (!hasFuture)
             {
-                Debug.LogError("FutureWrapper: XR_EXT_future is not enabled.  Check your feature's kOpenxrExtensionString.");
+                Log.E(TAG, "FutureWrapper: XR_EXT_future is not enabled.  Check your feature's kOpenxrExtensionString.");
                 return false;
             }
 
@@ -102,7 +106,7 @@ namespace VIVE.OpenXR.Feature
 
             if (!ret)
             {
-                Debug.LogError("FutureWrapper: Failed to get function pointer.");
+                Log.E(TAG,"FutureWrapper: Failed to get function pointer.");
                 return false;
             }
 
@@ -112,7 +116,7 @@ namespace VIVE.OpenXR.Feature
 
         public void OnInstanceDestroy()
         {
-            Debug.Log("FutureWrapper: OnInstanceDestroy()");
+            Log.D(TAG, "OnInstanceDestroy()");
             IsInited = false;
             XrPollFutureEXT = null;
             XrCancelFutureEXT = null;

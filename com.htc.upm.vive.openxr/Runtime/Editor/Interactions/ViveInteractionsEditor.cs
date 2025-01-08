@@ -75,7 +75,7 @@ namespace VIVE.OpenXR.Editor.Interaction
 				boxStyleWarning);
 			GUILayout.EndHorizontal();
 			EditorGUILayout.PropertyField(m_ViveXRTracker);
-
+			/*
 #if UNITY_ANDROID
 			// ViveHandInteractionExt
 			GUILayout.Space(20);
@@ -88,6 +88,7 @@ namespace VIVE.OpenXR.Editor.Interaction
 			GUILayout.EndHorizontal();
 			EditorGUILayout.PropertyField(m_KHRHandInteraction);
 #endif
+			*/
 			#endregion
 
 			ViveInteractions myScript = target as ViveInteractions;
@@ -96,7 +97,7 @@ namespace VIVE.OpenXR.Editor.Interaction
 				bool viveHandInteraction = myScript.UseViveHandInteraction();
 				bool viveWristTracker = myScript.UseViveWristTracker();
 				bool viveXrTracker = myScript.UseViveXrTracker();
-				bool khrHandInteraction = myScript.UseKhrHandInteraction();
+				//bool khrHandInteraction = myScript.UseKhrHandInteraction();
 
 				OpenXRSettings settings = null;
 #if UNITY_ANDROID
@@ -116,7 +117,7 @@ namespace VIVE.OpenXR.Editor.Interaction
 							feature.enabled = viveXrTracker;
 							addPathEnumeration = viveXrTracker;
 						}
-						if (feature is Hand.ViveHandInteractionExt) { feature.enabled = khrHandInteraction; }
+						//if (feature is Hand.ViveHandInteractionExt) { feature.enabled = khrHandInteraction; }
 					}
 
 					foreach (var feature in settings.GetFeatures<OpenXRFeature>())

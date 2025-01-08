@@ -635,6 +635,8 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 				}
 			},
 		};
+		// palm, wrist, thumb, index, middle, ring, pinky
+		private static readonly int[] fingerGroup = { 1, 1, 4, 5, 5, 5, 5 };
 
 		public bool valid = false;
 		public bool isTracked = false;
@@ -771,14 +773,16 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			group = 0;
 			index = jointId;
 
-			// palm, wrist, thumb, index, middle, ring, pinky
-			int[] fingerGroup = { 1, 1, 4, 5, 5, 5, 5 };
-			while (index > fingerGroup[group])
+			for (int i = 0; i < fingerGroup.Length; i++)
 			{
-				index -= fingerGroup[group];
-				group += 1;
+				if (index <= fingerGroup[i])
+				{
+					group = i;
+					index -= 1; // Adjust to 0-based index
+					return;
+				}
+				index -= fingerGroup[i];
 			}
-			index -= 1;
 		}
 	}
 
@@ -848,32 +852,29 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		/// <param name="isLeft">True if the hand is left; otherwise, false.</param>
 		private static void GetFingerData(FingerId id, ref FingerData finger, bool isLeft)
 		{
-			JointType[] jointTypes = { };
-			switch (id)
-			{
-				case FingerId.Thumb: jointTypes = s_ThumbJoints; break;
-				case FingerId.Index: jointTypes = s_IndexJoints; break;
-				case FingerId.Middle: jointTypes = s_MiddleJoints; break;
-				case FingerId.Ring: jointTypes = s_RingJoints; break;
-				case FingerId.Pinky: jointTypes = s_PinkyJoints; break;
-				default: return;
-			}
+			JointType[] jointTypes = GetJointTypes(id);
+			if (jointTypes == null) return;
+
+			float deltaTime = Time.deltaTime;
+			Vector3 parentVel = Vector3.zero;
+
 			for (int i = 0; i < jointTypes.Length; i++)
 			{
-				Vector3 parentVel = i == 0 ? Vector3.zero : finger.joints[i - 1].velocity;
-				JointData lastJoint = finger.joints[i];
-				GetJointData(jointTypes[i], ref finger.joints[i], isLeft);
+				ref JointData joint = ref finger.joints[i];
+				Vector3 lastPosition = joint.position;
+
+				DataWrapper.GetJointPose(jointTypes[i], ref joint.position, ref joint.rotation, isLeft);
+				joint.velocity = (joint.position - lastPosition) / deltaTime;
 
 				//As the velocity of child node should not be lower than the parent node.
 				//Add the current parent node's velocity multiplied by time to the last position of child node, obtaining the new simulated position.
-				if (parentVel.magnitude > finger.joints[i].velocity.magnitude)
+				if (parentVel.magnitude > joint.velocity.magnitude)
 				{
-					lastJoint.position += parentVel * Time.deltaTime;
-					finger.joints[i] = lastJoint;
+					joint.position += parentVel * deltaTime;
 				}
+				parentVel = joint.velocity;
 			}
 
-			// Since the thumb does not have joint3, it is replaced by joint2.
 			if (id == FingerId.Thumb)
 			{
 				finger.joints[(int)JointId.Tip] = finger.joint3;
@@ -883,6 +884,19 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			{
 				finger.direction = finger.tip.position - finger.joint3.position;
 			}
+		}
+
+		private static JointType[] GetJointTypes(FingerId id)
+		{
+			return id switch
+			{
+				FingerId.Thumb => s_ThumbJoints,
+				FingerId.Index => s_IndexJoints,
+				FingerId.Middle => s_MiddleJoints,
+				FingerId.Ring => s_RingJoints,
+				FingerId.Pinky => s_PinkyJoints,
+				_ => null
+			};
 		}
 
 		/// <summary>
@@ -1067,16 +1081,16 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 				Vector3 thumbTip = thumbData.tip.position;
 				Vector3 thumbJoint2 = thumbData.joint2.position;
 				Vector3 thumbJoint1 = thumbData.joint1.position;
-				Vector3[] fingerPos = { fingerData.tip.position,
-										fingerData.joint3.position,
-										fingerData.joint2.position};
 
 				float distance = float.PositiveInfinity;
-				for (int i = 0; i < fingerPos.Length; i++)
-				{
-					distance = Mathf.Min(distance, CalculateShortestDistance(fingerPos[i], thumbTip, thumbJoint2));
-					distance = Mathf.Min(distance, CalculateShortestDistance(fingerPos[i], thumbJoint2, thumbJoint1));
-				}
+				distance = Mathf.Min(distance, CalculateShortestDistance(fingerData.tip.position, thumbTip, thumbJoint2));
+				distance = Mathf.Min(distance, CalculateShortestDistance(fingerData.tip.position, thumbJoint2, thumbJoint1));
+
+				distance = Mathf.Min(distance, CalculateShortestDistance(fingerData.joint3.position, thumbTip, thumbJoint2));
+				distance = Mathf.Min(distance, CalculateShortestDistance(fingerData.joint3.position, thumbJoint2, thumbJoint1));
+
+				distance = Mathf.Min(distance, CalculateShortestDistance(fingerData.joint2.position, thumbTip, thumbJoint2));
+				distance = Mathf.Min(distance, CalculateShortestDistance(fingerData.joint2.position, thumbJoint2, thumbJoint1));
 				return distance;
 			}
 
@@ -1732,9 +1746,16 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		/// <param name="enable">True to enable the indicator, false to deactivate it.</param>
 		public void SetActive(bool enable)
 		{
-			if (target != null)
+			if (target)
 			{
-				target.SetActive(enable);
+				if (enable)
+				{
+					target.transform.localScale = Vector3.one;
+				}
+				else
+				{
+					target.transform.localScale = Vector3.zero;
+				}
 			}
 		}
 

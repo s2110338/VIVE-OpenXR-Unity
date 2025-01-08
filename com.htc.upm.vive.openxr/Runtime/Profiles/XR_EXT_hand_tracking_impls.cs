@@ -86,13 +86,8 @@ namespace VIVE.OpenXR
         {
             if (ASSERT_FEATURE())
             {
-                if (feature.GetJointLocations(isLeft, out XrHandJointLocationEXT[] array, out timestamp))
+                if (feature.GetJointLocations(isLeft, out handJointLocation, out timestamp))
                 {
-                    if (l_HandJointLocation == null) { l_HandJointLocation = new List<XrHandJointLocationEXT>(); }
-                    l_HandJointLocation.Clear();
-                    for (int i = 0; i < array.Length; i++) { l_HandJointLocation.Add(array[i]); }
-
-                    handJointLocation = l_HandJointLocation.ToArray();
                     return true;
                 }
             }
