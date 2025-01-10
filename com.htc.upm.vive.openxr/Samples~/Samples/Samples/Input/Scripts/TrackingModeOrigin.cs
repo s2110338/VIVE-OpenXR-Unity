@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.XR;
 using VIVE.OpenXR;
+using VIVE.OpenXR.DisplayRefreshRate;
 
 namespace UnityEngine.XR.OpenXR.Samples.ControllerSample
 {
@@ -64,10 +65,18 @@ namespace UnityEngine.XR.OpenXR.Samples.ControllerSample
             m_LastRecenteredTime = Time.time;
         }*/
 
+        static private void OnDisplayRateChanged(float fromRate, float toRate)
+        {
+            Debug.Log("DisplayRefreshRate fromRate = " + fromRate);
+            Debug.Log("DisplayRefreshRate toRate = " + toRate);
+        }
+
         public void OnDesiredSelectionChanged(int newValue)
         {
             desiredTrackingOriginMode  = (TrackingOriginModeFlags)(newValue == 0 ? 0 : (1 << (newValue - 1)));
 
+#if UNITY_ANDROID
+            ViveDisplayRefreshRateChanged.Listen(OnDisplayRateChanged);
             if (desiredTrackingOriginMode == TrackingOriginModeFlags.Device)
             {
                 float value;
@@ -103,6 +112,7 @@ namespace UnityEngine.XR.OpenXR.Samples.ControllerSample
                         
                 }
             }
+            #endif
         }
 
         private void TrackingOriginUpdated(TrackingOriginModeFlags mode)

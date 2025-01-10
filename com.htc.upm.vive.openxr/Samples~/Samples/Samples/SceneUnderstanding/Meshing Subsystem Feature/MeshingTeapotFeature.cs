@@ -78,7 +78,7 @@ namespace UnityEngine.XR.OpenXR.Samples.MeshingFeature
                 Marshal.GetFunctionPointerForDelegate(m_XrLocateSceneComponentsMSFT),
                 Marshal.GetFunctionPointerForDelegate(m_XrGetSceneMeshBuffersMSFT));
             systemProperties.type = XrStructureType.XR_TYPE_SYSTEM_PROPERTIES;
-            XrSystemPassThroughPropertiesHTC SystemPassThroughPropertiesHTC;
+            //XrSystemPassThroughPropertiesHTC SystemPassThroughPropertiesHTC;
             int res = xrGetSystemProperties(ref systemProperties);
             if (res != (int)XrResult.XR_SUCCESS)
             {

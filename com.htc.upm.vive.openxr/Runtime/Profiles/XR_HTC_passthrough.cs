@@ -1,9 +1,8 @@
+// Copyright HTC Corporation All Rights Reserved.
+
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
-using VIVE.OpenXR.CompositionLayer;
-using VIVE.OpenXR.CompositionLayer.Passthrough;
+using VIVE.OpenXR.Passthrough;
 
 namespace VIVE.OpenXR
 {
@@ -36,8 +35,8 @@ namespace VIVE.OpenXR
         {
             return new XrFrameState();
         }
-
     }
+
     public static class XR_HTC_passthrough
     {
         static XR_HTC_passthrough_defs m_Instance = null;

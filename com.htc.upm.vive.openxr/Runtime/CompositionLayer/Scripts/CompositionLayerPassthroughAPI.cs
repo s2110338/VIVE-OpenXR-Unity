@@ -11,6 +11,7 @@ using VIVE.OpenXR.CompositionLayer.Passthrough;
 
 namespace VIVE.OpenXR.CompositionLayer.Passthrough
 {
+	[Obsolete("This class is deprecated. Please use PassthroughAPI instead.")]
 	public static class CompositionLayerPassthroughAPI
 	{
 		const string LOG_TAG = "CompositionLayerPassthroughAPI";
@@ -79,7 +80,7 @@ namespace VIVE.OpenXR.CompositionLayer.Passthrough
 				new IntPtr(6), //Enter IntPtr(0) for backward compatibility (using createPassthrough to enable the passthrough feature), or enter IntPtr(6) to enable the passthrough feature based on the layer submitted to endframe.
 				XrPassthroughFormHTC.XR_PASSTHROUGH_FORM_PLANAR_HTC
 			);
-			XrResult res = XR_HTC_passthrough.xrCreatePassthroughHTC(createInfo, out passthrough);
+			XrResult res = passthroughFeature.CreatePassthroughHTC(createInfo, out passthrough);
 			if(res == XrResult.XR_SUCCESS)
             {
 				ulong passthrough_ulong = passthrough;
@@ -192,7 +193,7 @@ namespace VIVE.OpenXR.CompositionLayer.Passthrough
 				new IntPtr(6), //Enter IntPtr(0) for backward compatibility (using createPassthrough to enable the passthrough feature), or enter IntPtr(6) to enable the passthrough feature based on the layer submitted to endframe.
 				XrPassthroughFormHTC.XR_PASSTHROUGH_FORM_PROJECTED_HTC
 			);
-			XrResult res = XR_HTC_passthrough.xrCreatePassthroughHTC(createInfo, out passthrough);
+			XrResult res = passthroughFeature.CreatePassthroughHTC(createInfo, out passthrough);
 			if (res == XrResult.XR_SUCCESS)
 			{
 				ulong passthrough_ulong = passthrough;
@@ -301,7 +302,7 @@ namespace VIVE.OpenXR.CompositionLayer.Passthrough
 				new IntPtr(6), //Enter IntPtr(0) for backward compatibility (using createPassthrough to enable the passthrough feature), or enter IntPtr(6) to enable the passthrough feature based on the layer submitted to endframe.
 				XrPassthroughFormHTC.XR_PASSTHROUGH_FORM_PROJECTED_HTC
 			);
-			XrResult res = XR_HTC_passthrough.xrCreatePassthroughHTC(createInfo, out passthrough);
+			XrResult res = passthroughFeature.CreatePassthroughHTC(createInfo, out passthrough);
 			if (res == XrResult.XR_SUCCESS)
 			{
 				ulong passthrough_ulong = passthrough;
@@ -400,7 +401,7 @@ namespace VIVE.OpenXR.CompositionLayer.Passthrough
             }
 #if UNITY_STANDALONE
             XrPassthroughHTC passthrough = passthrough2Layer[passthroughID].passthrough;
-			XR_HTC_passthrough.xrDestroyPassthroughHTC(passthrough);
+			passthroughFeature.DestroyPassthroughHTC(passthrough);
 			passthrough2IsUnderLay.Remove(passthroughID);
 			SubmitLayer();
 			passthrough2Layer.Remove(passthroughID);

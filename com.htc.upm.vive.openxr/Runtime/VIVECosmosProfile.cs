@@ -1,6 +1,7 @@
 ﻿// Copyright HTC Corporation All Rights Reserved.
 
 using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.Scripting;
 using UnityEngine.XR.OpenXR.Input;
 using UnityEngine.InputSystem;
@@ -9,6 +10,7 @@ using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.XR;
 using UnityEngine.XR;
 using UnityEngine.XR.OpenXR.Features;
+
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.XR.OpenXR.Features;
@@ -272,6 +274,7 @@ namespace VIVE.OpenXR
         /// </summary>
         public const string haptic = "/output/haptic";
 
+        private const string kLayoutName = "ViveCosmosController";
         private const string kDeviceLocalizedName = "VIVE Cosmos Controller OpenXR";
 
         /// <summary>
@@ -279,20 +282,42 @@ namespace VIVE.OpenXR
         /// </summary>
         protected override void RegisterDeviceLayout()
         {
+            Debug.LogFormat("VIVECosmosProfile RegisterDeviceLayout() {0} , product: {1}", kLayoutName, kDeviceLocalizedName);
             InputSystem.RegisterLayout(typeof(ViveCosmosController),
-                        matches: new InputDeviceMatcher()
-                        .WithInterface(XRUtilities.InterfaceMatchAnyVersion)
-                        .WithProduct(kDeviceLocalizedName));
+                kLayoutName,
+                matches: new InputDeviceMatcher()
+                    .WithInterface(XRUtilities.InterfaceMatchAnyVersion)
+                    .WithProduct(kDeviceLocalizedName));
         }
-
 
         /// <summary>
         /// Removes the <see cref="ViveCosmosController"/> layout from the Input System. Matches the <see cref="ActionMapConfig"/> that is registered with <see cref="RegisterControllerMap"/>.
         /// </summary>
         protected override void UnregisterDeviceLayout()
         {
-            InputSystem.RemoveLayout(typeof(ViveCosmosController).Name);
+            Debug.LogFormat("VIVECosmosProfile UnregisterDeviceLayout() {0}", kLayoutName);
+            InputSystem.RemoveLayout(kLayoutName);
         }
+
+#if UNITY_XR_OPENXR_1_9_1
+        /// <summary>
+        /// Return interaction profile type. VIVEFocus3Controller profile is Device type.
+        /// </summary>
+        /// <returns>Interaction profile type.</returns>
+        protected override InteractionProfileType GetInteractionProfileType()
+        {
+            return typeof(ViveCosmosController).IsSubclassOf(typeof(XRController)) ? InteractionProfileType.XRController : InteractionProfileType.Device;
+        }
+
+        /// <summary>
+        /// Return device layer out string used for registering device VIVEFocus3Controller in InputSystem.
+        /// </summary>
+        /// <returns>Device layout string.</returns>
+        protected override string GetDeviceLayoutName()
+        {
+            return kLayoutName;
+        }
+#endif
 
         /// <summary>
         /// Registers an <see cref="ActionMapConfig"/> with OpenXR that matches the <see cref="https://www.khronos.org/registry/OpenXR/specs/1.0/html/xrspec.html#XR_HTC_vive_cosmos_controller_interaction">HTC Vive Controller</see>. Also calls <see cref="RegisterDeviceLayout"/> when the Input System package is available.

@@ -64,10 +64,6 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
         private InputActionReference m_TrackpadPress = null;
         public InputActionReference TrackpadPress { get { return m_TrackpadPress; } set { m_TrackpadPress = value; } }
 
-        [SerializeField]
-        private InputActionReference m_TrackpadTouch = null;
-        public InputActionReference TrackpadTouch { get { return m_TrackpadTouch; } set { m_TrackpadTouch = value; } }
-
         private Text m_Text = null;
         private void Start()
         {
@@ -82,7 +78,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 
             m_Text.text += " isTracked: ";
             {
-                if (Utils.GetButton(m_IsTracked, out bool value, out string msg))
+                if (CommonHelper.GetButton(m_IsTracked, out bool value, out string msg))
                 {
                     m_Text.text += value;
                 }
@@ -94,7 +90,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
             m_Text.text += "\n";
             m_Text.text += "trackingState: ";
             {
-                if (Utils.GetInteger(m_TrackingState, out InputTrackingState value, out string msg))
+                if (CommonHelper.GetInteger(m_TrackingState, out InputTrackingState value, out string msg))
                 {
                     m_Text.text += value;
                 }
@@ -106,7 +102,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
             m_Text.text += "\n";
             m_Text.text += "position (";
             {
-                if (Utils.GetVector3(m_Position, out Vector3 value, out string msg))
+                if (CommonHelper.GetVector3(m_Position, out Vector3 value, out string msg))
                 {
                     m_Text.text += value.x.ToString() + ", " + value.y.ToString() + ", " + value.z.ToString();
                 }
@@ -118,7 +114,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
             m_Text.text += ")\n";
             m_Text.text += "rotation (";
             {
-                if (Utils.GetQuaternion(m_Rotation, out Quaternion value, out string msg))
+                if (CommonHelper.GetQuaternion(m_Rotation, out Quaternion value, out string msg))
                 {
                     m_Text.text += value.x.ToString() + ", " + value.y.ToString() + ", " + value.z.ToString() + ", " + value.w.ToString();
                 }
@@ -130,7 +126,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
             m_Text.text += ")";
             m_Text.text += "\nmenu: ";
             {
-                if (Utils.GetButton(m_Menu, out bool value, out string msg))
+                if (CommonHelper.GetButton(m_Menu, out bool value, out string msg))
                 {
                     m_Text.text += value;
                 }
@@ -141,7 +137,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
             }
             m_Text.text += "\ngrip: ";
             {
-                if (Utils.GetButton(m_GripPress, out bool value, out string msg))
+                if (CommonHelper.GetButton(m_GripPress, out bool value, out string msg))
                 {
                     m_Text.text += value;
                 }
@@ -152,11 +148,11 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
             }
             m_Text.text += "\ntrigger press: ";
             {
-                if (Utils.GetButton(m_TriggerPress, out bool value, out string msg))
+                if (CommonHelper.GetButton(m_TriggerPress, out bool value, out string msg))
                 {
                     m_Text.text += value;
 
-                    if (Utils.PerformHaptic(m_TriggerPress, out msg))
+                    if (CommonHelper.PerformHaptic(m_TriggerPress, out msg))
                     {
                         m_Text.text += ", Vibrate";
                     }
@@ -172,18 +168,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
             }
             m_Text.text += "\ntrackpad press: ";
             {
-                if (Utils.GetButton(m_TrackpadPress, out bool value, out string msg))
-                {
-                    m_Text.text += value;
-                }
-                else
-                {
-                    m_Text.text += msg;
-                }
-            }
-            m_Text.text += "\ntrackpad touch: ";
-            {
-                if (Utils.GetButton(m_TrackpadTouch, out bool value, out string msg))
+                if (CommonHelper.GetButton(m_TrackpadPress, out bool value, out string msg))
                 {
                     m_Text.text += value;
                 }

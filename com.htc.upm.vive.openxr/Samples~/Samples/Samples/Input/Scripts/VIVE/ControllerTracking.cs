@@ -35,20 +35,8 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 		public bool UseInputAction { get { return m_UseInputAction; } set { m_UseInputAction = value; } }
 
 		[SerializeField]
-		private InputActionReference m_IsTracked = null;
-		public InputActionReference IsTracked { get { return m_IsTracked; } set { m_IsTracked = value; } }
-
-		[SerializeField]
-		private InputActionReference m_TrackingState = null;
-		public InputActionReference TrackingState { get { return m_TrackingState; } set { m_TrackingState = value; } }
-
-		[SerializeField]
-		private InputActionReference m_Position = null;
-		public InputActionReference Position { get { return m_Position; } set { m_Position = value; } }
-
-		[SerializeField]
-		private InputActionReference m_Rotation = null;
-		public InputActionReference Rotation { get { return m_Rotation; } set { m_Rotation = value; } }
+		private InputActionReference m_DevicePose = null;
+		public InputActionReference DevicePose { get { return m_DevicePose; } set { m_DevicePose = value; } }
 #endif
 		/// <summary> VIVE Left Controller Characteristics </summary>
 		public const InputDeviceCharacteristics kControllerLeftCharacteristics = (
@@ -200,7 +188,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 			{
 				m_Text.text += "isTracked: ";
 				{
-					if (Utils.GetButton(m_IsTracked, out bool value, out string msg))
+					if (CommonHelper.GetPoseIsTracked(m_DevicePose, out bool value, out string msg))
 					{
 						m_Text.text += value;
 					}
@@ -212,7 +200,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 				m_Text.text += "\n";
 				m_Text.text += "trackingState: ";
 				{
-					if (Utils.GetInteger(m_TrackingState, out InputTrackingState value, out string msg))
+					if (CommonHelper.GetPoseTrackingState(m_DevicePose, out InputTrackingState value, out string msg))
 					{
 						m_Text.text += value;
 					}
@@ -224,7 +212,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 				m_Text.text += "\n";
 				m_Text.text += "position (";
 				{
-					if (Utils.GetVector3(m_Position, out Vector3 value, out string msg))
+					if (CommonHelper.GetPosePosition(m_DevicePose, out Vector3 value, out string msg))
 					{
 						m_Text.text += value.x.ToString() + ", " + value.y.ToString() + ", " + value.z.ToString();
 					}
@@ -236,7 +224,7 @@ namespace VIVE.OpenXR.Samples.OpenXRInput
 				m_Text.text += ")\n";
 				m_Text.text += "rotation (";
 				{
-					if (Utils.GetQuaternion(m_Rotation, out Quaternion value, out string msg))
+					if (CommonHelper.GetPoseRotation(m_DevicePose, out Quaternion value, out string msg))
 					{
 						m_Text.text += value.x.ToString() + ", " + value.y.ToString() + ", " + value.z.ToString() + ", " + value.w.ToString();
 					}

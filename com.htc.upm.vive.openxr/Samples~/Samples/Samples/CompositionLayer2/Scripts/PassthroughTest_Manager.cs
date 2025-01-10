@@ -1,12 +1,14 @@
-using System.Collections;
+// Copyright HTC Corporation All Rights Reserved.
+
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.UI;
-using UnityEngine.XR.OpenXR;
+
 using VIVE.OpenXR.CompositionLayer;
-using VIVE.OpenXR.CompositionLayer.Passthrough;
+using VIVE.OpenXR.Passthrough;
 using VIVE.OpenXR.Samples;
+
+using XrPassthroughHTC = VIVE.OpenXR.Passthrough.XrPassthroughHTC;
 
 public class PassthroughTest_Manager : MonoBehaviour
 {
@@ -21,7 +23,7 @@ public class PassthroughTest_Manager : MonoBehaviour
     { 
         get
         {
-            List<int> currentLayerIDs = CompositionLayerPassthroughAPI.GetCurrentPassthroughLayerIDs();
+            List<XrPassthroughHTC> currentLayerIDs = PassthroughAPI.GetCurrentPassthroughLayerIDs();
             if (currentLayerIDs != null && currentLayerIDs.Contains(activePassthroughID)) //Layer is active
             {
                 //Debug.Log("passthroughActive: true");
@@ -34,7 +36,7 @@ public class PassthroughTest_Manager : MonoBehaviour
     private PassthroughLayerForm currentActiveLayerForm = PassthroughLayerForm.Planar;
     private LayerType currentActiveLayerType = LayerType.Overlay;
     private ProjectedPassthroughSpaceType currentActiveSpaceType = ProjectedPassthroughSpaceType.Worldlock;
-    private int activePassthroughID = 0;
+    private XrPassthroughHTC activePassthroughID = 0;
 
     private float scale = 1f, scaleModifier = 1f, alpha = 1f;
     private Vector3[] quadVertices = { new Vector3 (-1f, -1f, 0.0f),
@@ -133,13 +135,13 @@ public class PassthroughTest_Manager : MonoBehaviour
         {
             if (scaleChanged)
             {
-                CompositionLayerPassthroughAPI.SetProjectedPassthroughScale(activePassthroughID, new Vector3(scale * scaleModifier, scale * scaleModifier, scale * scaleModifier));
+                PassthroughAPI.SetProjectedPassthroughScale(activePassthroughID, new Vector3(scale * scaleModifier, scale * scaleModifier, scale * scaleModifier));
                 scaleChanged = false;
             }
 
             if (spaceTypeChanged)
             {
-                CompositionLayerPassthroughAPI.SetProjectedPassthroughSpaceType(activePassthroughID, currentActiveSpaceType);
+                PassthroughAPI.SetProjectedPassthroughSpaceType(activePassthroughID, currentActiveSpaceType);
                 spaceTypeChanged = false;
             }
 
@@ -149,11 +151,11 @@ public class PassthroughTest_Manager : MonoBehaviour
                 {
                     case ProjectedPassthroughSpaceType.Headlock: //Apply HMD offset
                         Vector3 relativePosition = hmd.transform.InverseTransformPoint(projectedMeshAnchor.transform.position);
-                        CompositionLayerPassthroughAPI.SetProjectedPassthroughMeshPosition(activePassthroughID, relativePosition, false);
+                        PassthroughAPI.SetProjectedPassthroughMeshPosition(activePassthroughID, relativePosition, false);
                         break;
                     case ProjectedPassthroughSpaceType.Worldlock:
                     default:
-                        CompositionLayerPassthroughAPI.SetProjectedPassthroughMeshPosition(activePassthroughID, projectedMeshAnchor.transform.position);
+                        PassthroughAPI.SetProjectedPassthroughMeshPosition(activePassthroughID, projectedMeshAnchor.transform.position);
                         break;
                 }
                 positionChanged = false;
@@ -165,11 +167,11 @@ public class PassthroughTest_Manager : MonoBehaviour
                 {
                     case ProjectedPassthroughSpaceType.Headlock: //Apply HMD offset
                         Quaternion relativeRotation = Quaternion.Inverse(hmd.transform.rotation).normalized * projectedMeshAnchor.transform.rotation.normalized;
-                        CompositionLayerPassthroughAPI.SetProjectedPassthroughMeshOrientation(activePassthroughID, relativeRotation, false);
+                        PassthroughAPI.SetProjectedPassthroughMeshOrientation(activePassthroughID, relativeRotation, false);
                         break;
                     case ProjectedPassthroughSpaceType.Worldlock:
                     default:
-                        CompositionLayerPassthroughAPI.SetProjectedPassthroughMeshOrientation(activePassthroughID, projectedMeshAnchor.transform.rotation);
+                        PassthroughAPI.SetProjectedPassthroughMeshOrientation(activePassthroughID, projectedMeshAnchor.transform.rotation);
                         break;
                 }
                 orientationChanged = false;
@@ -186,7 +188,7 @@ public class PassthroughTest_Manager : MonoBehaviour
     {
         if (passthroughActive) return;
 
-        activePassthroughID = CompositionLayerPassthroughAPI.CreatePlanarPassthrough(layerType, PassthroughSessionDestroyed, alpha);
+        PassthroughAPI.CreatePlanarPassthrough(out activePassthroughID, layerType, PassthroughSessionDestroyed, alpha);
 
         if (activePassthroughID != 0)
         {
@@ -204,7 +206,7 @@ public class PassthroughTest_Manager : MonoBehaviour
     {
         if (passthroughActive) return;
              
-        activePassthroughID = CompositionLayerPassthroughAPI.CreateProjectedPassthrough(layerType, PassthroughSessionDestroyed, alpha);
+        PassthroughAPI.CreateProjectedPassthrough(out activePassthroughID, layerType, PassthroughSessionDestroyed, alpha);
 
         if (activePassthroughID != 0)
         {
@@ -214,9 +216,9 @@ public class PassthroughTest_Manager : MonoBehaviour
         }
     }
 
-    private void PassthroughSessionDestroyed(int passthroughID) //Handle destruction of passthrough layer when OpenXR session is destroyed
+    private void PassthroughSessionDestroyed(XrPassthroughHTC passthrough) //Handle destruction of passthrough layer when OpenXR session is destroyed
     {
-        CompositionLayerPassthroughAPI.DestroyPassthrough(passthroughID);
+        PassthroughAPI.DestroyPassthrough(passthrough);
         activePassthroughID = 0;
     }
 
@@ -224,17 +226,17 @@ public class PassthroughTest_Manager : MonoBehaviour
     {
         if (passthroughActive && activePassthroughID != 0 && currentActiveLayerForm == PassthroughLayerForm.Projected)
         {
-            CompositionLayerPassthroughAPI.SetProjectedPassthroughMesh(activePassthroughID, quadVertices, quadIndicies, false);
+            PassthroughAPI.SetProjectedPassthroughMesh(activePassthroughID, quadVertices, quadIndicies, false);
             switch (currentActiveSpaceType)
             {
                 case ProjectedPassthroughSpaceType.Headlock: //Apply HMD offset
                     Vector3 relativePosition = hmd.transform.InverseTransformPoint(projectedMeshAnchor.transform.position);
                     Quaternion relativeRotation = Quaternion.Inverse(hmd.transform.rotation).normalized * projectedMeshAnchor.transform.rotation.normalized;
-                    CompositionLayerPassthroughAPI.SetProjectedPassthroughMeshTransform(activePassthroughID, currentActiveSpaceType, relativePosition, relativeRotation, new Vector3(scale * scaleModifier, scale * scaleModifier, scale * scaleModifier), false);
+                    PassthroughAPI.SetProjectedPassthroughMeshTransform(activePassthroughID, currentActiveSpaceType, relativePosition, relativeRotation, new Vector3(scale * scaleModifier, scale * scaleModifier, scale * scaleModifier), false);
                     break;
                 case ProjectedPassthroughSpaceType.Worldlock:
                 default:
-                    CompositionLayerPassthroughAPI.SetProjectedPassthroughMeshTransform(activePassthroughID, currentActiveSpaceType, projectedMeshAnchor.transform.position, projectedMeshAnchor.transform.rotation, new Vector3(scale * scaleModifier, scale * scaleModifier, scale * scaleModifier));
+                    PassthroughAPI.SetProjectedPassthroughMeshTransform(activePassthroughID, currentActiveSpaceType, projectedMeshAnchor.transform.position, projectedMeshAnchor.transform.rotation, new Vector3(scale * scaleModifier, scale * scaleModifier, scale * scaleModifier));
                     break;
             }
         }
@@ -244,17 +246,17 @@ public class PassthroughTest_Manager : MonoBehaviour
     {
         if (passthroughActive && activePassthroughID != 0 && currentActiveLayerForm == PassthroughLayerForm.Projected)
         {
-            CompositionLayerPassthroughAPI.SetProjectedPassthroughMesh(activePassthroughID, mesh.vertices, mesh.triangles, true);
+            PassthroughAPI.SetProjectedPassthroughMesh(activePassthroughID, mesh.vertices, mesh.triangles, true);
             switch (currentActiveSpaceType)
             {
                 case ProjectedPassthroughSpaceType.Headlock: //Apply HMD offset
                     Vector3 relativePosition = hmd.transform.InverseTransformPoint(projectedMeshAnchor.transform.position);
                     Quaternion relativeRotation = Quaternion.Inverse(hmd.transform.rotation).normalized * projectedMeshAnchor.transform.rotation.normalized;
-                    CompositionLayerPassthroughAPI.SetProjectedPassthroughMeshTransform(activePassthroughID, currentActiveSpaceType, relativePosition, relativeRotation, new Vector3(scale * scaleModifier, scale * scaleModifier, scale * scaleModifier), false);
+                    PassthroughAPI.SetProjectedPassthroughMeshTransform(activePassthroughID, currentActiveSpaceType, relativePosition, relativeRotation, new Vector3(scale * scaleModifier, scale * scaleModifier, scale * scaleModifier), false);
                     break;
                 case ProjectedPassthroughSpaceType.Worldlock:
                 default:
-                    CompositionLayerPassthroughAPI.SetProjectedPassthroughMeshTransform(activePassthroughID, currentActiveSpaceType, projectedMeshAnchor.transform.position, projectedMeshAnchor.transform.rotation, new Vector3(scale * scaleModifier, scale * scaleModifier, scale * scaleModifier));
+                    PassthroughAPI.SetProjectedPassthroughMeshTransform(activePassthroughID, currentActiveSpaceType, projectedMeshAnchor.transform.position, projectedMeshAnchor.transform.rotation, new Vector3(scale * scaleModifier, scale * scaleModifier, scale * scaleModifier));
                     break;
             }
         }
@@ -264,7 +266,7 @@ public class PassthroughTest_Manager : MonoBehaviour
     {
         if (passthroughActive && activePassthroughID != 0)
         {
-            CompositionLayerPassthroughAPI.SetPassthroughLayerType(activePassthroughID, LayerType.Overlay);
+            PassthroughAPI.SetPassthroughLayerType(activePassthroughID, LayerType.Overlay);
             currentActiveLayerType = LayerType.Overlay;
         }
     }
@@ -273,7 +275,7 @@ public class PassthroughTest_Manager : MonoBehaviour
     {
         if (passthroughActive && activePassthroughID != 0)
         {
-            CompositionLayerPassthroughAPI.SetPassthroughLayerType(activePassthroughID, LayerType.Underlay);
+            PassthroughAPI.SetPassthroughLayerType(activePassthroughID, LayerType.Underlay);
             currentActiveLayerType = LayerType.Underlay;
         }
     }
@@ -282,7 +284,7 @@ public class PassthroughTest_Manager : MonoBehaviour
     {
         if (passthroughActive && activePassthroughID != 0 && currentActiveLayerForm == PassthroughLayerForm.Projected)
         {
-            if (CompositionLayerPassthroughAPI.SetProjectedPassthroughSpaceType(activePassthroughID, ProjectedPassthroughSpaceType.Headlock))
+            if (PassthroughAPI.SetProjectedPassthroughSpaceType(activePassthroughID, ProjectedPassthroughSpaceType.Headlock))
             {
                 positionChanged = orientationChanged = spaceTypeChanged = true;
 
@@ -297,7 +299,7 @@ public class PassthroughTest_Manager : MonoBehaviour
     {
         if (passthroughActive && activePassthroughID != 0 && currentActiveLayerForm == PassthroughLayerForm.Projected)
         {
-            if (CompositionLayerPassthroughAPI.SetProjectedPassthroughSpaceType(activePassthroughID, ProjectedPassthroughSpaceType.Worldlock))
+            if (PassthroughAPI.SetProjectedPassthroughSpaceType(activePassthroughID, ProjectedPassthroughSpaceType.Worldlock))
             {
                 positionChanged = orientationChanged = spaceTypeChanged = true;
 
@@ -312,7 +314,7 @@ public class PassthroughTest_Manager : MonoBehaviour
     {
         if (passthroughActive && activePassthroughID != 0)
         {
-            CompositionLayerPassthroughAPI.DestroyPassthrough(activePassthroughID);
+            PassthroughAPI.DestroyPassthrough(activePassthroughID);
             activePassthroughID = 0;
         }
     }
@@ -323,7 +325,7 @@ public class PassthroughTest_Manager : MonoBehaviour
         alpha = newAlpha;
         if (passthroughActive && activePassthroughID != 0)
         {
-            CompositionLayerPassthroughAPI.SetPassthroughAlpha(activePassthroughID, newAlpha);
+            PassthroughAPI.SetPassthroughAlpha(activePassthroughID, newAlpha);
         }
     }
 

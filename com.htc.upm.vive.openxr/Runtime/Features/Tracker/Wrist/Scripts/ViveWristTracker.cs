@@ -32,10 +32,11 @@ namespace VIVE.OpenXR.Tracker
     /// </summary>
 #if UNITY_EDITOR
     [OpenXRFeature(UiName = "VIVE XR Wrist Tracker",
-        BuildTargetGroups = new[] { BuildTargetGroup.Android , BuildTargetGroup.Standalone},
+        Hidden = true,
+        BuildTargetGroups = new[] { BuildTargetGroup.Android, BuildTargetGroup.Standalone },
         Company = "HTC",
         Desc = "Support for enabling the wrist tracker interaction profile. Will register the controller map for wrist tracker if enabled.",
-        DocumentationLink = "..\\Documentation",
+        DocumentationLink = "https://registry.khronos.org/OpenXR/specs/1.1/html/xrspec.html#XR_HTC_vive_wrist_tracker_interaction",
         Version = "1.0.0",
         OpenxrExtensionStrings = kOpenxrExtensionString,
         Category = FeatureCategory.Interaction,
@@ -43,16 +44,19 @@ namespace VIVE.OpenXR.Tracker
 #endif
     public class ViveWristTracker : OpenXRInteractionFeature
     {
+        #region Log
         const string LOG_TAG = "VIVE.OpenXR.Tracker.ViveWristTracker ";
         StringBuilder m_sb = null;
-        StringBuilder sb {
-            get {
+        StringBuilder sb
+        {
+            get
+            {
                 if (m_sb == null) { m_sb = new StringBuilder(); }
                 return m_sb;
             }
         }
-        void DEBUG(StringBuilder msg) { Debug.Log(msg); }
-        void WARNING(StringBuilder msg) { Debug.LogWarning(msg); }
+        void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
+        #endregion
 
         /// <summary>
         /// OpenXR specification <see href="https://registry.khronos.org/OpenXR/specs/1.0/html/xrspec.html#XR_HTC_vive_wrist_tracker_interaction">12.72. XR_HTC_vive_wrist_tracker_interaction</see>.
@@ -70,12 +74,12 @@ namespace VIVE.OpenXR.Tracker
         private const string leftWrist = "/user/wrist_htc/left";
         private const string rightWrist = "/user/wrist_htc/right";
 
-		// Available Bindings
-		// Left Hand Only
-		/// <summary>
-		/// Constant for a boolean interaction binding '.../input/x/click' OpenXR Input Binding. Used by input subsystem to bind actions to physical inputs. This binding is only available for the <see cref="leftWrist"/> user path.
-		/// </summary>
-		public const string buttonX = "/input/x/click";
+        // Available Bindings
+        // Left Hand Only
+        /// <summary>
+        /// Constant for a boolean interaction binding '.../input/x/click' OpenXR Input Binding. Used by input subsystem to bind actions to physical inputs. This binding is only available for the <see cref="leftWrist"/> user path.
+        /// </summary>
+        public const string buttonX = "/input/x/click";
         /// <summary>
         /// Constant for a boolean interaction binding '.../input/menu/click' OpenXR Input Binding. Used by input subsystem to bind actions to physical inputs. This binding is only available for the <see cref="leftWrist"/> user path.
         /// </summary>
@@ -100,15 +104,19 @@ namespace VIVE.OpenXR.Tracker
         [Preserve, InputControlLayout(displayName = "VIVE Wrist Tracker (OpenXR)", commonUsages = new[] { "LeftHand", "RightHand" }, isGenericTypeOfDevice = true)]
         public class WristTrackerDevice : OpenXRDevice
         {
+            #region Log
             const string LOG_TAG = "VIVE.OpenXR.Tracker.ViveWristTracker.WristTrackerDevice ";
             StringBuilder m_sb = null;
-            StringBuilder sb {
-                get {
+            StringBuilder sb
+            {
+                get
+                {
                     if (m_sb == null) { m_sb = new StringBuilder(); }
                     return m_sb;
                 }
             }
-            void DEBUG(StringBuilder msg) { Debug.Log(msg); }
+            void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
+            #endregion
 
             /// <summary>
             /// A <see href="https://docs.unity3d.com/Packages/com.unity.inputsystem@1.0/api/UnityEngine.InputSystem.Controls.ButtonControl.html">ButtonControl</see> that represents the <see cref="buttonA"/> <see cref="buttonX"/> OpenXR bindings, depending on handedness.
@@ -167,8 +175,7 @@ namespace VIVE.OpenXR.Tracker
                 devicePosition = GetChildControl<Vector3Control>("devicePosition");
                 deviceRotation = GetChildControl<QuaternionControl>("deviceRotation");
 
-                sb.Clear().Append(LOG_TAG)
-                    .Append(" FinishSetup() device interfaceName: ").Append(description.interfaceName)
+                sb.Clear().Append(" FinishSetup() device interfaceName: ").Append(description.interfaceName)
                     .Append(", deviceClass: ").Append(description.deviceClass)
                     .Append(", product: ").Append(description.product)
                     .Append(", serial: ").Append(description.serial);
@@ -189,7 +196,7 @@ namespace VIVE.OpenXR.Tracker
         {
             m_XrInstanceCreated = true;
             m_XrInstance = xrInstance;
-            sb.Clear().Append(LOG_TAG).Append(" OnInstanceCreate() " + m_XrInstance); DEBUG(sb);
+            sb.Clear().Append(" OnInstanceCreate() " + m_XrInstance); DEBUG(sb);
 
             return base.OnInstanceCreate(xrInstance);
         }
@@ -201,11 +208,12 @@ namespace VIVE.OpenXR.Tracker
         /// </summary>
         protected override void RegisterDeviceLayout()
         {
+            sb.Clear().Append("RegisterDeviceLayout() ").Append(kLayoutName).Append(", product: ").Append(kDeviceLocalizedName); DEBUG(sb);
             InputSystem.RegisterLayout(typeof(WristTrackerDevice),
-                        kLayoutName,
-                        matches: new InputDeviceMatcher()
-                        .WithInterface(XRUtilities.InterfaceMatchAnyVersion)
-                        .WithProduct(kDeviceLocalizedName));
+                kLayoutName,
+                matches: new InputDeviceMatcher()
+                    .WithInterface(XRUtilities.InterfaceMatchAnyVersion)
+                    .WithProduct(kDeviceLocalizedName));
         }
 
         /// <summary>
@@ -213,8 +221,29 @@ namespace VIVE.OpenXR.Tracker
         /// </summary>
         protected override void UnregisterDeviceLayout()
         {
+            sb.Clear().Append("UnregisterDeviceLayout() ").Append(kLayoutName); DEBUG(sb);
             InputSystem.RemoveLayout(kLayoutName);
         }
+
+#if UNITY_XR_OPENXR_1_9_1
+        /// <summary>
+        /// Return interaction profile type. WristTrackerDevice profile is Device type.
+        /// </summary>
+        /// <returns>Interaction profile type.</returns>
+        protected override InteractionProfileType GetInteractionProfileType()
+        {
+            return typeof(WristTrackerDevice).IsSubclassOf(typeof(XRController)) ? InteractionProfileType.XRController : InteractionProfileType.Device;
+        }
+
+        /// <summary>
+        /// Return device layer out string used for registering device WristTrackerDevice in InputSystem.
+        /// </summary>
+        /// <returns>Device layout string.</returns>
+        protected override string GetDeviceLayoutName()
+        {
+            return kLayoutName;
+        }
+#endif
 
         /// <summary>
         /// Registers action maps to Unity XR.
@@ -245,30 +274,30 @@ namespace VIVE.OpenXR.Tracker
                 {
 					// X / A Press
 					new ActionConfig()
-					{
-						name = "primaryButton",
-						localizedName = "Primary Pressed",
-						type = ActionType.Binary,
-						usages = new List<string>()
-						{
-							"PrimaryButton"
-						},
-						bindings = new List<ActionBinding>()
-						{
-							new ActionBinding()
-							{
-								interactionPath = buttonX,
-								interactionProfileName = profile,
-								userPaths = new List<string>() { leftWrist }
-							},
-							new ActionBinding()
-							{
-								interactionPath = buttonA,
-								interactionProfileName = profile,
-								userPaths = new List<string>() { rightWrist }
-							},
-						}
-					},
+                    {
+                        name = "primaryButton",
+                        localizedName = "Primary Pressed",
+                        type = ActionType.Binary,
+                        usages = new List<string>()
+                        {
+                            "PrimaryButton"
+                        },
+                        bindings = new List<ActionBinding>()
+                        {
+                            new ActionBinding()
+                            {
+                                interactionPath = buttonX,
+                                interactionProfileName = profile,
+                                userPaths = new List<string>() { leftWrist }
+                            },
+                            new ActionBinding()
+                            {
+                                interactionPath = buttonA,
+                                interactionProfileName = profile,
+                                userPaths = new List<string>() { rightWrist }
+                            },
+                        }
+                    },
 					// Menu
 					new ActionConfig()
                     {

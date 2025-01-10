@@ -13,7 +13,11 @@ namespace VIVE.OpenXR
 	[DisallowMultipleComponent]
 	public sealed class VIVERig : MonoBehaviour
 	{
-		const string LOG_TAG = "VIVE.OpenXR.VIVERig ";
+		private static VIVERig m_Instance;
+		public static VIVERig Instance => m_Instance;
+
+		#region Log
+		const string LOG_TAG = "VIVE.OpenXR.VIVERig";
 		StringBuilder m_sb = null;
 		StringBuilder sb {
 			get {
@@ -21,16 +25,13 @@ namespace VIVE.OpenXR
 				return m_sb;
 			}
 		}
-		void DEBUG(StringBuilder msg) { Debug.Log(msg); }
+		void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
+		#endregion
 
+		#region Inspector
 		[SerializeField]
 		private GameObject m_CameraOffset = null;
 		public GameObject CameraOffset { get { return m_CameraOffset; } set { m_CameraOffset = value; } }
-
-		[SerializeField]
-		private GameObject m_CameraObject = null;
-		[System.Obsolete("No Used")]
-		public GameObject CameraObject { get { return m_CameraObject; } set { m_CameraObject = value; } }
 
 		private TrackingOriginModeFlags m_TrackingOriginEx = TrackingOriginModeFlags.Device;
 		[SerializeField]
@@ -39,7 +40,13 @@ namespace VIVE.OpenXR
 
 		private Vector3 cameraPosOffset = Vector3.zero;
 		[SerializeField]
+		private float m_CameraHeight = 1.5f;
+		public float CameraHeight { get { return m_CameraHeight; } set { m_CameraHeight = value; } }
+
+		[System.Obsolete("This variable is deprecated. Please use CameraHeight instead.")]
+		[SerializeField]
 		private float m_CameraYOffset = 1;
+		[System.Obsolete("This variable is deprecated. Please use CameraHeight instead.")]
 		public float CameraYOffset { get { return m_CameraYOffset; } set { m_CameraYOffset = value; } }
 
 #if ENABLE_INPUT_SYSTEM
@@ -47,6 +54,7 @@ namespace VIVE.OpenXR
 		private InputActionAsset m_ActionAsset;
 		public InputActionAsset actionAsset { get => m_ActionAsset; set => m_ActionAsset = value; }
 #endif
+		#endregion
 
 		static List<XRInputSubsystem> s_InputSubsystems = new List<XRInputSubsystem>();
 		private void OnEnable()
@@ -77,7 +85,7 @@ namespace VIVE.OpenXR
 		private void TrackingOriginUpdated(XRInputSubsystem obj)
 		{
 			m_LastRecenteredTime = Time.time;
-			sb.Clear().Append(LOG_TAG).Append("TrackingOriginUpdated() m_LastRecenteredTime: ").Append(m_LastRecenteredTime); DEBUG(sb);
+			sb.Clear().Append("TrackingOriginUpdated() m_LastRecenteredTime: ").Append(m_LastRecenteredTime); DEBUG(sb);
 		}
 
 		XRInputSubsystem m_InputSystem = null;
@@ -91,17 +99,27 @@ namespace VIVE.OpenXR
 		}
 		private void Awake()
 		{
+			if (m_Instance == null)
+			{
+				m_Instance = this;
+			}
+			else if (m_Instance != this)
+			{
+				Destroy(this);
+			}
+
 			UpdateInputSystem();
 			if (m_InputSystem != null)
 			{
+				sb.Clear().Append("Awake() TrySetTrackingOriginMode ").Append(m_TrackingOrigin); DEBUG(sb);
 				m_InputSystem.TrySetTrackingOriginMode(m_TrackingOrigin);
 
 				TrackingOriginModeFlags mode = m_InputSystem.GetTrackingOriginMode();
-				sb.Clear().Append(LOG_TAG).Append("Awake() Tracking mode is set to ").Append(mode); DEBUG(sb);
+				sb.Clear().Append("Awake() Tracking mode is set to ").Append(mode); DEBUG(sb);
 			}
 			else
 			{
-				sb.Clear().Append(LOG_TAG).Append("Awake() no XRInputSubsystem."); DEBUG(sb);
+				sb.Clear().Append("Awake() no XRInputSubsystem."); DEBUG(sb);
 			}
 			m_TrackingOriginEx = m_TrackingOrigin;
 		}
@@ -117,15 +135,15 @@ namespace VIVE.OpenXR
 					m_InputSystem.TrySetTrackingOriginMode(m_TrackingOrigin);
 
 					mode = m_InputSystem.GetTrackingOriginMode();
-					sb.Clear().Append(LOG_TAG).Append("Update() Tracking mode is set to " + mode);
+					sb.Clear().Append("Update() Tracking mode is set to " + mode);
 					m_TrackingOriginEx = m_TrackingOrigin;
 				}
 			}
 
-			if (m_CameraOffset != null)
+			if (m_CameraOffset != null && m_TrackingOrigin == TrackingOriginModeFlags.Device)
 			{
 				cameraPosOffset.x = m_CameraOffset.transform.localPosition.x;
-				cameraPosOffset.y = m_CameraYOffset;
+				cameraPosOffset.y = m_CameraHeight;
 				cameraPosOffset.z = m_CameraOffset.transform.localPosition.z;
 
 				m_CameraOffset.transform.localPosition = cameraPosOffset;

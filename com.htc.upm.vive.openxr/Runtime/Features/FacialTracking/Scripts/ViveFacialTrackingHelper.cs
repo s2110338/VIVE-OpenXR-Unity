@@ -201,19 +201,19 @@ namespace VIVE.OpenXR.FacialTracking
         /// <summary>
         /// This blend shape raises the right side of the mouth further with a higher value.
         /// </summary>
-        XR_LIP_EXPRESSION_MOUTH_SMILE_RIGHT_HTC = 12,
+        XR_LIP_EXPRESSION_MOUTH_RAISER_RIGHT_HTC = 12,
         /// <summary>
         /// This blend shape raises the left side of the mouth further with a higher value.
         /// </summary>
-        XR_LIP_EXPRESSION_MOUTH_SMILE_LEFT_HTC = 13,
+        XR_LIP_EXPRESSION_MOUTH_RAISER_LEFT_HTC = 13,
         /// <summary>
         /// This blend shape lowers the right side of the mouth further with a higher value.
         /// </summary>
-        XR_LIP_EXPRESSION_MOUTH_SAD_RIGHT_HTC = 14,
+        XR_LIP_EXPRESSION_MOUTH_STRETCHER_RIGHT_HTC = 14,
         /// <summary>
         /// This blend shape lowers the left side of the mouth further with a higher value.
         /// </summary>
-        XR_LIP_EXPRESSION_MOUTH_SAD_LEFT_HTC = 15,
+        XR_LIP_EXPRESSION_MOUTH_STRETCHER_LEFT_HTC = 15,
         /// <summary>
         /// This blend shape puffs up the right side of the cheek further with a higher value.
         /// </summary>
@@ -433,7 +433,7 @@ namespace VIVE.OpenXR.FacialTracking
         /// </summary>
         /// <param name="facialTracker">An <see cref="XrFacialTrackerHTC">XrFacialTrackerHTC</see> previously created by <see href="https://registry.khronos.org/OpenXR/specs/1.0/html/xrspec.html#xrCreateFacialTrackerHTC">xrCreateFacialTrackerHTC</see>.</param>
         /// <param name="facialExpressions">A pointer to <see cref="XrFacialExpressionsHTC">XrFacialExpressionsHTC</see> receiving the returned facial expressions.</param>
-        /// <returns></returns>
+        /// <returns>XR_SUCCESS for success.</returns>
         public delegate XrResult xrGetFacialExpressionsHTCDelegate(
             XrFacialTrackerHTC facialTracker,
             ref XrFacialExpressionsHTC facialExpressions);

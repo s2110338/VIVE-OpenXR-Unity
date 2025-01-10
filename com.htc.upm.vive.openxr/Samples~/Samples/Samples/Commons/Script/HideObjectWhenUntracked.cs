@@ -9,19 +9,28 @@ namespace VIVE.OpenXR.Samples
 {
     public class HideObjectWhenUntracked : MonoBehaviour
     {
-        const string LOG_TAG = "VIVE.OpenXR.Samples.HideObjectWhenUntracked ";
+        #region Log
+        const string LOG_TAG = "VIVE.OpenXR.Samples.HideObjectWhenUntracked";
         StringBuilder m_sb = null;
-        StringBuilder sb {
-            get {
+        StringBuilder sb
+        {
+            get
+            {
                 if (m_sb == null) { m_sb = new StringBuilder(); }
                 return m_sb;
             }
         }
-        void DEBUG(StringBuilder msg) { Debug.Log(msg); }
+        void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
+        int printFrame = 0;
+        protected bool printIntervalLog = false;
+        #endregion
 
+        #region Inspector
         public bool IsLeft = false;
-        private string hand {
-            get {
+        private string hand
+        {
+            get
+            {
                 return (IsLeft ? " Left " : " Right ");
             }
         }
@@ -37,13 +46,8 @@ namespace VIVE.OpenXR.Samples
         [SerializeField]
         private GameObject m_ObjectToHide = null;
         public GameObject ObjectToHide { get { return m_ObjectToHide; } set { m_ObjectToHide = value; } }
+        #endregion
 
-        int printFrame = 0;
-        protected bool printIntervalLog = false;
-
-        bool isActive = false;
-        int trackingState = 0;
-        bool positionTracked = false, rotationTracked = false;
         private void Update()
         {
             printFrame++;
@@ -53,6 +57,10 @@ namespace VIVE.OpenXR.Samples
             if (m_ObjectToHide == null) { return; }
 
             string errMsg = "";
+            bool isActive = false;
+            int trackingState = 0;
+            bool positionTracked = false, rotationTracked = false;
+
             if (OpenXRHelper.VALIDATE(m_IsActive, out errMsg))
             {
                 if (m_IsActive.action.activeControl.valueType == typeof(float))
@@ -62,10 +70,13 @@ namespace VIVE.OpenXR.Samples
             }
             else
             {
-                isActive = false;
                 if (printIntervalLog)
                 {
-                    sb.Clear().Append(LOG_TAG).Append(hand).Append("Update() ").Append(m_IsActive.action.name).Append(", ").Append(errMsg);
+                    sb.Clear().Append("Update() ")
+                        .Append(hand).Append(", ")
+                        .Append(m_ObjectToHide != null ? m_ObjectToHide.name : "").Append(", ")
+                        .Append(m_IsActive.action.name).Append(", ")
+                        .Append(errMsg);
                     DEBUG(sb);
                 }
             }
@@ -75,17 +86,24 @@ namespace VIVE.OpenXR.Samples
             }
             else
             {
-                trackingState = 0;
                 if (printIntervalLog)
                 {
-                    sb.Clear().Append(LOG_TAG).Append(hand).Append("Update() ").Append(m_TrackingState.action.name).Append(", ").Append(errMsg);
+                    sb.Clear().Append("Update() ")
+                        .Append(hand).Append(", ")
+                        .Append(m_ObjectToHide != null ? m_ObjectToHide.name : "").Append(", ")
+                        .Append(m_TrackingState.action.name).Append(", ")
+                        .Append(errMsg);
                     DEBUG(sb);
                 }
             }
 
             if (printIntervalLog)
             {
-                sb.Clear().Append(LOG_TAG).Append(hand).Append("Update() isActive: ").Append(isActive).Append(", trackingState: ").Append(trackingState);
+                sb.Clear().Append("Update() ")
+                    .Append(hand).Append(", ")
+                    .Append(m_ObjectToHide != null ? m_ObjectToHide.name : "").Append(", ")
+                    .Append("isActive: ").Append(isActive).Append(", ")
+                    .Append("trackingState: ").Append(trackingState);
                 DEBUG(sb);
             }
 

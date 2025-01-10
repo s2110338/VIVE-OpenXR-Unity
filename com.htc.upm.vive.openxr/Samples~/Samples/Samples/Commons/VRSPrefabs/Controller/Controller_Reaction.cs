@@ -1,7 +1,9 @@
-using System.Collections;
-using System.Collections.Generic;
+// Copyright HTC Corporation All Rights Reserved.
+
 using UnityEngine;
 using UnityEngine.InputSystem;
+
+[System.Obsolete("This script is deprecated. Please use Focus3ModelAction instead.")]
 public class Controller_Reaction : MonoBehaviour
 {
     public string LorR = "L";

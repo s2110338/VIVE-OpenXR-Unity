@@ -1,10 +1,9 @@
-using System.Collections;
-using System.Collections.Generic;
+// Copyright HTC Corporation All Rights Reserved.
+
 using UnityEngine;
 using UnityEngine.UI;
-using VIVE.OpenXR.CompositionLayer;
-using VIVE.OpenXR.CompositionLayer.Passthrough;
 
+using VIVE.OpenXR.Passthrough;
 using VIVE.OpenXR.Samples;
 
 namespace VIVE.OpenXR.CompositionLayer.Samples.Passthrough
@@ -21,7 +20,7 @@ namespace VIVE.OpenXR.CompositionLayer.Samples.Passthrough
         private Vector3 scale = Vector3.one;
         private float scaleModifier = 1f;
 
-        private int activePassthroughID = 0;
+        private OpenXR.Passthrough.XrPassthroughHTC activePassthroughID = 0;
         private LayerType currentActiveLayerType = LayerType.Underlay;
         private ProjectedPassthroughSpaceType currentActiveSpaceType = ProjectedPassthroughSpaceType.Worldlock;
 
@@ -69,7 +68,7 @@ namespace VIVE.OpenXR.CompositionLayer.Samples.Passthrough
             {
                 if (activePassthroughID != 0)
                 {
-                    CompositionLayerPassthroughAPI.DestroyPassthrough(activePassthroughID);
+                    PassthroughAPI.DestroyPassthrough(activePassthroughID);
                     activePassthroughID = 0;
                 }
             }
@@ -79,7 +78,7 @@ namespace VIVE.OpenXR.CompositionLayer.Samples.Passthrough
         {
             if (activePassthroughID != 0)
             {
-                CompositionLayerPassthroughAPI.SetPassthroughLayerType(activePassthroughID, LayerType.Overlay);
+                PassthroughAPI.SetPassthroughLayerType(activePassthroughID, LayerType.Overlay);
                 currentActiveLayerType = LayerType.Overlay;
             }
         }
@@ -88,7 +87,7 @@ namespace VIVE.OpenXR.CompositionLayer.Samples.Passthrough
         {
             if (activePassthroughID != 0)
             {
-                CompositionLayerPassthroughAPI.SetPassthroughLayerType(activePassthroughID, LayerType.Underlay);
+                PassthroughAPI.SetPassthroughLayerType(activePassthroughID, LayerType.Underlay);
                 currentActiveLayerType = LayerType.Underlay;
             }
         }
@@ -97,7 +96,7 @@ namespace VIVE.OpenXR.CompositionLayer.Samples.Passthrough
         {
             if (activePassthroughID != 0)
             {
-                if (CompositionLayerPassthroughAPI.SetProjectedPassthroughSpaceType(activePassthroughID, ProjectedPassthroughSpaceType.Headlock))
+                if (PassthroughAPI.SetProjectedPassthroughSpaceType(activePassthroughID, ProjectedPassthroughSpaceType.Headlock))
                 {
                     passthroughMeshTransform.SetParent(hmd.transform);
 
@@ -110,7 +109,7 @@ namespace VIVE.OpenXR.CompositionLayer.Samples.Passthrough
         {
             if (activePassthroughID != 0)
             {
-                if (CompositionLayerPassthroughAPI.SetProjectedPassthroughSpaceType(activePassthroughID, ProjectedPassthroughSpaceType.Worldlock))
+                if (PassthroughAPI.SetProjectedPassthroughSpaceType(activePassthroughID, ProjectedPassthroughSpaceType.Worldlock))
                 {
                     passthroughMeshTransform.SetParent(null);
 
@@ -131,30 +130,30 @@ namespace VIVE.OpenXR.CompositionLayer.Samples.Passthrough
 
         void StartPassthrough()
         {
-            activePassthroughID = CompositionLayerPassthroughAPI.CreateProjectedPassthrough(currentActiveLayerType, OnDestroyPassthroughFeatureSession);
+            PassthroughAPI.CreateProjectedPassthrough(out activePassthroughID, currentActiveLayerType, OnDestroyPassthroughFeatureSession);
             SetPassthroughMesh();
         }
 
         void SetPassthroughMesh()
         {
-            CompositionLayerPassthroughAPI.SetProjectedPassthroughMesh(activePassthroughID, passthroughMesh.vertices, passthroughMesh.triangles);
+            PassthroughAPI.SetProjectedPassthroughMesh(activePassthroughID, passthroughMesh.vertices, passthroughMesh.triangles);
             switch (currentActiveSpaceType)
             {
                 case ProjectedPassthroughSpaceType.Headlock: //Apply HMD offset
                     Vector3 relativePosition = hmd.transform.InverseTransformPoint(passthroughMeshTransform.transform.position);
                     Quaternion relativeRotation = Quaternion.Inverse(hmd.transform.rotation).normalized * passthroughMeshTransform.transform.rotation.normalized;
-                    CompositionLayerPassthroughAPI.SetProjectedPassthroughMeshTransform(activePassthroughID, currentActiveSpaceType, relativePosition, relativeRotation, scale * scaleModifier, false);
+                    PassthroughAPI.SetProjectedPassthroughMeshTransform(activePassthroughID, currentActiveSpaceType, relativePosition, relativeRotation, scale * scaleModifier, false);
                     break;
                 case ProjectedPassthroughSpaceType.Worldlock:
                 default:
-                    CompositionLayerPassthroughAPI.SetProjectedPassthroughMeshTransform(activePassthroughID, currentActiveSpaceType, passthroughMeshTransform.transform.position, passthroughMeshTransform.transform.rotation, scale * scaleModifier);
+                    PassthroughAPI.SetProjectedPassthroughMeshTransform(activePassthroughID, currentActiveSpaceType, passthroughMeshTransform.transform.position, passthroughMeshTransform.transform.rotation, scale * scaleModifier);
                     break;
             }
         }
 
-        void OnDestroyPassthroughFeatureSession(int passthroughID)
+        void OnDestroyPassthroughFeatureSession(OpenXR.Passthrough.XrPassthroughHTC passthrough)
         {
-            CompositionLayerPassthroughAPI.DestroyPassthrough(passthroughID);
+            PassthroughAPI.DestroyPassthrough(passthrough);
             activePassthroughID = 0;
         }
     }

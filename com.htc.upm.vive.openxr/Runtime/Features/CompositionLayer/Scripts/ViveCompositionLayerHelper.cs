@@ -1,4 +1,4 @@
-﻿// Copyright HTC Corporation All Rights Reserved.
+// Copyright HTC Corporation All Rights Reserved.
 
 using System;
 using System.Collections.Generic;
@@ -66,65 +66,6 @@ namespace VIVE.OpenXR.CompositionLayer
 			return a.value / b.value;
 		}
 
-	}
-	public struct XrCompositionLayerFlags : IEquatable<UInt64>
-	{
-		private readonly UInt64 value;
-
-		public XrCompositionLayerFlags(UInt64 u)
-		{
-			value = u;
-		}
-
-		public static implicit operator UInt64(XrCompositionLayerFlags xrBool)
-		{
-			return xrBool.value;
-		}
-		public static implicit operator XrCompositionLayerFlags(UInt64 u)
-		{
-			return new XrCompositionLayerFlags(u);
-		}
-
-		public bool Equals(XrCompositionLayerFlags other)
-		{
-			return value == other.value;
-		}
-		public bool Equals(UInt64 other)
-		{
-			return value == other;
-		}
-		public override bool Equals(object obj)
-		{
-			return obj is XrCompositionLayerFlags && Equals((XrCompositionLayerFlags)obj);
-		}
-
-		public override int GetHashCode()
-		{
-			return value.GetHashCode();
-		}
-
-		public override string ToString()
-		{
-			return value.ToString();
-		}
-
-		public static bool operator ==(XrCompositionLayerFlags a, XrCompositionLayerFlags b) { return a.Equals(b); }
-		public static bool operator !=(XrCompositionLayerFlags a, XrCompositionLayerFlags b) { return !a.Equals(b); }
-		public static bool operator >=(XrCompositionLayerFlags a, XrCompositionLayerFlags b) { return a.value >= b.value; }
-		public static bool operator <=(XrCompositionLayerFlags a, XrCompositionLayerFlags b) { return a.value <= b.value; }
-		public static bool operator >(XrCompositionLayerFlags a, XrCompositionLayerFlags b) { return a.value > b.value; }
-		public static bool operator <(XrCompositionLayerFlags a, XrCompositionLayerFlags b) { return a.value < b.value; }
-		public static XrCompositionLayerFlags operator +(XrCompositionLayerFlags a, XrCompositionLayerFlags b) { return a.value + b.value; }
-		public static XrCompositionLayerFlags operator -(XrCompositionLayerFlags a, XrCompositionLayerFlags b) { return a.value - b.value; }
-		public static XrCompositionLayerFlags operator *(XrCompositionLayerFlags a, XrCompositionLayerFlags b) { return a.value * b.value; }
-		public static XrCompositionLayerFlags operator /(XrCompositionLayerFlags a, XrCompositionLayerFlags b)
-		{
-			if (b.value == 0)
-			{
-				throw new DivideByZeroException();
-			}
-			return a.value / b.value;
-		}
 	}
 
 	public struct XrSwapchainCreateFlags : IEquatable<UInt64>
@@ -288,6 +229,36 @@ namespace VIVE.OpenXR.CompositionLayer
 		public XrColor4f colorScale;
 		public XrColor4f colorBias;
 	}
+	[StructLayout(LayoutKind.Sequential)]
+	public struct XrCompositionLayerSharpeningSettingHTC
+	{
+        public XrStructureType type;
+        public IntPtr next;
+        public XrSharpeningModeHTC mode;
+        public float sharpeningLevel;
+    }
+	[StructLayout(LayoutKind.Sequential)]
+    public struct XrCompositionLayerSuperSamplingSettingHTC
+	{
+        public XrStructureType type;
+        public IntPtr next;
+        public XrSuperSamplingModeHTC mode;
+    }
+	public enum XrSharpeningModeHTC
+	{
+        FAST = 0,
+        NORMAL = 1,
+        QUALITY = 2,
+        AUTOMATIC = 3,
+	}
+	public enum XrSuperSamplingModeHTC
+	{
+        FAST = 0,
+        NORMAL = 1,
+        QUALITY = 2,
+        AUTOMATIC = 3,
+    }
+
 	public enum GraphicsAPI
 	{
 		GLES3	= 1,
@@ -408,29 +379,6 @@ namespace VIVE.OpenXR.CompositionLayer
 			next = in_next;
 			form = in_form;
 		}
-	};
-	/// <summary>
-	/// The XrCompositionLayerBaseHeader structure is not intended to be directly used, but forms a basis for defining current and future structures containing composition layer information. The XrFrameEndInfo structure contains an array of pointers to these polymorphic header structures. 
-	/// </summary>
-	[StructLayout(LayoutKind.Sequential)]
-	public struct XrCompositionLayerBaseHeader
-	{
-		/// <summary>
-		/// The XrStructureType of this structure.
-		/// </summary>
-		public XrStructureType type;
-		/// <summary>
-		/// Next is NULL or a pointer to the next structure in a structure chain, such as XrPassthroughMeshTransformInfoHTC.
-		/// </summary>
-		public IntPtr next;
-		/// <summary>
-		/// A bitmask of XrCompositionLayerFlagBits describing flags to apply to the layer.
-		/// </summary>
-		public XrCompositionLayerFlags layerFlags;
-		/// <summary>
-		/// The XrSpace in which the layer will be kept stable over time.
-		/// </summary>
-		public XrSpace space;
 	};
 	/// <summary>
 	/// The application can specify the XrPassthroughColorHTC to adjust the alpha value of the passthrough. The range is between 0.0f and 1.0f, 1.0f means opaque.

@@ -67,7 +67,9 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 
 		[SerializeField]
 		private Rigidbody m_Rigidbody = null;
-		public new Rigidbody rigidbody => m_Rigidbody;
+#pragma warning disable
+		public Rigidbody rigidbody => m_Rigidbody;
+#pragma warning enable
 
 		[SerializeField]
 		private List<GrabPose> m_GrabPoses = new List<GrabPose>();
@@ -82,15 +84,17 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		private bool m_ShowAllIndicator = false;
 		private List<Collider> allColliders = new List<Collider>();
 		private HandGrabInteractor closestGrabber = null;
-		private OnBeginGrabbed beginGrabbed;
-		private OnEndGrabbed endGrabbed;
 
 		[SerializeField]
 		private IOneHandContraintMovement m_OneHandContraintMovement;
-		public bool isContraint => m_OneHandContraintMovement != null;
+        public IOneHandContraintMovement oneHandContraintMovement { get { return m_OneHandContraintMovement; } set { m_OneHandContraintMovement = value; } }
+        public bool isContraint => m_OneHandContraintMovement != null;
 
+#pragma warning disable
 		[SerializeField]
 		private int m_PreviewIndex = -1;
+#pragma warning enable
+		private RaycastHit[] hitResults = new RaycastHit[10];
 
 		#region MonoBehaviour
 		private void Awake()
@@ -124,7 +128,6 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 				handPose.GetPosition(JointType.Wrist, out Vector3 wristPos);
 				handPose.GetRotation(JointType.Wrist, out Quaternion wristRot);
 				UpdateBestGrabPose(handGrabber.isLeft, new Pose(wristPos, wristRot));
-				beginGrabbed?.Invoke(this);
 				m_OnBeginGrabbed?.Invoke(this);
 				DEBUG($"{transform.name} is grabbed by {handGrabber.name}");
 			}
@@ -132,7 +135,6 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			{
 				m_Grabber = null;
 				m_BestGrabPose = GrabPose.Identity;
-				endGrabbed?.Invoke(this);
 				m_OnEndGrabbed?.Invoke(this);
 				DEBUG($"{transform.name} is released.");
 			}
@@ -183,46 +185,6 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			Vector3 closestPoint = GetClosestPoint(grabberPos);
 			float distacne = Vector3.Distance(grabberPos, closestPoint);
 			return distacne > grabDistance ? 0 : 1 - (distacne / grabDistance);
-		}
-
-		/// <summary>
-		/// Add a listener for the event triggered when the grabbable object is grabbed.
-		/// </summary>
-		/// <param name="handler">The method to be called when the grabbable object is grabbed.</param>
-		[Obsolete("Please use onBeginGrabbed instead.")]
-		public void AddBeginGrabbedListener(OnBeginGrabbed handler)
-		{
-			beginGrabbed += handler;
-		}
-
-		/// <summary>
-		/// Remove a listener for the event triggered when the grabbable object is grabbed.
-		/// </summary>
-		/// <param name="handler">The method to be removed from the event listeners.</param>
-		[Obsolete("Please use onBeginGrabbed instead.")]
-		public void RemoveBeginGrabbedListener(OnBeginGrabbed handler)
-		{
-			beginGrabbed -= handler;
-		}
-
-		/// <summary>
-		/// Add a listener for the event triggered when the grabbable object is released.
-		/// </summary>
-		/// <param name="handler">The method to be called when the grabbable object is released.</param>
-		[Obsolete("Please use onEndGrabbed instead.")]
-		public void AddEndGrabbedListener(OnEndGrabbed handler)
-		{
-			endGrabbed += handler;
-		}
-
-		/// <summary>
-		/// Remove a listener for the event triggered when the grabbable object is released.
-		/// </summary>
-		/// <param name="handler">The method to be removed from the event listeners.</param>
-		[Obsolete("Please use onEndGrabbed instead.")]
-		public void RemoveEndGrabbedListener(OnEndGrabbed handler)
-		{
-			endGrabbed -= handler;
 		}
 
 		/// <summary>
@@ -302,16 +264,19 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		{
 			Vector3 closestPoint = Vector3.zero;
 			float shortDistance = float.MaxValue;
-			foreach (var collider in allColliders)
+			for (int i = 0; i < allColliders.Count; i++)
 			{
+				Collider collider = allColliders[i];
 				Vector3 closePoint = collider.ClosestPointOnBounds(sourcePos);
 				float distance = Vector3.Distance(sourcePos, closePoint);
 				if (collider.bounds.Contains(closePoint))
 				{
-					Vector3 direction = (closePoint - sourcePos).normalized;
-					RaycastHit[] hits = Physics.RaycastAll(sourcePos, direction, distance);
-					foreach (var hit in hits)
+					Vector3 direction = closePoint - sourcePos;
+					direction.Normalize();
+					int hitCount = Physics.RaycastNonAlloc(sourcePos, direction, hitResults, distance);
+					for (int j = 0; j < hitCount; j++)
 					{
+						RaycastHit hit = hitResults[j];
 						if (hit.collider == collider)
 						{
 							float hitDistance = Vector3.Distance(sourcePos, hit.point);

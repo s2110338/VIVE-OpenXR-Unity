@@ -1,6 +1,7 @@
 // Copyright HTC Corporation All Rights Reserved.
 using System;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Xml;
@@ -12,7 +13,6 @@ using UnityEngine;
 using UnityEngine.XR.OpenXR;
 using UnityEngine.XR.OpenXR.Features;
 using UnityEngine.XR.OpenXR.Features.Interactions;
-using VIVE.OpenXR.FacialTracking;
 using VIVE.OpenXR.Hand;
 using VIVE.OpenXR.Tracker;
 
@@ -152,7 +152,7 @@ namespace VIVE.OpenXR.Editor
 
 				m_IsEnabled = enabled;
 
-				sb.Clear().Append(LOG_TAG).Append(m_IsEnabled ? "Enable " : "Disable ").Append("Simultaneous Interaction."); DEBUG(sb);
+				//sb.Clear().Append(LOG_TAG).Append(m_IsEnabled ? "Enable " : "Disable ").Append("Simultaneous Interaction."); DEBUG(sb);
 			}
 
 			[MenuItem(MENU_NAME, validate = true, priority = 601)]
@@ -255,6 +255,10 @@ namespace VIVE.OpenXR.Editor
 				bool enableTracker = false;
 				bool enableEyetracking = false;
 				bool enableLipexpression = false;
+				const string kHandTrackingExtension = "XR_EXT_hand_tracking";
+				const string kFacialTrackingExtension = "XR_HTC_facial_tracking";
+				const string kHandInteractionHTC = "XR_HTC_hand_interaction";
+				const string kHandInteractionEXT = "XR_EXT_hand_interaction";
 
 				var settings = OpenXRSettings.GetSettingsForBuildTargetGroup(BuildTargetGroup.Android);
 				if (null == settings)
@@ -279,14 +283,32 @@ namespace VIVE.OpenXR.Editor
 
 				foreach (var feature in settings.GetFeatures<OpenXRFeature>())
 				{
-					if (feature is ViveHandTracking && feature.enabled)
+					if (!feature.enabled) { continue; }
+
+					FieldInfo fieldInfoOpenXrExtensionStrings = typeof(OpenXRFeature).GetField(
+						"openxrExtensionStrings",
+						BindingFlags.NonPublic | BindingFlags.Instance);
+					if (fieldInfoOpenXrExtensionStrings != null)
 					{
-						enableHandtracking = true;
-					}
-					if (feature is ViveFacialTracking && feature.enabled)
-					{
-						enableEyetracking = true;
-						enableLipexpression = true;
+						var openXrExtensionStringsArray =
+							((string)fieldInfoOpenXrExtensionStrings.GetValue(feature)).Split(' ');
+
+						foreach (string stringItem in openXrExtensionStringsArray)
+						{
+							if (string.IsNullOrEmpty(stringItem)) { continue; }
+
+							if (stringItem.Equals(kHandTrackingExtension) ||
+								stringItem.Equals(kHandInteractionHTC) ||
+								stringItem.Equals(kHandInteractionEXT))
+							{
+								enableHandtracking = true;
+							}
+							if (stringItem.Equals(kFacialTrackingExtension))
+							{
+								enableEyetracking = true;
+								enableLipexpression = true;
+							}
+						}
 					}
 				}
 

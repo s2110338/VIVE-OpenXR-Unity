@@ -83,6 +83,15 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 		static GUIContent Label_IsDynamicLayer = new GUIContent("Dynamic Layer", "Specify whether Layer needs to be updated each frame or not.");
 		SerializedProperty Property_IsDynamicLayer;
 
+		static string PropertyName_IsCustomRects = "isCustomRects";
+		static GUIContent Label_IsCustomRects = new GUIContent("Customize Rects", "Using a single texture as a stereo image");
+		SerializedProperty Property_IsCustomRects;
+
+		static string PropertyName_CustomRects = "customRects";
+		static GUIContent Label_CustomRects = new GUIContent("Customize Rects Type", "Specify the customize rects type of the left texture.");
+		SerializedProperty Property_CustomRects;
+
+
 		static string PropertyName_ApplyColorScaleBias = "applyColorScaleBias";
 		static GUIContent Label_ApplyColorScaleBias = new GUIContent("Apply Color Scale Bias", "Color scale and bias are applied to a layer color during composition, after its conversion to premultiplied alpha representation. LayerColor = LayerColor * colorScale + colorBias");
 		SerializedProperty Property_ApplyColorScaleBias;
@@ -114,15 +123,18 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 
 		private bool showLayerParams = true, showColorScaleBiasParams = true;
 
-		private bool showExternalSurfaceParams = false;
+		//private bool showExternalSurfaceParams = false;
 
-
+		Rect FullRect = new Rect(0, 0, 1, 1);
+		Rect LeftRightRect = new Rect(0, 0, 0.5f, 1);
+		Rect TopDownRect = new Rect(0, 0.5f, 1, 0.5f);
 		public override void OnInspectorGUI()
 		{
 			if (Property_LayerType == null) Property_LayerType = serializedObject.FindProperty(PropertyName_LayerType);
 			if (Property_CompositionDepth == null) Property_CompositionDepth = serializedObject.FindProperty(PropertyName_CompositionDepth);
 			if (Property_LayerShape == null) Property_LayerShape = serializedObject.FindProperty(PropertyName_LayerShape);
 			if (Property_LayerVisibility == null) Property_LayerVisibility = serializedObject.FindProperty(PropertyName_LayerVisibility);
+			if (Property_CustomRects == null) Property_CustomRects = serializedObject.FindProperty(PropertyName_CustomRects);
 			if (Property_LockMode == null) Property_LockMode = serializedObject.FindProperty(PropertyName_LockMode);
 			if (Property_QuadWidth == null) Property_QuadWidth = serializedObject.FindProperty(PropertyName_QuadWidth);
 			if (Property_QuadHeight == null) Property_QuadHeight = serializedObject.FindProperty(PropertyName_QuadHeight);
@@ -134,6 +146,7 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 			if (Property_ExternalSurfaceWidth == null) Property_ExternalSurfaceWidth = serializedObject.FindProperty(PropertyName_ExternalSurfaceWidth);
 			if (Property_ExternalSurfaceHeight == null) Property_ExternalSurfaceHeight = serializedObject.FindProperty(PropertyName_ExternalSurfaceHeight);
 			if (Property_IsDynamicLayer == null) Property_IsDynamicLayer = serializedObject.FindProperty(PropertyName_IsDynamicLayer);
+			if (Property_IsCustomRects == null) Property_IsCustomRects = serializedObject.FindProperty(PropertyName_IsCustomRects);
 			if (Property_ApplyColorScaleBias == null) Property_ApplyColorScaleBias = serializedObject.FindProperty(PropertyName_ApplyColorScaleBias);
 			if (Property_SolidEffect == null) Property_SolidEffect = serializedObject.FindProperty(PropertyName_SolidEffect);
 			if (Property_ColorScale == null) Property_ColorScale = serializedObject.FindProperty(PropertyName_ColorScale);
@@ -311,6 +324,12 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 				{
 					if (GUILayout.Button("Show Cylinder Preview"))
 					{
+						Rect srcRectLeft = FullRect;
+						if (targetCompositionLayer.isCustomRects && targetCompositionLayer.customRects == CompositionLayer.CustomRectsType.LeftRight)
+							srcRectLeft = LeftRightRect;
+						if (targetCompositionLayer.isCustomRects && targetCompositionLayer.customRects == CompositionLayer.CustomRectsType.TopDown)
+							srcRectLeft = TopDownRect;
+
 						targetCompositionLayer.isPreviewingCylinder = true;
 						Vector3[] cylinderVertices = CompositionLayer.MeshGenerationHelper.GenerateCylinderVertex(targetCompositionLayer.CylinderAngleOfArc, targetCompositionLayer.CylinderRadius, targetCompositionLayer.CylinderHeight);
 						//Add components to Game Object
@@ -330,6 +349,8 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 						if (targetCompositionLayer.texture != null)
 						{
 							cylinderMeshRenderer.sharedMaterial.mainTexture = targetCompositionLayer.texture;
+							cylinderMeshRenderer.sharedMaterial.mainTextureOffset = srcRectLeft.position;
+							cylinderMeshRenderer.sharedMaterial.mainTextureScale = srcRectLeft.size;
 						}
 
 						//Generate Mesh
@@ -409,6 +430,12 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 				{
 					if (GUILayout.Button("Show Quad Preview"))
 					{
+						Rect srcRectLeft = FullRect;
+						if (targetCompositionLayer.isCustomRects && targetCompositionLayer.customRects == CompositionLayer.CustomRectsType.LeftRight)
+							srcRectLeft = LeftRightRect;
+						if (targetCompositionLayer.isCustomRects && targetCompositionLayer.customRects == CompositionLayer.CustomRectsType.TopDown)
+							srcRectLeft = TopDownRect;
+
 						targetCompositionLayer.isPreviewingQuad = true;
 						//Generate vertices
 						Vector3[] quadVertices = CompositionLayer.MeshGenerationHelper.GenerateQuadVertex(targetCompositionLayer.quadWidth, targetCompositionLayer.quadHeight);
@@ -430,6 +457,8 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 						if (targetCompositionLayer.texture != null)
 						{
 							quadMeshRenderer.sharedMaterial.mainTexture = targetCompositionLayer.texture;
+							quadMeshRenderer.sharedMaterial.mainTextureOffset = srcRectLeft.position;
+							quadMeshRenderer.sharedMaterial.mainTextureScale = srcRectLeft.size;
 						}
 						//Generate Mesh
 						quadMeshFilter.mesh = CompositionLayer.MeshGenerationHelper.GenerateQuadMesh(quadVertices);
@@ -440,11 +469,18 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 			//Rect UI For textures
 			Rect labelRect = EditorGUILayout.GetControlRect();
 
-			EditorGUI.LabelField(new Rect(labelRect.x, labelRect.y, labelRect.width / 2, labelRect.height), new GUIContent("Texture", "Texture to be rendered on the layer"));
+			EditorGUI.LabelField(new Rect(labelRect.x, labelRect.y, labelRect.width / 2, labelRect.height), new GUIContent("Left Texture", "Texture used for the left eye"));
+			EditorGUI.LabelField(new Rect(labelRect.x + labelRect.width / 2, labelRect.y, labelRect.width / 2, labelRect.height), new GUIContent("Right Texture", "Texture used for the right eye"));
 
 			Rect textureRect = EditorGUILayout.GetControlRect(GUILayout.Height(64));
 
 			targetCompositionLayer.texture = (Texture)EditorGUI.ObjectField(new Rect(textureRect.x, textureRect.y, 64, textureRect.height), targetCompositionLayer.texture, typeof(Texture), true);
+			targetCompositionLayer.textureRight = (Texture)EditorGUI.ObjectField(new Rect(textureRect.x + textureRect.width / 2, textureRect.y, 64, textureRect.height), targetCompositionLayer.textureRight, typeof(Texture), true);
+			if (null == targetCompositionLayer.textureLeft)
+			{
+			    targetCompositionLayer.texture = targetCompositionLayer.textureRight;
+				//myScript.textures[1] = right;
+			}
 
 			EditorGUILayout.PropertyField(Property_LayerVisibility, new GUIContent(Label_LayerVisibility));
 			serializedObject.ApplyModifiedProperties();
@@ -456,7 +492,7 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 			//serializedObject.ApplyModifiedProperties();
 
 			//if (targetCompositionLayer.isExternalSurface)
-			if (false)
+			/*if (false)
 			{
 				EditorGUI.indentLevel++;
 				showExternalSurfaceParams = EditorGUILayout.Foldout(showExternalSurfaceParams, "External Surface Parameters");
@@ -469,8 +505,21 @@ namespace VIVE.OpenXR.CompositionLayer.Editor
 					serializedObject.ApplyModifiedProperties();
 				}
 				EditorGUI.indentLevel--;
+			}*/
+
+			if (targetCompositionLayer.textureLeft == targetCompositionLayer.textureRight || targetCompositionLayer.textureRight == null)
+			{
+			    EditorGUILayout.PropertyField(Property_IsCustomRects, Label_IsCustomRects);
+			    serializedObject.ApplyModifiedProperties();
 			}
 
+			if (targetCompositionLayer.isCustomRects)
+			{
+			    EditorGUILayout.PropertyField(Property_CustomRects, new GUIContent(Label_CustomRects));
+			    serializedObject.ApplyModifiedProperties();
+			}
+
+			EditorGUILayout.Space();
 			EditorGUILayout.PropertyField(Property_ApplyColorScaleBias, Label_ApplyColorScaleBias);
 			serializedObject.ApplyModifiedProperties();
 

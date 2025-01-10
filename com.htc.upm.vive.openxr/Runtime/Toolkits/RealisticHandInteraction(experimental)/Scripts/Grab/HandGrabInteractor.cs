@@ -9,6 +9,7 @@
 // specifications, and documentation provided by HTC to You."
 
 using System;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
@@ -34,8 +35,6 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		private void DEBUG(string msg) { Debug.Log($"{LOG_TAG}, {msg}"); }
 		private void WARNING(string msg) { Debug.LogWarning($"{LOG_TAG}, {msg}"); }
 		private void ERROR(string msg) { Debug.LogError($"{LOG_TAG}, {msg}"); }
-		int logFrame = 0;
-		bool printIntervalLog => logFrame == 0;
 
 		#endregion
 
@@ -79,8 +78,6 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		private GrabState m_State = GrabState.None;
 		private Pose wristPose = Pose.identity;
 		private Vector3[] fingerTipPosition = new Vector3[(int)FingerId.Count];
-		private OnBeginGrab beginGrabHandler;
-		private OnEndGrab endGrabHandler;
 
 		#region MonoBehaviour
 		private void Awake()
@@ -155,46 +152,6 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			}
 			return false;
 		}
-
-		/// <summary>
-		/// Add a listener for the event triggered when the grabber begins grabbing.
-		/// </summary>
-		/// <param name="handler">The method to be called when the grabber begins grabbing.</param>
-		[Obsolete("Please use onBeginGrab instead.")]
-		public void AddBeginGrabListener(OnBeginGrab handler)
-		{
-			beginGrabHandler += handler;
-		}
-
-		/// <summary>
-		/// Remove a listener for the event triggered when the grabber begins grabbing.
-		/// </summary>
-		/// <param name="handler">The method to be removed from the event listeners.</param>
-		[Obsolete("Please use onBeginGrab instead.")]
-		public void RemoveBeginGrabListener(OnBeginGrab handler)
-		{
-			beginGrabHandler -= handler;
-		}
-
-		/// <summary>
-		/// Add a listener for the event triggered when the grabber ends grabbing.
-		/// </summary>
-		/// <param name="handler">The method to be called when the grabber ends grabbing.</param>
-		[Obsolete("Please use onEndGrab instead.")]
-		public void AddEndGrabListener(OnEndGrab handler)
-		{
-			endGrabHandler += handler;
-		}
-
-		/// <summary>
-		/// Remove a listener for the event triggered when the grabber ends grabbing.
-		/// </summary>
-		/// <param name="handler">The method to be removed from the event listeners.</param>
-		[Obsolete("Please use onEndGrab instead.")]
-		public void RemoveEndGrabListener(OnEndGrab handler)
-		{
-			endGrabHandler -= handler;
-		}
 		#endregion
 
 		/// <summary>
@@ -231,13 +188,32 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		{
 			grabbable = null;
 			maxScore = 0f;
-			foreach (HandGrabInteractable interactable in GrabManager.handGrabbables)
-			{
-				interactable.ShowIndicator(false, this);
 
-				foreach (Vector3 tipPos in fingerTipPosition)
+			Collider[] nearColliders = Physics.OverlapSphere(wristPose.position, 0.5f);
+			List<HandGrabInteractable> nearHandGrabInteractables = new List<HandGrabInteractable>();
+			for (int i = 0; i < nearColliders.Length; i++)
+			{
+				HandGrabInteractable interactable = nearColliders[i].GetComponentInParent<HandGrabInteractable>();
+				if (interactable && !nearHandGrabInteractables.Contains(interactable))
 				{
-					float distanceScore = interactable.CalculateDistanceScore(tipPos, grabDistance);
+					nearHandGrabInteractables.Add(interactable);
+					continue;
+				}
+				interactable = nearColliders[i].GetComponentInChildren<HandGrabInteractable>();
+				if (interactable && !nearHandGrabInteractables.Contains(interactable))
+				{
+					nearHandGrabInteractables.Add(interactable);
+					continue;
+				}
+			}
+
+			for (int i = 0; i < nearHandGrabInteractables.Count; i++)
+			{
+				HandGrabInteractable interactable = nearHandGrabInteractables[i];
+				interactable.ShowIndicator(false, this);
+				for (int j = 0; j < fingerTipPosition.Length; j++)
+				{
+					float distanceScore = interactable.CalculateDistanceScore(fingerTipPosition[j], grabDistance);
 					if (distanceScore > maxScore)
 					{
 						maxScore = distanceScore;
@@ -280,7 +256,6 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 				m_Grabbable = currentCandidate;
 				m_Grabbable.SetGrabber(this);
 				m_Grabbable.ShowIndicator(false, this);
-				beginGrabHandler?.Invoke(this);
 				onBeginGrab?.Invoke(this);
 
 				DEBUG($"The {(m_Handedness == Handedness.Left ? "left" : "right")} hand begins to grab the {m_Grabbable.name}");
@@ -296,7 +271,6 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			{
 				DEBUG($"The {(m_Handedness == Handedness.Left ? "left" : "right")} hand ends to grab the {m_Grabbable.name}");
 
-				endGrabHandler?.Invoke(this);
 				onEndGrab?.Invoke(this);
 				m_Grabbable.SetGrabber(null);
 				m_Grabbable = null;

@@ -13,11 +13,7 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Events;
-
-
-#if UNITY_XR_HANDS
-using UnityEngine.XR.Hands;
-#endif
+using VIVE.OpenXR.Toolkits.Common;
 
 namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 {
@@ -60,31 +56,15 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 	/// <summary>
 	/// This class is designed to update hand tracking data.
 	/// </summary>
-#if UNITY_XR_HANDS
 	public static class DataWrapper
 	{
-		private static XRHandSubsystem handSubsystem = null;
-		private static List<XRHandSubsystem> s_XRHandSubsystems = new List<XRHandSubsystem>();
-
 		/// <summary>
 		/// Validate whether the hand tracking is active.
 		/// </summary>
 		/// <returns>True if the hand tracking is active; otherwise, false.</returns>
 		public static bool Validate()
 		{
-			if (handSubsystem == null || !handSubsystem.running)
-			{
-				SubsystemManager.GetSubsystems(s_XRHandSubsystems);
-				for (int i = 0; i < s_XRHandSubsystems.Count; i++)
-				{
-					if (handSubsystem != null)
-					{
-						handSubsystem = null;
-					}
-					handSubsystem = s_XRHandSubsystems[i];
-				}
-			}
-			return handSubsystem != null && handSubsystem.running;
+			return VIVEInput.IsHandValidate();
 		}
 
 		/// <summary>
@@ -94,11 +74,8 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		/// <returns>True if the hand tracking is successfully tracking; otherwise, false.</returns>
 		public static bool IsHandTracked(bool isLeft)
 		{
-			if (handSubsystem != null)
-			{
-				return isLeft ? handSubsystem.leftHand.isTracked : handSubsystem.rightHand.isTracked;
-			}
-			return false;
+			Common.Handedness handedness = isLeft ? Common.Handedness.Left : Common.Handedness.Right;
+			return VIVEInput.IsHandTracked(handedness);
 		}
 
 		/// <summary>
@@ -111,53 +88,17 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		/// <returns></returns>
 		public static bool GetJointPose(JointType jointType, ref Vector3 position, ref Quaternion rotation, bool isLeft)
 		{
-			if (IsHandTracked(isLeft))
+			Common.Handedness handedness = isLeft ? Common.Handedness.Left : Common.Handedness.Right;
+			if (IsHandTracked(isLeft) &&
+				VIVEInput.GetJointPose(handedness, (HandJointType)jointType, out Pose jointPose))
 			{
-				XRHand hand = isLeft ? handSubsystem.leftHand : handSubsystem.rightHand;
-				XRHandJoint xrHandJoint = hand.GetJoint(ConvertToXRHandJointID(jointType));
-				if (xrHandJoint.TryGetPose(out Pose pose))
-				{
-					position = pose.position;
-					rotation = pose.rotation;
-					return true;
-				}
+				position = jointPose.position;
+				rotation = jointPose.rotation;
+				return true;
 			}
 			return false;
 		}
-
-		private static XRHandJointID ConvertToXRHandJointID(JointType jointType)
-		{
-			int id = (int)jointType;
-			switch (id)
-			{
-				case 0:
-					return XRHandJointID.Palm;
-				case 1:
-					return XRHandJointID.Wrist;
-				default:
-					return (XRHandJointID)(id + 1);
-			}
-		}
 	}
-#else
-	public static class DataWrapper
-	{
-		public static bool Validate() 
-		{ 
-			return false;
-		}
-
-		public static bool IsHandTracked(bool isLeft)
-		{
-			return false;
-		}
-
-		public static bool GetJointPose(JointType jointType, ref Vector3 position, ref Quaternion rotation, bool isLeft)
-		{
-			return false;
-		}
-	}
-#endif
 
 	/// <summary>
 	/// The enum is designed to define the IDs of joints.
@@ -242,28 +183,38 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 	{
 		public Vector3 direction = Vector3.zero;
 		public JointData[] joints = null;
-		public JointData joint0 {
-			get {
+		public JointData joint0
+		{
+			get
+			{
 				return joints[(Int32)JointId.Joint0];
 			}
 		}
-		public JointData joint1 {
-			get {
+		public JointData joint1
+		{
+			get
+			{
 				return joints[(Int32)JointId.Joint1];
 			}
 		}
-		public JointData joint2 {
-			get {
+		public JointData joint2
+		{
+			get
+			{
 				return joints[(Int32)JointId.Joint2];
 			}
 		}
-		public JointData joint3 {
-			get {
+		public JointData joint3
+		{
+			get
+			{
 				return joints[(Int32)JointId.Joint3];
 			}
 		}
-		public JointData tip {
-			get {
+		public JointData tip
+		{
+			get
+			{
 				return joints[(Int32)JointId.Tip];
 			}
 		}
@@ -692,28 +643,38 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		public JointData palm;
 		public JointData wrist;
 		public FingerData[] fingers = null; // size: FingerId.Count
-		public FingerData thumb {
-			get {
+		public FingerData thumb
+		{
+			get
+			{
 				return fingers[(Int32)FingerId.Thumb];
 			}
 		}
-		public FingerData index {
-			get {
+		public FingerData index
+		{
+			get
+			{
 				return fingers[(Int32)FingerId.Index];
 			}
 		}
-		public FingerData middle {
-			get {
+		public FingerData middle
+		{
+			get
+			{
 				return fingers[(Int32)FingerId.Middle];
 			}
 		}
-		public FingerData ring {
-			get {
+		public FingerData ring
+		{
+			get
+			{
 				return fingers[(Int32)FingerId.Ring];
 			}
 		}
-		public FingerData pinky {
-			get {
+		public FingerData pinky
+		{
+			get
+			{
 				return fingers[(Int32)FingerId.Pinky];
 			}
 		}
@@ -1026,13 +987,17 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 
 			const string LOG_TAG = "VIVE.OpenXR.Toolkits.RealisticHandInteraction.HandGrabState.FingerPinchState ";
 			StringBuilder m_sb = null;
-			StringBuilder sb {
-				get {
+			StringBuilder sb
+			{
+				get
+				{
 					if (m_sb == null) { m_sb = new StringBuilder(); }
 					return m_sb;
 				}
 			}
-			void DEBUG(StringBuilder msg) { Debug.Log(msg); }
+			void DEBUG(string msg) { Debug.Log($"{LOG_TAG}, {msg}"); }
+			bool printIntervalLog = false;
+			int logFrame = 0;
 
 			private bool isLeft = false;
 			private FingerData thumbData;
@@ -1107,10 +1072,10 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 										fingerData.joint2.position};
 
 				float distance = float.PositiveInfinity;
-				foreach (var fingerJointPos in fingerPos)
+				for (int i = 0; i < fingerPos.Length; i++)
 				{
-					distance = Mathf.Min(distance, CalculateShortestDistance(fingerJointPos, thumbTip, thumbJoint2));
-					distance = Mathf.Min(distance, CalculateShortestDistance(fingerJointPos, thumbJoint2, thumbJoint1));
+					distance = Mathf.Min(distance, CalculateShortestDistance(fingerPos[i], thumbTip, thumbJoint2));
+					distance = Mathf.Min(distance, CalculateShortestDistance(fingerPos[i], thumbJoint2, thumbJoint1));
 				}
 				return distance;
 			}
@@ -1169,12 +1134,14 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 						m_isPinching = true;
 						minDistance = distance;
 
-						sb.Clear().Append(LOG_TAG).Append(isLeft ? "Left " : "Right ").Append(m_finger.Name())
-							.Append(" UpdateState() pinch strength: ").Append(m_pinchStrength)
-							.Append(", pinch on threshold: ").Append(kPinchStrengthOnThreshold)
-							.Append(", is pinching: ").Append(m_isPinching)
-							.Append(", pinch distance: ").Append(minDistance);
-						DEBUG(sb);
+						if (printIntervalLog)
+						{
+							DEBUG($"{(isLeft ? "Left " : "Right ")} {finger.Name()}" +
+								$" UpdateState() pinch strength: {m_pinchStrength}" +
+								$", pinch on threshold: {kPinchStrengthOnThreshold}" +
+								$", is pinching: {m_isPinching}" +
+								$", pinch distance: {minDistance}");
+						}
 
 						updated = true;
 					}
@@ -1187,12 +1154,14 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 					{
 						m_isPinching = false;
 
-						sb.Clear().Append(LOG_TAG).Append(isLeft ? "Left " : "Right ").Append(m_finger.Name())
-							.Append(" UpdateState() pinch strength: ").Append(m_pinchStrength)
-							.Append(", pinch off threshold: ").Append(kPinchStrengthOffThreshold)
-							.Append(", is pinching: ").Append(m_isPinching)
-							.Append(", pinch distance: ").Append(minDistance);
-						DEBUG(sb);
+						if (printIntervalLog)
+						{
+							DEBUG($"{(isLeft ? "Left " : "Right ")} {finger.Name()}" +
+								$" UpdateState() pinch strength: {m_pinchStrength}" +
+								$", pinch off threshold: {kPinchStrengthOffThreshold}" +
+								$", is pinching: {m_isPinching}" +
+								$", pinch distance: {minDistance}");
+						}
 
 						updated = true;
 					}
@@ -1207,6 +1176,9 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			/// <param name="finger">The FingerData of the finger.</param>
 			public void Update(FingerData thumb, FingerData finger)
 			{
+				logFrame++;
+				logFrame %= 300;
+				printIntervalLog = logFrame == 0;
 				if (!Validate()) { return; }
 
 				this.thumbData = thumb;
@@ -1901,15 +1873,6 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 	[Serializable]
 	public class HandGrabbableEvent : UnityEvent<IGrabbable> { };
 
-	[Obsolete("Please use HandGrabberEvent instead.")]
-	public delegate void OnBeginGrab(IGrabber grabber);
-	[Obsolete("Please use HandGrabberEvent instead.")]
-	public delegate void OnEndGrab(IGrabber grabber);
-	[Obsolete("Please use HandGrabbableEvent instead.")]
-	public delegate void OnBeginGrabbed(IGrabbable grabbable);
-	[Obsolete("Please use HandGrabbableEvent instead.")]
-	public delegate void OnEndGrabbed(IGrabbable grabbable);
-
 	/// <summary>
 	/// Interface for objects capable of grabbing.
 	/// </summary>
@@ -1919,15 +1882,6 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		bool isGrabbing { get; }
 		HandGrabberEvent onBeginGrab { get; }
 		HandGrabberEvent onEndGrab { get; }
-
-		[Obsolete("Please use onBeginGrab instead.")]
-		void AddBeginGrabListener(OnBeginGrab handler);
-		[Obsolete("Please use onBeginGrab instead.")]
-		void RemoveBeginGrabListener(OnBeginGrab handler);
-		[Obsolete("Please use onEndGrab instead.")]
-		void AddEndGrabListener(OnEndGrab handler);
-		[Obsolete("Please use onEndGrab instead.")]
-		void RemoveEndGrabListener(OnEndGrab handler);
 	}
 
 	/// <summary>
@@ -1950,15 +1904,6 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		HandGrabbableEvent onBeginGrabbed { get; }
 		HandGrabbableEvent onEndGrabbed { get; }
 		void SetGrabber(IGrabber grabber);
-
-		[Obsolete("Please use onBeginGrabbed instead.")]
-		void AddBeginGrabbedListener(OnBeginGrabbed handler);
-		[Obsolete("Please use onBeginGrabbed instead.")]
-		void RemoveBeginGrabbedListener(OnBeginGrabbed handler);
-		[Obsolete("Please use onEndGrabbed instead.")]
-		void AddEndGrabbedListener(OnEndGrabbed handler);
-		[Obsolete("Please use onEndGrabbed instead.")]
-		void RemoveEndGrabbedListener(OnEndGrabbed handler);
 	}
 
 	/// <summary>

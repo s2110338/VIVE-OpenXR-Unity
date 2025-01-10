@@ -1,17 +1,19 @@
 // Copyright HTC Corporation All Rights Reserved.
 
+#define CoordinateOpenGL
+
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.XR;
+using VIVE.OpenXR.Toolkits.BodyTracking.AvatarCoordinate;
+using VIVE.OpenXR.Toolkits.BodyTracking.RuntimeDependency;
 
-using VIVE.OpenXR.Hand;
-
-using CommonUsages = UnityEngine.XR.CommonUsages;
-using InputDevice = UnityEngine.XR.InputDevice;
+#if WAVE_BODY_CALIBRATION || WAVE_BODY_IK
+using Wave.Native;
+#endif
 
 namespace VIVE.OpenXR.Toolkits.BodyTracking
 {
@@ -93,6 +95,16 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 
 		// Total 14 Body Pose Roles.
 	}
+	public enum TrackedDeviceType : UInt32
+	{
+		Invalid = 0,
+		HMD = 1,
+		Controller = 2,
+		Hand = 3,
+		ViveWristTracker = 4,
+		ViveSelfTracker = 5,
+		ViveSelfTrackerIM = 6,
+	}
 
 	public struct TransformData
 	{
@@ -108,9 +120,9 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			localPosition = in_localPos;
 
 			rotation = in_rot;
-			BodyTrackingUtils.Validate(ref rotation);
+			Rdp.Validate(ref rotation);
 			localRotation = in_localRot;
-			BodyTrackingUtils.Validate(ref localRotation);
+			Rdp.Validate(ref localRotation);
 
 			localScale = in_scale;
 		}
@@ -120,14 +132,16 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			localPosition = trans.localPosition;
 
 			rotation = trans.rotation;
-			BodyTrackingUtils.Validate(ref rotation);
+			Rdp.Validate(ref rotation);
 			localRotation = trans.localRotation;
-			BodyTrackingUtils.Validate(ref localRotation);
+			Rdp.Validate(ref localRotation);
 
 			localScale = trans.localScale;
 		}
-		public static TransformData identity {
-			get {
+		public static TransformData identity
+		{
+			get
+			{
 				return new TransformData(Vector3.zero, Vector3.zero, Quaternion.identity, Quaternion.identity, Vector3.zero);
 			}
 		}
@@ -136,8 +150,10 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			if (trans == null) { return; }
 			position = trans.position;
 			localPosition = trans.localPosition;
-			BodyTrackingUtils.Update(ref rotation, trans.rotation);
-			BodyTrackingUtils.Update(ref localRotation, trans.localRotation);
+			rotation = trans.rotation;
+			Rdp.Validate(ref rotation);
+			localRotation = trans.localRotation;
+			Rdp.Validate(ref localRotation);
 			localScale = trans.localScale;
 		}
 		public void Update(ref Transform trans)
@@ -154,13 +170,15 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 	{
 		const string LOG_TAG = "VIVE.OpenXR.Toolkits.BodyTracking.BodyAvatar";
 		StringBuilder m_sb = null;
-		StringBuilder sb {
-			get {
+		StringBuilder sb
+		{
+			get
+			{
 				if (m_sb == null) { m_sb = new StringBuilder(); }
 				return m_sb;
 			}
 		}
-		void DEBUG(StringBuilder msg) { Debug.Log(msg); }
+		void DEBUG(StringBuilder msg) { Rdp.d(LOG_TAG, msg, true); }
 
 		public float height = 0;
 
@@ -199,6 +217,8 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		public Joint rightHand = Joint.identity;
 
 		public float scale = 1;
+		public float confidence = 1;
+		public const float kAvatarHeight = 1.5f;
 
 		private Joint[] s_AvatarJoints = null;
 		private void UpdateJoints()
@@ -282,6 +302,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 				rightHand.jointType = JointType.RIGHTHAND; jointCount++;
 			}
 			scale = 1;
+			confidence = 1;
 
 			s_AvatarJoints = new Joint[jointCount];
 		}
@@ -320,6 +341,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			rightFoot.Update(in_avatar.rightFoot);
 
 			scale = in_avatar.scale;
+			confidence = in_avatar.confidence;
 		}
 		public void Update(Joint joint)
 		{
@@ -357,16 +379,311 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			if (joint.jointType == JointType.RIGHTFOREARM) { rightForearm.Update(joint); } // 25
 			if (joint.jointType == JointType.RIGHTHAND) { rightHand.Update(joint); }
 		}
+		public void Update(JointType jointType, PoseState poseState, Vector3 translation, Vector3 velocity, Vector3 angularVelocity, Quaternion rotation, bool init = false)
+		{
+			string func = "Update() ";
+			if (jointType == JointType.HEAD)
+			{
+				head.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("head poseState: ").Append(head.poseState)
+						.Append(", position (").Append(head.translation.x.ToString("N3")).Append(", ").Append(head.translation.y.ToString("N3")).Append(", ").Append(head.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(head.rotation.x.ToString("N3")).Append(", ").Append(head.rotation.y.ToString("N3")).Append(", ").Append(head.rotation.z.ToString("N3")).Append(", ").Append(head.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.NECK)
+			{
+				neck.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("neck poseState: ").Append(neck.poseState)
+						.Append(", position (").Append(neck.translation.x.ToString("N3")).Append(", ").Append(neck.translation.y.ToString("N3")).Append(", ").Append(neck.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(neck.rotation.x.ToString("N3")).Append(", ").Append(neck.rotation.y.ToString("N3")).Append(", ").Append(neck.rotation.z.ToString("N3")).Append(", ").Append(neck.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.CHEST)
+			{
+				chest.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("chest poseState: ").Append(chest.poseState)
+						.Append(", position (").Append(chest.translation.x.ToString("N3")).Append(", ").Append(chest.translation.y.ToString("N3")).Append(", ").Append(chest.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(chest.rotation.x.ToString("N3")).Append(", ").Append(chest.rotation.y.ToString("N3")).Append(", ").Append(chest.rotation.z.ToString("N3")).Append(", ").Append(chest.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.WAIST)
+			{
+				waist.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("waist poseState: ").Append(waist.poseState)
+						.Append(", position (").Append(waist.translation.x.ToString("N3")).Append(", ").Append(waist.translation.y.ToString("N3")).Append(", ").Append(waist.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(waist.rotation.x.ToString("N3")).Append(", ").Append(waist.rotation.y.ToString("N3")).Append(", ").Append(waist.rotation.z.ToString("N3")).Append(", ").Append(waist.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.HIP)
+			{
+				hip.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("hip poseState: ").Append(hip.poseState)
+						.Append(", position (").Append(hip.translation.x.ToString("N3")).Append(", ").Append(hip.translation.y.ToString("N3")).Append(", ").Append(hip.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(hip.rotation.x.ToString("N3")).Append(", ").Append(hip.rotation.y.ToString("N3")).Append(", ").Append(hip.rotation.z.ToString("N3")).Append(", ").Append(hip.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+
+			if (jointType == JointType.LEFTCLAVICLE)
+			{
+				leftClavicle.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftClavicle poseState: ").Append(leftClavicle.poseState)
+						.Append(", position (").Append(leftClavicle.translation.x.ToString("N3")).Append(", ").Append(leftClavicle.translation.y.ToString("N3")).Append(", ").Append(leftClavicle.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftClavicle.rotation.x.ToString("N3")).Append(", ").Append(leftClavicle.rotation.y.ToString("N3")).Append(", ").Append(leftClavicle.rotation.z.ToString("N3")).Append(", ").Append(leftClavicle.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.LEFTSCAPULA)
+			{
+				leftScapula.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftScapula poseState: ").Append(leftScapula.poseState)
+						.Append(", position (").Append(leftScapula.translation.x.ToString("N3")).Append(", ").Append(leftScapula.translation.y.ToString("N3")).Append(", ").Append(leftScapula.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftScapula.rotation.x.ToString("N3")).Append(", ").Append(leftScapula.rotation.y.ToString("N3")).Append(", ").Append(leftScapula.rotation.z.ToString("N3")).Append(", ").Append(leftScapula.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.LEFTUPPERARM)
+			{
+				leftUpperarm.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftUpperarm poseState: ").Append(leftUpperarm.poseState)
+						.Append(", position (").Append(leftUpperarm.translation.x.ToString("N3")).Append(", ").Append(leftUpperarm.translation.y.ToString("N3")).Append(", ").Append(leftUpperarm.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftUpperarm.rotation.x.ToString("N3")).Append(", ").Append(leftUpperarm.rotation.y.ToString("N3")).Append(", ").Append(leftUpperarm.rotation.z.ToString("N3")).Append(", ").Append(leftUpperarm.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.LEFTFOREARM)
+			{
+				leftForearm.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftForearm poseState: ").Append(leftForearm.poseState)
+						.Append(", position (").Append(leftForearm.translation.x.ToString("N3")).Append(", ").Append(leftForearm.translation.y.ToString("N3")).Append(", ").Append(leftForearm.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftForearm.rotation.x.ToString("N3")).Append(", ").Append(leftForearm.rotation.y.ToString("N3")).Append(", ").Append(leftForearm.rotation.z.ToString("N3")).Append(", ").Append(leftForearm.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.LEFTHAND)
+			{
+				leftHand.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftHand poseState: ").Append(leftHand.poseState)
+						.Append(", position (").Append(leftHand.translation.x.ToString("N3")).Append(", ").Append(leftHand.translation.y.ToString("N3")).Append(", ").Append(leftHand.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftHand.rotation.x.ToString("N3")).Append(", ").Append(leftHand.rotation.y.ToString("N3")).Append(", ").Append(leftHand.rotation.z.ToString("N3")).Append(", ").Append(leftHand.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+
+			if (jointType == JointType.LEFTTHIGH)
+			{
+				leftThigh.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftThigh poseState: ").Append(leftThigh.poseState)
+						.Append(", position (").Append(leftThigh.translation.x.ToString("N3")).Append(", ").Append(leftThigh.translation.y.ToString("N3")).Append(", ").Append(leftThigh.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftThigh.rotation.x.ToString("N3")).Append(", ").Append(leftThigh.rotation.y.ToString("N3")).Append(", ").Append(leftThigh.rotation.z.ToString("N3")).Append(", ").Append(leftThigh.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.LEFTLEG)
+			{
+				leftLeg.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftLeg poseState: ").Append(leftLeg.poseState)
+						.Append(", position (").Append(leftLeg.translation.x.ToString("N3")).Append(", ").Append(leftLeg.translation.y.ToString("N3")).Append(", ").Append(leftLeg.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftLeg.rotation.x.ToString("N3")).Append(", ").Append(leftLeg.rotation.y.ToString("N3")).Append(", ").Append(leftLeg.rotation.z.ToString("N3")).Append(", ").Append(leftLeg.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.LEFTANKLE)
+			{
+				leftAnkle.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftAnkle poseState: ").Append(leftAnkle.poseState)
+						.Append(", position (").Append(leftAnkle.translation.x.ToString("N3")).Append(", ").Append(leftAnkle.translation.y.ToString("N3")).Append(", ").Append(leftAnkle.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftAnkle.rotation.x.ToString("N3")).Append(", ").Append(leftAnkle.rotation.y.ToString("N3")).Append(", ").Append(leftAnkle.rotation.z.ToString("N3")).Append(", ").Append(leftAnkle.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.LEFTFOOT)
+			{
+				leftFoot.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftFoot poseState: ").Append(leftFoot.poseState)
+						.Append(", position (").Append(leftFoot.translation.x.ToString("N3")).Append(", ").Append(leftFoot.translation.y.ToString("N3")).Append(", ").Append(leftFoot.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftFoot.rotation.x.ToString("N3")).Append(", ").Append(leftFoot.rotation.y.ToString("N3")).Append(", ").Append(leftFoot.rotation.z.ToString("N3")).Append(", ").Append(leftFoot.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+
+			if (jointType == JointType.RIGHTCLAVICLE)
+			{
+				rightClavicle.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightClavicle poseState: ").Append(rightClavicle.poseState)
+						.Append(", position (").Append(rightClavicle.translation.x.ToString("N3")).Append(", ").Append(rightClavicle.translation.y.ToString("N3")).Append(", ").Append(rightClavicle.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightClavicle.rotation.x.ToString("N3")).Append(", ").Append(rightClavicle.rotation.y.ToString("N3")).Append(", ").Append(rightClavicle.rotation.z.ToString("N3")).Append(", ").Append(rightClavicle.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.RIGHTSCAPULA)
+			{
+				rightScapula.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightScapula poseState: ").Append(rightScapula.poseState)
+						.Append(", position (").Append(rightScapula.translation.x.ToString("N3")).Append(", ").Append(rightScapula.translation.y.ToString("N3")).Append(", ").Append(rightScapula.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightScapula.rotation.x.ToString("N3")).Append(", ").Append(rightScapula.rotation.y.ToString("N3")).Append(", ").Append(rightScapula.rotation.z.ToString("N3")).Append(", ").Append(rightScapula.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.RIGHTUPPERARM)
+			{
+				rightUpperarm.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightUpperarm poseState: ").Append(rightUpperarm.poseState)
+						.Append(", position (").Append(rightUpperarm.translation.x.ToString("N3")).Append(", ").Append(rightUpperarm.translation.y.ToString("N3")).Append(", ").Append(rightUpperarm.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightUpperarm.rotation.x.ToString("N3")).Append(", ").Append(rightUpperarm.rotation.y.ToString("N3")).Append(", ").Append(rightUpperarm.rotation.z.ToString("N3")).Append(", ").Append(rightUpperarm.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.RIGHTFOREARM)
+			{
+				rightForearm.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightForearm poseState: ").Append(rightForearm.poseState)
+						.Append(", position (").Append(rightForearm.translation.x.ToString("N3")).Append(", ").Append(rightForearm.translation.y.ToString("N3")).Append(", ").Append(rightForearm.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightForearm.rotation.x.ToString("N3")).Append(", ").Append(rightForearm.rotation.y.ToString("N3")).Append(", ").Append(rightForearm.rotation.z.ToString("N3")).Append(", ").Append(rightForearm.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.RIGHTHAND)
+			{
+				rightHand.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightHand poseState: ").Append(rightHand.poseState)
+						.Append(", position (").Append(rightHand.translation.x.ToString("N3")).Append(", ").Append(rightHand.translation.y.ToString("N3")).Append(", ").Append(rightHand.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightHand.rotation.x.ToString("N3")).Append(", ").Append(rightHand.rotation.y.ToString("N3")).Append(", ").Append(rightHand.rotation.z.ToString("N3")).Append(", ").Append(rightHand.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+
+			if (jointType == JointType.RIGHTTHIGH)
+			{
+				rightThigh.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightThigh poseState: ").Append(rightThigh.poseState)
+						.Append(", position (").Append(rightThigh.translation.x.ToString("N3")).Append(", ").Append(rightThigh.translation.y.ToString("N3")).Append(", ").Append(rightThigh.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightThigh.rotation.x.ToString("N3")).Append(", ").Append(rightThigh.rotation.y.ToString("N3")).Append(", ").Append(rightThigh.rotation.z.ToString("N3")).Append(", ").Append(rightThigh.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.RIGHTLEG)
+			{
+				rightLeg.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightLeg poseState: ").Append(rightLeg.poseState)
+						.Append(", position (").Append(rightLeg.translation.x.ToString("N3")).Append(", ").Append(rightLeg.translation.y.ToString("N3")).Append(", ").Append(rightLeg.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightLeg.rotation.x.ToString("N3")).Append(", ").Append(rightLeg.rotation.y.ToString("N3")).Append(", ").Append(rightLeg.rotation.z.ToString("N3")).Append(", ").Append(rightLeg.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.RIGHTANKLE)
+			{
+				rightAnkle.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightAnkle poseState: ").Append(rightAnkle.poseState)
+						.Append(", position (").Append(rightAnkle.translation.x.ToString("N3")).Append(", ").Append(rightAnkle.translation.y.ToString("N3")).Append(", ").Append(rightAnkle.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightAnkle.rotation.x.ToString("N3")).Append(", ").Append(rightAnkle.rotation.y.ToString("N3")).Append(", ").Append(rightAnkle.rotation.z.ToString("N3")).Append(", ").Append(rightAnkle.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.RIGHTFOOT)
+			{
+				rightFoot.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightFoot poseState: ").Append(rightFoot.poseState)
+						.Append(", position (").Append(rightFoot.translation.x.ToString("N3")).Append(", ").Append(rightFoot.translation.y.ToString("N3")).Append(", ").Append(rightFoot.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightFoot.rotation.x.ToString("N3")).Append(", ").Append(rightFoot.rotation.y.ToString("N3")).Append(", ").Append(rightFoot.rotation.z.ToString("N3")).Append(", ").Append(rightFoot.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+
+			if (jointType == JointType.SPINELOWER)
+			{
+				spineLower.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("spineLower poseState: ").Append(spineLower.poseState)
+						.Append(", position (").Append(spineLower.translation.x.ToString("N3")).Append(", ").Append(spineLower.translation.y.ToString("N3")).Append(", ").Append(spineLower.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(spineLower.rotation.x.ToString("N3")).Append(", ").Append(spineLower.rotation.y.ToString("N3")).Append(", ").Append(spineLower.rotation.z.ToString("N3")).Append(", ").Append(spineLower.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.SPINEMIDDLE)
+			{
+				spineMiddle.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("spineMiddle poseState: ").Append(spineMiddle.poseState)
+						.Append(", position (").Append(spineMiddle.translation.x.ToString("N3")).Append(", ").Append(spineMiddle.translation.y.ToString("N3")).Append(", ").Append(spineMiddle.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(spineMiddle.rotation.x.ToString("N3")).Append(", ").Append(spineMiddle.rotation.y.ToString("N3")).Append(", ").Append(spineMiddle.rotation.z.ToString("N3")).Append(", ").Append(spineMiddle.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (jointType == JointType.SPINEHIGH)
+			{
+				spineHigh.Update(poseState, translation, velocity, angularVelocity, rotation);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("spineHigh poseState: ").Append(spineHigh.poseState)
+						.Append(", position (").Append(spineHigh.translation.x.ToString("N3")).Append(", ").Append(spineHigh.translation.y.ToString("N3")).Append(", ").Append(spineHigh.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(spineHigh.rotation.x.ToString("N3")).Append(", ").Append(spineHigh.rotation.y.ToString("N3")).Append(", ").Append(spineHigh.rotation.z.ToString("N3")).Append(", ").Append(spineHigh.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+		}
 
 		private void Update([In] Transform trans, [In] Vector3 velocity, [In] Vector3 angularVelocity, ref Joint joint)
 		{
 			if (trans == null) { return; }
 			joint.poseState = (PoseState.ROTATION | PoseState.TRANSLATION);
 			joint.translation = trans.position;
-			BodyTrackingUtils.Update(ref joint.rotation, trans.rotation);
 			joint.velocity = velocity;
+			joint.rotation = trans.rotation;
+			Rdp.Validate(ref joint.rotation);
 			joint.angularVelocity = angularVelocity;
-			//sb.Clear().Append(LOG_TAG).Append("Update() ").Append(joint.Log()); DEBUG(sb);
 		}
 		public void Update(JointType jointType, Transform trans, Vector3 velocity, Vector3 angularVelocity)
 		{
@@ -406,11 +723,11 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		private void Update([In] Transform trans, [In] Vector3 velocity, ref Joint joint)
 		{
 			if (trans == null) { return; }
-			joint.translation = trans.transform.position;
-			BodyTrackingUtils.Update(ref joint.rotation, trans.transform.rotation);
 			joint.poseState = (PoseState.ROTATION | PoseState.TRANSLATION);
+			joint.translation = trans.transform.position;
 			joint.velocity = velocity;
-			//sb.Clear().Append(LOG_TAG).Append("Update() ").Append(joint.Log()); DEBUG(sb);
+			joint.rotation = trans.transform.rotation;
+			Rdp.Validate(ref joint.rotation);
 		}
 		public void Update(JointType jointType, Transform trans, Vector3 velocity)
 		{
@@ -451,9 +768,10 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		{
 			if (trans == null) { return; }
 			joint.translation = trans.position;
-			BodyTrackingUtils.Update(ref joint.rotation, trans.rotation);
+			joint.rotation = trans.rotation;
+			Rdp.Validate(ref joint.rotation);
 			joint.poseState = (PoseState.ROTATION | PoseState.TRANSLATION);
-			//sb.Clear().Append(LOG_TAG).Append("Update() ").Append(joint.Log()); DEBUG(sb);
+			//sb.Clear().Append("Update() ").Append(joint.Rdp()); DEBUG(sb);
 		}
 		public void Update(JointType jointType, Transform trans)
 		{
@@ -496,8 +814,8 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			if (joint.poseState.HasFlag(PoseState.TRANSLATION)) { trans.position = joint.translation * scale; }
 			if (joint.poseState.HasFlag(PoseState.ROTATION))
 			{
+				Rdp.Validate(ref joint.rotation);
 				trans.rotation = joint.rotation;
-				if (trans.rotation.isZero()) { trans.rotation = Quaternion.identity; }
 			}
 		}
 		public void Update([In] JointType jointType, ref Transform trans, float scale = 1)
@@ -536,6 +854,46 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			if (jointType == JointType.SPINEHIGH) { Update(spineHigh, ref trans, scale); }
 		}
 
+#if WAVE_BODY_IK
+		public void Update(ref WVR_AvatarData_t avatar)
+		{
+			avatar.height = height;
+			avatar.originType = Rdp.GetOriginFromRdp();
+
+			hip.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Hip]);
+
+			leftThigh.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Left_Thigh]);
+			leftLeg.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Left_Leg]);
+			leftAnkle.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Left_Ankle]);
+			leftFoot.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Left_Foot]);
+
+			rightThigh.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Right_Thigh]);
+			rightLeg.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Right_Leg]);
+			rightAnkle.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Right_Ankle]);
+			rightFoot.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Right_Foot]);
+
+			waist.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Waist]);
+			spineLower.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Spine_Lower]);
+			spineMiddle.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Spine_Middle]);
+			spineHigh.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Spine_High]);
+
+			chest.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Chest]);
+			head.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Head]);
+			neck.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Neck]);
+
+			leftClavicle.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Left_Clavicle]);
+			leftScapula.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Left_Scapula]);
+			leftUpperarm.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Left_Upper_Arm]);
+			leftForearm.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Left_Forearm]);
+			leftHand.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Left_Hand]);
+
+			rightClavicle.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Right_Clavicle]);
+			rightScapula.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Right_Scapula]);
+			rightUpperarm.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Right_Upper_Arm]);
+			rightForearm.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Right_Forearm]);
+			rightHand.Update(ref avatar.joints[(UInt32)WVR_BodyJoint.WVR_BodyJoint_Right_Hand]);
+		}
+#endif
 		public void Update([In] Body body)
 		{
 			if (body == null) { return; }
@@ -687,6 +1045,80 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 				Update(avatarJoints[i]);
 			}
 		}
+
+		bool print = true;
+		public void ChangeJointCoordinate(AvatarCoordinateProducer coordinate)
+		{
+			if (coordinate == null) { return; }
+
+			if (print)
+			{
+				print = false;
+
+				sb.Clear().Append("ChangeJointCoordinate()")
+					.Append("\nhip (").Append(coordinate.hip.x).Append(", ").Append(coordinate.hip.y).Append(", ").Append(coordinate.hip.z).Append(")")
+					.Append("\nleftThigh (").Append(coordinate.leftThigh.x).Append(", ").Append(coordinate.leftThigh.y).Append(", ").Append(coordinate.leftThigh.z).Append(")")
+					.Append("\nleftLeg (").Append(coordinate.leftLeg.x).Append(", ").Append(coordinate.leftLeg.y).Append(", ").Append(coordinate.leftLeg.z).Append(")")
+					.Append("\nleftAnkle (").Append(coordinate.leftAnkle.x).Append(", ").Append(coordinate.leftAnkle.y).Append(", ").Append(coordinate.leftAnkle.z).Append(")")
+					.Append("\nleftFoot (").Append(coordinate.leftFoot.x).Append(", ").Append(coordinate.leftFoot.y).Append(", ").Append(coordinate.leftFoot.z).Append(")")
+					.Append("\nrightThigh (").Append(coordinate.rightThigh.x).Append(", ").Append(coordinate.rightThigh.y).Append(", ").Append(coordinate.rightThigh.z).Append(")")
+					.Append("\nrightLeg (").Append(coordinate.rightLeg.x).Append(", ").Append(coordinate.rightLeg.y).Append(", ").Append(coordinate.rightLeg.z).Append(")")
+					.Append("\nrightAnkle (").Append(coordinate.rightAnkle.x).Append(", ").Append(coordinate.rightAnkle.y).Append(", ").Append(coordinate.rightAnkle.z).Append(")")
+					.Append("\nrightFoot (").Append(coordinate.rightFoot.x).Append(", ").Append(coordinate.rightFoot.y).Append(", ").Append(coordinate.rightFoot.z).Append(")")
+					.Append("\nwaist (").Append(coordinate.waist.x).Append(", ").Append(coordinate.waist.y).Append(", ").Append(coordinate.waist.z).Append(")")
+					.Append("\nspineLower (").Append(coordinate.spineLower.x).Append(", ").Append(coordinate.spineLower.y).Append(", ").Append(coordinate.spineLower.z).Append(")")
+					.Append("\nspineMiddle (").Append(coordinate.spineMiddle.x).Append(", ").Append(coordinate.spineMiddle.y).Append(", ").Append(coordinate.spineMiddle.z).Append(")")
+					.Append("\nspineHigh (").Append(coordinate.spineHigh.x).Append(", ").Append(coordinate.spineHigh.y).Append(", ").Append(coordinate.spineHigh.z).Append(")")
+					.Append("\nchest (").Append(coordinate.chest.x).Append(", ").Append(coordinate.chest.y).Append(", ").Append(coordinate.chest.z).Append(")")
+					.Append("\nneck (").Append(coordinate.neck.x).Append(", ").Append(coordinate.neck.y).Append(", ").Append(coordinate.neck.z).Append(")")
+					.Append("\nhead (").Append(coordinate.head.x).Append(", ").Append(coordinate.head.y).Append(", ").Append(coordinate.head.z).Append(")")
+					.Append("\nleftClavicle (").Append(coordinate.leftClavicle.x).Append(", ").Append(coordinate.leftClavicle.y).Append(", ").Append(coordinate.leftClavicle.z).Append(")")
+					.Append("\nleftScapula (").Append(coordinate.leftScapula.x).Append(", ").Append(coordinate.leftScapula.y).Append(", ").Append(coordinate.leftScapula.z).Append(")")
+					.Append("\nleftUpperarm (").Append(coordinate.leftUpperarm.x).Append(", ").Append(coordinate.leftUpperarm.y).Append(", ").Append(coordinate.leftUpperarm.z).Append(")")
+					.Append("\nleftForearm (").Append(coordinate.leftForearm.x).Append(", ").Append(coordinate.leftForearm.y).Append(", ").Append(coordinate.leftForearm.z).Append(")")
+					.Append("\nleftHand (").Append(coordinate.leftHand.x).Append(", ").Append(coordinate.leftHand.y).Append(", ").Append(coordinate.leftHand.z).Append(")")
+					.Append("\nrightClavicle (").Append(coordinate.rightClavicle.x).Append(", ").Append(coordinate.rightClavicle.y).Append(", ").Append(coordinate.rightClavicle.z).Append(")")
+					.Append("\nrightScapula (").Append(coordinate.rightScapula.x).Append(", ").Append(coordinate.rightScapula.y).Append(", ").Append(coordinate.rightScapula.z).Append(")")
+					.Append("\nrightUpperarm (").Append(coordinate.rightUpperarm.x).Append(", ").Append(coordinate.rightUpperarm.y).Append(", ").Append(coordinate.rightUpperarm.z).Append(")")
+					.Append("\nrightForearm (").Append(coordinate.rightForearm.x).Append(", ").Append(coordinate.rightForearm.y).Append(", ").Append(coordinate.rightForearm.z).Append(")")
+					.Append("\nrightHand (").Append(coordinate.rightHand.x).Append(", ").Append(coordinate.rightHand.y).Append(", ").Append(coordinate.rightHand.z).Append(")");
+				DEBUG(sb);
+			}
+
+			BodyTrackingUtils.TransformCoordinate(ref hip, coordinate.hip);
+
+			BodyTrackingUtils.TransformCoordinate(ref leftThigh, coordinate.leftThigh);
+			BodyTrackingUtils.TransformCoordinate(ref leftLeg, coordinate.leftLeg);
+			BodyTrackingUtils.TransformCoordinate(ref leftAnkle, coordinate.leftAnkle);
+			BodyTrackingUtils.TransformCoordinate(ref leftFoot, coordinate.leftFoot);
+
+			BodyTrackingUtils.TransformCoordinate(ref rightThigh, coordinate.rightThigh);
+			BodyTrackingUtils.TransformCoordinate(ref rightLeg, coordinate.rightLeg);
+			BodyTrackingUtils.TransformCoordinate(ref rightAnkle, coordinate.rightAnkle);
+			BodyTrackingUtils.TransformCoordinate(ref rightFoot, coordinate.rightFoot);
+
+			BodyTrackingUtils.TransformCoordinate(ref waist, coordinate.waist);
+
+			BodyTrackingUtils.TransformCoordinate(ref spineLower, coordinate.spineLower);
+			BodyTrackingUtils.TransformCoordinate(ref spineMiddle, coordinate.spineMiddle);
+			BodyTrackingUtils.TransformCoordinate(ref spineHigh, coordinate.spineHigh);
+
+			BodyTrackingUtils.TransformCoordinate(ref chest, coordinate.chest);
+			BodyTrackingUtils.TransformCoordinate(ref neck, coordinate.neck);
+			BodyTrackingUtils.TransformCoordinate(ref head, coordinate.head);
+
+			BodyTrackingUtils.TransformCoordinate(ref leftClavicle, coordinate.leftClavicle);
+			BodyTrackingUtils.TransformCoordinate(ref leftScapula, coordinate.leftScapula);
+			BodyTrackingUtils.TransformCoordinate(ref leftUpperarm, coordinate.leftUpperarm);
+			BodyTrackingUtils.TransformCoordinate(ref leftForearm, coordinate.leftForearm);
+			BodyTrackingUtils.TransformCoordinate(ref leftHand, coordinate.leftHand);
+
+			BodyTrackingUtils.TransformCoordinate(ref rightClavicle, coordinate.rightClavicle);
+			BodyTrackingUtils.TransformCoordinate(ref rightScapula, coordinate.rightScapula);
+			BodyTrackingUtils.TransformCoordinate(ref rightUpperarm, coordinate.rightUpperarm);
+			BodyTrackingUtils.TransformCoordinate(ref rightForearm, coordinate.rightForearm);
+			BodyTrackingUtils.TransformCoordinate(ref rightHand, coordinate.rightHand);
+		}
 	}
 
 	[Serializable]
@@ -695,9 +1127,11 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		public Vector3 translation;
 		[SerializeField]
 		private Vector4 m_rotation;
-		public Vector4 rotation {
-			get {
-				if (m_rotation == Vector4.zero) { m_rotation.w = 1; }
+		public Vector4 rotation
+		{
+			get
+			{
+				Rdp.Validate(ref m_rotation);
 				return m_rotation;
 			}
 			set { m_rotation = value; }
@@ -707,7 +1141,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		private void UpdateExtrinsic()
 		{
 			ext.translation = translation;
-			BodyTrackingUtils.Update(rotation, ref ext.rotation);
+			Rdp.GetQuaternion(m_rotation, out ext.rotation);
 		}
 		public Extrinsic GetExtrinsic()
 		{
@@ -723,41 +1157,69 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			ext = Extrinsic.identity;
 			UpdateExtrinsic();
 		}
-		public static ExtrinsicVector4_t identity {
-			get {
+		public static ExtrinsicVector4_t identity
+		{
+			get
+			{
 				return new ExtrinsicVector4_t(Vector3.zero, new Vector4(0, 0, 0, 1));
 			}
 		}
+
 		public void Update(ExtrinsicVector4_t in_ext)
 		{
 			translation = in_ext.translation;
-			rotation = in_ext.rotation;
+			m_rotation = in_ext.rotation;
+		}
+		public void Update(Vector3 in_tra, Vector4 in_rot)
+		{
+			translation = in_tra;
+			m_rotation = in_rot;
+
+			ext = Extrinsic.identity;
+			UpdateExtrinsic();
 		}
 		public void Update(Extrinsic in_ext)
 		{
 			translation = in_ext.translation;
-			BodyTrackingUtils.Update(in_ext.rotation, ref m_rotation);
+			Rdp.GetVector4(in_ext.rotation, out m_rotation);
+		}
+		public void Update(Quaternion in_rot)
+		{
+			Rdp.GetVector4(in_rot, out m_rotation);
 		}
 
-		public string Log()
+		public void Reset()
 		{
-			string log = "position(" + translation.x.ToString() + ", " + translation.y.ToString() + ", " + translation.z.ToString() + ")";
-			log += ", rotation(" + rotation.x.ToString() + ", " + rotation.y.ToString() + ", " + rotation.z.ToString() + ", " + rotation.w.ToString() + ")";
-			return log;
+			translation.x = 0;
+			translation.y = 0;
+			translation.z = 0;
+			m_rotation.x = 0;
+			m_rotation.y = 0;
+			m_rotation.z = 0;
+			m_rotation.w = 1;
 		}
+#if WAVE_BODY_CALIBRATION
+		public void Update(WVR_BodyTracking_Extrinsic_t in_ext)
+		{
+			Rdp.GetVector3FromGL(in_ext.position, out translation);
+			Rdp.GetVector4FromGL(in_ext.rotation, out m_rotation);
+		}
+#endif
 	}
 	[Serializable]
 	public struct ExtrinsicInfo_t
 	{
 		const string LOG_TAG = "VIVE.OpenXR.Toolkits.BodyTracking.ExtrinsicInfo_t";
 		static StringBuilder m_sb = null;
-		static StringBuilder sb {
-			get {
+		static StringBuilder sb
+		{
+			get
+			{
 				if (m_sb == null) { m_sb = new StringBuilder(); }
 				return m_sb;
 			}
 		}
-		void DEBUG(StringBuilder msg) { Debug.Log(msg); }
+		void DEBUG(StringBuilder msg) { Rdp.d(LOG_TAG, msg, true); }
 
 		public bool isTracking;
 		public ExtrinsicVector4_t extrinsic;
@@ -766,15 +1228,17 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			isTracking = in_isTracking;
 			extrinsic = in_extrinsic;
 		}
-		public static ExtrinsicInfo_t identity {
-			get {
+		public static ExtrinsicInfo_t identity
+		{
+			get
+			{
 				return new ExtrinsicInfo_t(false, ExtrinsicVector4_t.identity);
 			}
 		}
-		public void Init()
+		public void Reset()
 		{
 			isTracking = false;
-			extrinsic = ExtrinsicVector4_t.identity;
+			extrinsic.Reset();
 		}
 		public void Update(ExtrinsicInfo_t in_info)
 		{
@@ -791,9 +1255,22 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			isTracking = true;
 			extrinsic.Update(in_ext);
 		}
+		public void Update(TrackedDeviceExtrinsic in_ext)
+		{
+			isTracking = true;
+			extrinsic.Update(in_ext.extrinsic);
+		}
+#if WAVE_BODY_CALIBRATION
+		public void Update(WVR_BodyTracking_Extrinsic_t in_ext)
+		{
+			isTracking = true;
+			extrinsic.Update(in_ext);
+		}
+#endif
+
 		public void printLog(string prefix)
 		{
-			sb.Clear().Append(LOG_TAG).Append(prefix)
+			sb.Clear().Append(prefix)
 				.Append(", position(").Append(extrinsic.translation.x).Append(", ").Append(extrinsic.translation.y).Append(", ").Append(extrinsic.translation.z).Append(")")
 				.Append(", rotation(").Append(extrinsic.rotation.x).Append(", ").Append(extrinsic.rotation.y).Append(", ").Append(extrinsic.rotation.z).Append(", ").Append(extrinsic.rotation.w).Append(")");
 			DEBUG(sb);
@@ -804,13 +1281,15 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 	{
 		const string LOG_TAG = "VIVE.OpenXR.Toolkits.BodyTracking.TrackedDeviceExtrinsicState_t";
 		static StringBuilder m_sb = null;
-		static StringBuilder sb {
-			get {
+		static StringBuilder sb
+		{
+			get
+			{
 				if (m_sb == null) { m_sb = new StringBuilder(); }
 				return m_sb;
 			}
 		}
-		static void DEBUG(StringBuilder msg) { Debug.Log(msg); }
+		static void DEBUG(StringBuilder msg) { Rdp.d(LOG_TAG, msg, true); }
 
 		public bool isTracking;
 		public TrackedDeviceExtrinsic deviceExtrinsic;
@@ -820,10 +1299,16 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			isTracking = in_isTracking;
 			deviceExtrinsic = in_deviceExtrinsic;
 		}
-		public static TrackedDeviceExtrinsicState_t identity {
-			get {
+		public static TrackedDeviceExtrinsicState_t identity
+		{
+			get
+			{
 				return new TrackedDeviceExtrinsicState_t(false, TrackedDeviceExtrinsic.identity);
 			}
+		}
+		public static TrackedDeviceExtrinsicState_t init(TrackedDeviceRole role)
+		{
+			return new TrackedDeviceExtrinsicState_t(false, TrackedDeviceExtrinsic.init(role));
 		}
 		public void Update(TrackedDeviceExtrinsicState_t in_info)
 		{
@@ -835,7 +1320,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			isTracking = extInfo.isTracking;
 			deviceExtrinsic.extrinsic.Update(extInfo.extrinsic.GetExtrinsic());
 
-			sb.Clear().Append(LOG_TAG).Append(deviceExtrinsic.trackedDeviceRole.Name())
+			sb.Clear().Append(deviceExtrinsic.trackedDeviceRole.Name())
 				.Append(", isTracking: ").Append(isTracking)
 				.Append(", position(")
 					.Append(deviceExtrinsic.extrinsic.translation.x).Append(", ")
@@ -850,6 +1335,11 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 				.Append(")");
 			DEBUG(sb);
 		}
+		public void Update(TrackedDeviceExtrinsic in_ext)
+		{
+			isTracking = true;
+			deviceExtrinsic.Update(in_ext);
+		}
 	}
 	/// <summary>
 	/// A class records the developer's choices of tracking devices.
@@ -860,269 +1350,244 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 	{
 		const string LOG_TAG = "VIVE.OpenXR.Toolkits.BodyTracking.BodyTrackedDevice";
 		static StringBuilder m_sb = null;
-		static StringBuilder sb {
-			get {
+		static StringBuilder sb
+		{
+			get
+			{
 				if (m_sb == null) { m_sb = new StringBuilder(); }
 				return m_sb;
 			}
 		}
-		void DEBUG(StringBuilder msg) { Debug.Log(msg); }
+		void DEBUG(StringBuilder msg) { Rdp.d(LOG_TAG, msg, true); }
 		static int logFrame = 0;
 		bool printIntervalLog = false;
-		void ERROR(StringBuilder msg) { Debug.LogError(msg); }
+		void ERROR(StringBuilder msg) { Rdp.e(LOG_TAG, msg, true); }
 
-		public TrackedDeviceExtrinsicState_t hip = TrackedDeviceExtrinsicState_t.identity;
-		public TrackedDeviceExtrinsicState_t chest = TrackedDeviceExtrinsicState_t.identity;
-		public TrackedDeviceExtrinsicState_t head = TrackedDeviceExtrinsicState_t.identity;
+		public TrackedDeviceExtrinsicState_t hip = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_HIP);
+		public TrackedDeviceExtrinsicState_t chest = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_CHEST);
+		public TrackedDeviceExtrinsicState_t head = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_HEAD);
 
-		public TrackedDeviceExtrinsicState_t leftElbow = TrackedDeviceExtrinsicState_t.identity;
-		public TrackedDeviceExtrinsicState_t leftWrist = TrackedDeviceExtrinsicState_t.identity;
-		public TrackedDeviceExtrinsicState_t leftHand = TrackedDeviceExtrinsicState_t.identity;
-		public TrackedDeviceExtrinsicState_t leftHandheld = TrackedDeviceExtrinsicState_t.identity;
+		public TrackedDeviceExtrinsicState_t leftElbow = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_LEFTELBOW);
+		public TrackedDeviceExtrinsicState_t leftWrist = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_LEFTWRIST);
+		public TrackedDeviceExtrinsicState_t leftHand = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_LEFTHAND);
+		public TrackedDeviceExtrinsicState_t leftHandheld = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_LEFTHANDHELD);
 
-		public TrackedDeviceExtrinsicState_t rightElbow = TrackedDeviceExtrinsicState_t.identity;
-		public TrackedDeviceExtrinsicState_t rightWrist = TrackedDeviceExtrinsicState_t.identity;
-		public TrackedDeviceExtrinsicState_t rightHand = TrackedDeviceExtrinsicState_t.identity;
-		public TrackedDeviceExtrinsicState_t rightHandheld = TrackedDeviceExtrinsicState_t.identity;
+		public TrackedDeviceExtrinsicState_t rightElbow = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_RIGHTELBOW);
+		public TrackedDeviceExtrinsicState_t rightWrist = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_RIGHTWRIST);
+		public TrackedDeviceExtrinsicState_t rightHand = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_RIGHTHAND);
+		public TrackedDeviceExtrinsicState_t rightHandheld = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_RIGHTHANDHELD);
 
-		public TrackedDeviceExtrinsicState_t leftKnee = TrackedDeviceExtrinsicState_t.identity;
-		public TrackedDeviceExtrinsicState_t leftAnkle = TrackedDeviceExtrinsicState_t.identity;
-		public TrackedDeviceExtrinsicState_t leftFoot = TrackedDeviceExtrinsicState_t.identity;
+		public TrackedDeviceExtrinsicState_t leftKnee = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_LEFTKNEE);
+		public TrackedDeviceExtrinsicState_t leftAnkle = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_LEFTANKLE);
+		public TrackedDeviceExtrinsicState_t leftFoot = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_LEFTFOOT);
 
-		public TrackedDeviceExtrinsicState_t rightKnee = TrackedDeviceExtrinsicState_t.identity;
-		public TrackedDeviceExtrinsicState_t rightAnkle = TrackedDeviceExtrinsicState_t.identity;
-		public TrackedDeviceExtrinsicState_t rightFoot = TrackedDeviceExtrinsicState_t.identity;
+		public TrackedDeviceExtrinsicState_t rightKnee = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_RIGHTKNEE);
+		public TrackedDeviceExtrinsicState_t rightAnkle = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_RIGHTANKLE);
+		public TrackedDeviceExtrinsicState_t rightFoot = TrackedDeviceExtrinsicState_t.init(TrackedDeviceRole.ROLE_RIGHTFOOT);
 
-		private Dictionary<DeviceExtRole, List<TrackedDeviceExtrinsic>> s_TrackedDeviceExtrinsics = new Dictionary<DeviceExtRole, List<TrackedDeviceExtrinsic>>();
-		private Dictionary<DeviceExtRole, TrackedDeviceExtrinsic[]> trackedDevicesArrays = new Dictionary<DeviceExtRole, TrackedDeviceExtrinsic[]>();
-
+		private Dictionary<DeviceExtRole, TrackedDeviceExtrinsic[]> s_TrackedDeviceExtrinsics = new Dictionary<DeviceExtRole, TrackedDeviceExtrinsic[]>();
 		private bool getDeviceExtrinsicsFirstTime = true;
 		private void UpdateTrackedDevicesArray()
 		{
-			if (s_TrackedDeviceExtrinsics == null) { s_TrackedDeviceExtrinsics = new Dictionary<DeviceExtRole, List<TrackedDeviceExtrinsic>>(); }
-			s_TrackedDeviceExtrinsics.Clear();
+			Dictionary<DeviceExtRole, List<TrackedDeviceExtrinsic>> dev_exts = new Dictionary<DeviceExtRole, List<TrackedDeviceExtrinsic>>();
 
-			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.Arm_Wrist, new List<TrackedDeviceExtrinsic>());
-			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.UpperBody_Wrist, new List<TrackedDeviceExtrinsic>());
-			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.FullBody_Wrist_Ankle, new List<TrackedDeviceExtrinsic>());
-			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.FullBody_Wrist_Foot, new List<TrackedDeviceExtrinsic>());
+			dev_exts.Add(DeviceExtRole.Arm_Wrist, new List<TrackedDeviceExtrinsic>());
+			dev_exts.Add(DeviceExtRole.UpperBody_Wrist, new List<TrackedDeviceExtrinsic>());
+			dev_exts.Add(DeviceExtRole.FullBody_Wrist_Ankle, new List<TrackedDeviceExtrinsic>());
+			dev_exts.Add(DeviceExtRole.FullBody_Wrist_Foot, new List<TrackedDeviceExtrinsic>());
 
-			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.Arm_Handheld_Hand, new List<TrackedDeviceExtrinsic>());
-			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.UpperBody_Handheld_Hand, new List<TrackedDeviceExtrinsic>());
-			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.FullBody_Handheld_Hand_Ankle, new List<TrackedDeviceExtrinsic>());
-			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.FullBody_Handheld_Hand_Foot, new List<TrackedDeviceExtrinsic>());
+			dev_exts.Add(DeviceExtRole.Arm_Handheld_Hand, new List<TrackedDeviceExtrinsic>());
+			dev_exts.Add(DeviceExtRole.UpperBody_Handheld_Hand, new List<TrackedDeviceExtrinsic>());
+			dev_exts.Add(DeviceExtRole.FullBody_Handheld_Hand_Ankle, new List<TrackedDeviceExtrinsic>());
+			dev_exts.Add(DeviceExtRole.FullBody_Handheld_Hand_Foot, new List<TrackedDeviceExtrinsic>());
 
-			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle, new List<TrackedDeviceExtrinsic>());
+			dev_exts.Add(DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle, new List<TrackedDeviceExtrinsic>());
 
 			// 7 roles use hip.
 			if (hip.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(hip.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(hip.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Wrist].Add(hip.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Ankle].Add(hip.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Foot].Add(hip.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Wrist].Add(hip.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Wrist_Ankle].Add(hip.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Wrist_Foot].Add(hip.deviceExtrinsic);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand].Add(hip.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(hip.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(hip.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand].Add(hip.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(hip.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(hip.deviceExtrinsic);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(hip.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(hip.deviceExtrinsic);
 			}
 			if (chest.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(chest.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(chest.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 			}
 			// 9 roles use head.
 			if (head.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(head.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(head.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.Arm_Wrist].Add(head.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Wrist].Add(head.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Ankle].Add(head.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Foot].Add(head.deviceExtrinsic);
+				dev_exts[DeviceExtRole.Arm_Wrist].Add(head.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Wrist].Add(head.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Wrist_Ankle].Add(head.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Wrist_Foot].Add(head.deviceExtrinsic);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.Arm_Handheld_Hand].Add(head.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand].Add(head.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(head.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(head.deviceExtrinsic);
+				dev_exts[DeviceExtRole.Arm_Handheld_Hand].Add(head.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand].Add(head.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(head.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(head.deviceExtrinsic);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(head.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(head.deviceExtrinsic);
 			}
 
 			if (leftElbow.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftElbow.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftElbow.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 			}
 			// 4 roles use leftWrist.
 			if (leftWrist.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftWrist.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftWrist.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.Arm_Wrist].Add(leftWrist.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Wrist].Add(leftWrist.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Ankle].Add(leftWrist.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Foot].Add(leftWrist.deviceExtrinsic);
+				dev_exts[DeviceExtRole.Arm_Wrist].Add(leftWrist.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Wrist].Add(leftWrist.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Wrist_Ankle].Add(leftWrist.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Wrist_Foot].Add(leftWrist.deviceExtrinsic);
 			}
 			// 5 roles use leftHand
 			if (leftHand.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftHand.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftHand.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.Arm_Handheld_Hand].Add(leftHand.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand].Add(leftHand.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(leftHand.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(leftHand.deviceExtrinsic);
+				dev_exts[DeviceExtRole.Arm_Handheld_Hand].Add(leftHand.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand].Add(leftHand.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(leftHand.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(leftHand.deviceExtrinsic);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(leftHand.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(leftHand.deviceExtrinsic);
 			}
 			// 5 roles use leftHandheld
 			if (leftHandheld.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftHandheld.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftHandheld.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.Arm_Handheld_Hand].Add(leftHandheld.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand].Add(leftHandheld.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(leftHandheld.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(leftHandheld.deviceExtrinsic);
+				dev_exts[DeviceExtRole.Arm_Handheld_Hand].Add(leftHandheld.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand].Add(leftHandheld.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(leftHandheld.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(leftHandheld.deviceExtrinsic);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(leftHandheld.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(leftHandheld.deviceExtrinsic);
 			}
 
 			if (rightElbow.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightElbow.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightElbow.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 			}
 			// 4 roles use rightWrist.
 			if (rightWrist.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightWrist.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightWrist.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.Arm_Wrist].Add(rightWrist.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Wrist].Add(rightWrist.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Ankle].Add(rightWrist.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Foot].Add(rightWrist.deviceExtrinsic);
+				dev_exts[DeviceExtRole.Arm_Wrist].Add(rightWrist.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Wrist].Add(rightWrist.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Wrist_Ankle].Add(rightWrist.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Wrist_Foot].Add(rightWrist.deviceExtrinsic);
 			}
 			// 5 roles use rightHand
 			if (rightHand.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightHand.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightHand.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.Arm_Handheld_Hand].Add(rightHand.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand].Add(rightHand.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(rightHand.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(rightHand.deviceExtrinsic);
+				dev_exts[DeviceExtRole.Arm_Handheld_Hand].Add(rightHand.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand].Add(rightHand.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(rightHand.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(rightHand.deviceExtrinsic);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(rightHand.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(rightHand.deviceExtrinsic);
 			}
 			// 5 roles use rightHandheld
 			if (rightHandheld.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightHandheld.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightHandheld.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.Arm_Handheld_Hand].Add(rightHandheld.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand].Add(rightHandheld.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(rightHandheld.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(rightHandheld.deviceExtrinsic);
+				dev_exts[DeviceExtRole.Arm_Handheld_Hand].Add(rightHandheld.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand].Add(rightHandheld.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(rightHandheld.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(rightHandheld.deviceExtrinsic);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(rightHandheld.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(rightHandheld.deviceExtrinsic);
 			}
 
 			// Only 1 role uses leftKnee.
 			if (leftKnee.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftKnee.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftKnee.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(leftKnee.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(leftKnee.deviceExtrinsic);
 			}
 			// 3 roles use leftAnkle
 			if (leftAnkle.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftAnkle.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftAnkle.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Ankle].Add(leftAnkle.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(leftAnkle.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Wrist_Ankle].Add(leftAnkle.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(leftAnkle.deviceExtrinsic);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(leftAnkle.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(leftAnkle.deviceExtrinsic);
 			}
 			// 2 roles use leftFoot
 			if (leftFoot.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftFoot.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(leftFoot.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Foot].Add(leftFoot.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(leftFoot.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Wrist_Foot].Add(leftFoot.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(leftFoot.deviceExtrinsic);
 			}
 
 			// Only 1 role uses rightKnee.
 			if (rightKnee.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightKnee.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightKnee.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(rightKnee.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(rightKnee.deviceExtrinsic);
 			}
 			// 3 roles use rightAnkle
 			if (rightAnkle.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightAnkle.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightAnkle.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Ankle].Add(rightAnkle.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(rightAnkle.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Wrist_Ankle].Add(rightAnkle.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Ankle].Add(rightAnkle.deviceExtrinsic);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(rightAnkle.deviceExtrinsic);
+				dev_exts[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].Add(rightAnkle.deviceExtrinsic);
 			}
 			// 2 roles use rightFoot
 			if (rightFoot.isTracking)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightFoot.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
+				sb.Clear().Append("UpdateTrackedDevicesArray() Uses extrinsic of ").Append(rightFoot.deviceExtrinsic.trackedDeviceRole.Name()); DEBUG(sb);
 
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Foot].Add(rightFoot.deviceExtrinsic);
-				s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(rightFoot.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Wrist_Foot].Add(rightFoot.deviceExtrinsic);
+				dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Foot].Add(rightFoot.deviceExtrinsic);
 			}
 
-			if (trackedDevicesArrays == null) { trackedDevicesArrays = new Dictionary<DeviceExtRole, TrackedDeviceExtrinsic[]>(); }
-			trackedDevicesArrays.Clear();
+			if (s_TrackedDeviceExtrinsics == null) { s_TrackedDeviceExtrinsics = new Dictionary<DeviceExtRole, TrackedDeviceExtrinsic[]>(); }
+			s_TrackedDeviceExtrinsics.Clear();
 
-			trackedDevicesArrays.Add(DeviceExtRole.Arm_Wrist, s_TrackedDeviceExtrinsics[DeviceExtRole.Arm_Wrist].ToArray());
-			trackedDevicesArrays.Add(DeviceExtRole.UpperBody_Wrist, s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Wrist].ToArray());
-			trackedDevicesArrays.Add(DeviceExtRole.FullBody_Wrist_Ankle, s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Ankle].ToArray());
-			trackedDevicesArrays.Add(DeviceExtRole.FullBody_Wrist_Foot, s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Foot].ToArray());
+			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.Arm_Wrist, dev_exts[DeviceExtRole.Arm_Wrist].ToArray());
+			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.UpperBody_Wrist, dev_exts[DeviceExtRole.UpperBody_Wrist].ToArray());
+			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.FullBody_Wrist_Ankle, dev_exts[DeviceExtRole.FullBody_Wrist_Ankle].ToArray());
+			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.FullBody_Wrist_Foot, dev_exts[DeviceExtRole.FullBody_Wrist_Foot].ToArray());
 
-			trackedDevicesArrays.Add(DeviceExtRole.Arm_Handheld_Hand, s_TrackedDeviceExtrinsics[DeviceExtRole.Arm_Handheld_Hand].ToArray());
-			trackedDevicesArrays.Add(DeviceExtRole.UpperBody_Handheld_Hand, s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand].ToArray());
-			trackedDevicesArrays.Add(DeviceExtRole.FullBody_Handheld_Hand_Ankle, s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Ankle].ToArray());
-			trackedDevicesArrays.Add(DeviceExtRole.FullBody_Handheld_Hand_Foot, s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Foot].ToArray());
+			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.Arm_Handheld_Hand, dev_exts[DeviceExtRole.Arm_Handheld_Hand].ToArray());
+			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.UpperBody_Handheld_Hand, dev_exts[DeviceExtRole.UpperBody_Handheld_Hand].ToArray());
+			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.FullBody_Handheld_Hand_Ankle, dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Ankle].ToArray());
+			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.FullBody_Handheld_Hand_Foot, dev_exts[DeviceExtRole.FullBody_Handheld_Hand_Foot].ToArray());
 
-			trackedDevicesArrays.Add(DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle, s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].ToArray());
+			s_TrackedDeviceExtrinsics.Add(DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle, dev_exts[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle].ToArray());
 
 			getDeviceExtrinsicsFirstTime = true;
 		}
 
-		public BodyTrackedDevice()
-		{
-			hip.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_HIP;
-			chest.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_CHEST;
-			head.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_HEAD;
-
-			leftElbow.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTELBOW;
-			leftWrist.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTWRIST;
-			leftHand.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTHAND;
-			leftHandheld.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTHANDHELD;
-
-			rightElbow.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTELBOW;
-			rightWrist.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTWRIST;
-			rightHand.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTHAND;
-			rightHandheld.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTHANDHELD;
-
-			leftKnee.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTKNEE;
-			leftAnkle.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTANKLE;
-			leftFoot.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTFOOT;
-
-			rightKnee.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTKNEE;
-			rightAnkle.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTANKLE;
-			rightFoot.deviceExtrinsic.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTFOOT;
-		}
 		public void Update(BodyTrackedDevice in_device)
 		{
 			if (in_device == null) { return; }
@@ -1155,7 +1620,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		public void Update([In] TrackerExtrinsic in_ext)
 		{
 			if (in_ext == null) { return; }
-			sb.Clear().Append(LOG_TAG).Append("Update() TrackerExtrinsic of each device."); DEBUG(sb);
+			sb.Clear().Append("Update() TrackerExtrinsic of each device."); DEBUG(sb);
 
 			hip.Update(in_ext.hip); // 0
 			chest.Update(in_ext.chest);
@@ -1181,6 +1646,56 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 
 			UpdateTrackedDevicesArray();
 		}
+		public void Update([In] TrackedDeviceExtrinsic[] bodyTrackedDevices)
+		{
+			if (bodyTrackedDevices == null) { return; }
+
+			for (int dev = 0; dev < bodyTrackedDevices.Length; dev++)
+			{
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_HIP) { hip.Update(bodyTrackedDevices[dev]); }
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_CHEST) { chest.Update(bodyTrackedDevices[dev]); }
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_CHEST) { head.Update(bodyTrackedDevices[dev]); }
+
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTELBOW) { leftElbow.Update(bodyTrackedDevices[dev]); }
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTWRIST) { leftWrist.Update(bodyTrackedDevices[dev]); }
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTHAND) { leftHand.Update(bodyTrackedDevices[dev]); }
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTHANDHELD) { leftHandheld.Update(bodyTrackedDevices[dev]); }
+
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTELBOW) { rightElbow.Update(bodyTrackedDevices[dev]); }
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTWRIST) { rightWrist.Update(bodyTrackedDevices[dev]); }
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTHAND) { rightHand.Update(bodyTrackedDevices[dev]); }
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTHANDHELD) { rightHandheld.Update(bodyTrackedDevices[dev]); }
+
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTKNEE) { leftKnee.Update(bodyTrackedDevices[dev]); }
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTANKLE) { leftAnkle.Update(bodyTrackedDevices[dev]); }
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTFOOT) { leftFoot.Update(bodyTrackedDevices[dev]); }
+
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTKNEE) { rightKnee.Update(bodyTrackedDevices[dev]); }
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTANKLE) { rightAnkle.Update(bodyTrackedDevices[dev]); }
+				if (bodyTrackedDevices[dev].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTFOOT) { rightFoot.Update(bodyTrackedDevices[dev]); }
+			}
+
+			if (s_TrackedDeviceExtrinsics == null) { UpdateTrackedDevicesArray(); }
+
+			for (int dev = 0; dev < bodyTrackedDevices.Length; dev++)
+			{
+				for (int i = 0; i < s_TrackedDeviceExtrinsics.Count; i++)
+				{
+					DeviceExtRole role = s_TrackedDeviceExtrinsics.ElementAt(i).Key;
+					for (int ext = 0; ext < s_TrackedDeviceExtrinsics[role].Length; ext++)
+					{
+						if (s_TrackedDeviceExtrinsics[role][ext].trackedDeviceRole == bodyTrackedDevices[dev].trackedDeviceRole)
+						{
+							sb.Clear().Append("Update() ").Append(s_TrackedDeviceExtrinsics[role][ext].trackedDeviceRole.Name()).Append(" extrinsic")
+								.Append(" at s_TrackedDeviceExtrinsics[").Append(role.Name()).Append("][").Append(ext).Append("]");
+							DEBUG(sb);
+
+							s_TrackedDeviceExtrinsics[role][ext].extrinsic.Update(bodyTrackedDevices[dev].extrinsic);
+						}
+					}
+				}
+			}
+		}
 
 		/// <summary> The device extrinsics for use depends on the calibration pose role. </summary>
 		public bool GetDevicesExtrinsics(BodyPoseRole calibRole, out TrackedDeviceExtrinsic[] bodyTrackedDevices, out UInt32 bodyTrackedDeviceCount)
@@ -1192,13 +1707,13 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			// Upper Body + Leg FK
 			if (calibRole == BodyPoseRole.UpperBody_Handheld_Knee_Ankle || calibRole == BodyPoseRole.UpperBody_Hand_Knee_Ankle)
 			{
-				bodyTrackedDevices = trackedDevicesArrays[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle];
+				bodyTrackedDevices = s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle];
 				bodyTrackedDeviceCount = (UInt32)(bodyTrackedDevices.Length & 0x7FFFFFFF);
 
 				if (printIntervalLog || getDeviceExtrinsicsFirstTime)
 				{
-					sb.Clear().Append(LOG_TAG).Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle.Name()); DEBUG(sb);
-					sb.Clear().Append(LOG_TAG);
+					sb.Clear().Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.UpperBody_Handheld_Hand_Knee_Ankle.Name()); DEBUG(sb);
+					sb.Clear();
 					for (int i = 0; i < bodyTrackedDeviceCount; i++)
 					{
 						sb.Append("GetDevicesExtrinsics() Add extrinsic[").Append(i).Append("] ")
@@ -1212,13 +1727,13 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			// Full Body
 			if (calibRole == BodyPoseRole.FullBody_Wrist_Ankle)
 			{
-				bodyTrackedDevices = trackedDevicesArrays[DeviceExtRole.FullBody_Wrist_Ankle];
+				bodyTrackedDevices = s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Ankle];
 				bodyTrackedDeviceCount = (UInt32)(bodyTrackedDevices.Length & 0x7FFFFFFF);
 
 				if (printIntervalLog || getDeviceExtrinsicsFirstTime)
 				{
-					sb.Clear().Append(LOG_TAG).Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.FullBody_Wrist_Ankle.Name()); DEBUG(sb);
-					sb.Clear().Append(LOG_TAG);
+					sb.Clear().Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.FullBody_Wrist_Ankle.Name()); DEBUG(sb);
+					sb.Clear();
 					for (int i = 0; i < bodyTrackedDeviceCount; i++)
 					{
 						sb.Append("GetDevicesExtrinsics() Add extrinsic[").Append(i).Append("] ")
@@ -1230,13 +1745,13 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			}
 			if (calibRole == BodyPoseRole.FullBody_Wrist_Foot)
 			{
-				bodyTrackedDevices = trackedDevicesArrays[DeviceExtRole.FullBody_Wrist_Foot];
+				bodyTrackedDevices = s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Wrist_Foot];
 				bodyTrackedDeviceCount = (UInt32)(bodyTrackedDevices.Length & 0x7FFFFFFF);
 
 				if (printIntervalLog || getDeviceExtrinsicsFirstTime)
 				{
-					sb.Clear().Append(LOG_TAG).Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.FullBody_Wrist_Foot.Name()); DEBUG(sb);
-					sb.Clear().Append(LOG_TAG);
+					sb.Clear().Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.FullBody_Wrist_Foot.Name()); DEBUG(sb);
+					sb.Clear();
 					for (int i = 0; i < bodyTrackedDeviceCount; i++)
 					{
 						sb.Append("GetDevicesExtrinsics() Add extrinsic[").Append(i).Append("] ")
@@ -1248,13 +1763,13 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			}
 			if (calibRole == BodyPoseRole.FullBody_Handheld_Ankle || calibRole == BodyPoseRole.FullBody_Hand_Ankle)
 			{
-				bodyTrackedDevices = trackedDevicesArrays[DeviceExtRole.FullBody_Handheld_Hand_Ankle];
+				bodyTrackedDevices = s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Ankle];
 				bodyTrackedDeviceCount = (UInt32)(bodyTrackedDevices.Length & 0x7FFFFFFF);
 
 				if (printIntervalLog || getDeviceExtrinsicsFirstTime)
 				{
-					sb.Clear().Append(LOG_TAG).Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.FullBody_Handheld_Hand_Ankle.Name()); DEBUG(sb);
-					sb.Clear().Append(LOG_TAG);
+					sb.Clear().Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.FullBody_Handheld_Hand_Ankle.Name()); DEBUG(sb);
+					sb.Clear();
 					for (int i = 0; i < bodyTrackedDeviceCount; i++)
 					{
 						sb.Append("GetDevicesExtrinsics() Add extrinsic[").Append(i).Append("] ")
@@ -1266,13 +1781,13 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			}
 			if (calibRole == BodyPoseRole.FullBody_Handheld_Foot || calibRole == BodyPoseRole.FullBody_Hand_Foot)
 			{
-				bodyTrackedDevices = trackedDevicesArrays[DeviceExtRole.FullBody_Handheld_Hand_Foot];
+				bodyTrackedDevices = s_TrackedDeviceExtrinsics[DeviceExtRole.FullBody_Handheld_Hand_Foot];
 				bodyTrackedDeviceCount = (UInt32)(bodyTrackedDevices.Length & 0x7FFFFFFF);
 
 				if (printIntervalLog || getDeviceExtrinsicsFirstTime)
 				{
-					sb.Clear().Append(LOG_TAG).Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.FullBody_Handheld_Hand_Foot.Name()); DEBUG(sb);
-					sb.Clear().Append(LOG_TAG);
+					sb.Clear().Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.FullBody_Handheld_Hand_Foot.Name()); DEBUG(sb);
+					sb.Clear();
 					for (int i = 0; i < bodyTrackedDeviceCount; i++)
 					{
 						sb.Append("GetDevicesExtrinsics() Add extrinsic[").Append(i).Append("] ")
@@ -1286,13 +1801,13 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			// Upper Body
 			if (calibRole == BodyPoseRole.UpperBody_Wrist)
 			{
-				bodyTrackedDevices = trackedDevicesArrays[DeviceExtRole.UpperBody_Wrist];
+				bodyTrackedDevices = s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Wrist];
 				bodyTrackedDeviceCount = (UInt32)(bodyTrackedDevices.Length & 0x7FFFFFFF);
 
 				if (printIntervalLog || getDeviceExtrinsicsFirstTime)
 				{
-					sb.Clear().Append(LOG_TAG).Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.UpperBody_Wrist.Name()); DEBUG(sb);
-					sb.Clear().Append(LOG_TAG);
+					sb.Clear().Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.UpperBody_Wrist.Name()); DEBUG(sb);
+					sb.Clear();
 					for (int i = 0; i < bodyTrackedDeviceCount; i++)
 					{
 						sb.Append("GetDevicesExtrinsics() Add extrinsic[").Append(i).Append("] ")
@@ -1304,13 +1819,13 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			}
 			if (calibRole == BodyPoseRole.UpperBody_Handheld || calibRole == BodyPoseRole.UpperBody_Hand)
 			{
-				bodyTrackedDevices = trackedDevicesArrays[DeviceExtRole.UpperBody_Handheld_Hand];
+				bodyTrackedDevices = s_TrackedDeviceExtrinsics[DeviceExtRole.UpperBody_Handheld_Hand];
 				bodyTrackedDeviceCount = (UInt32)(bodyTrackedDevices.Length & 0x7FFFFFFF);
 
 				if (printIntervalLog || getDeviceExtrinsicsFirstTime)
 				{
-					sb.Clear().Append(LOG_TAG).Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.UpperBody_Handheld_Hand.Name()); DEBUG(sb);
-					sb.Clear().Append(LOG_TAG);
+					sb.Clear().Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.UpperBody_Handheld_Hand.Name()); DEBUG(sb);
+					sb.Clear();
 					for (int i = 0; i < bodyTrackedDeviceCount; i++)
 					{
 						sb.Append("GetDevicesExtrinsics() Add extrinsic[").Append(i).Append("] ")
@@ -1324,13 +1839,13 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			// Arm
 			if (calibRole == BodyPoseRole.Arm_Wrist)
 			{
-				bodyTrackedDevices = trackedDevicesArrays[DeviceExtRole.Arm_Wrist];
+				bodyTrackedDevices = s_TrackedDeviceExtrinsics[DeviceExtRole.Arm_Wrist];
 				bodyTrackedDeviceCount = (UInt32)(bodyTrackedDevices.Length & 0x7FFFFFFF);
 
 				if (printIntervalLog || getDeviceExtrinsicsFirstTime)
 				{
-					sb.Clear().Append(LOG_TAG).Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.Arm_Wrist.Name()); DEBUG(sb);
-					sb.Clear().Append(LOG_TAG);
+					sb.Clear().Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.Arm_Wrist.Name()); DEBUG(sb);
+					sb.Clear();
 					for (int i = 0; i < bodyTrackedDeviceCount; i++)
 					{
 						sb.Append("GetDevicesExtrinsics() Add extrinsic[").Append(i).Append("] ")
@@ -1342,13 +1857,13 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			}
 			if (calibRole == BodyPoseRole.Arm_Handheld || calibRole == BodyPoseRole.Arm_Hand)
 			{
-				bodyTrackedDevices = trackedDevicesArrays[DeviceExtRole.Arm_Handheld_Hand];
+				bodyTrackedDevices = s_TrackedDeviceExtrinsics[DeviceExtRole.Arm_Handheld_Hand];
 				bodyTrackedDeviceCount = (UInt32)(bodyTrackedDevices.Length & 0x7FFFFFFF);
 
 				if (printIntervalLog || getDeviceExtrinsicsFirstTime)
 				{
-					sb.Clear().Append(LOG_TAG).Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.Arm_Handheld_Hand.Name()); DEBUG(sb);
-					sb.Clear().Append(LOG_TAG);
+					sb.Clear().Append("GetDevicesExtrinsics() of extrinsic role ").Append(DeviceExtRole.Arm_Handheld_Hand.Name()); DEBUG(sb);
+					sb.Clear();
 					for (int i = 0; i < bodyTrackedDeviceCount; i++)
 					{
 						sb.Append("GetDevicesExtrinsics() Add extrinsic[").Append(i).Append("] ")
@@ -1368,7 +1883,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		private DeviceExtRole m_IKRoles = DeviceExtRole.Unknown;
 		public DeviceExtRole GetIKRoles(BodyPoseRole calibRole)
 		{
-			if (printIntervalLog || getDeviceExtrinsicsFirstTime) { sb.Clear().Append(LOG_TAG).Append("GetIKRoles()"); DEBUG(sb); }
+			if (printIntervalLog || getDeviceExtrinsicsFirstTime) { sb.Clear().Append("GetIKRoles()"); DEBUG(sb); }
 
 			if (ikFrame == Time.frameCount) { return m_IKRoles; }
 			else { m_IKRoles = DeviceExtRole.Unknown; ikFrame = Time.frameCount; }
@@ -1379,92 +1894,75 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			return m_IKRoles;
 		}
 	}
-	public class BodyIKInfo
+
+	internal struct TrackingInfos_t
 	{
-		public BodyTrackingMode mode = BodyTrackingMode.UNKNOWNMODE;
-		public BodyAvatar avatar = new BodyAvatar();
-		public BodyTrackedDevice trackedDevice = new BodyTrackedDevice();
+		internal struct TrackingInfo_t
+		{
+			public TrackedDeviceType type;
+			public UInt32[] ids;
+			public UInt32 count;
 
-		public BodyIKInfo(BodyTrackingMode in_mode)
-		{
-			mode = in_mode;
+			public TrackingInfo_t(TrackedDeviceType in_type, UInt32[] in_ids, UInt32 in_count)
+			{
+				type = in_type;
+				ids = in_ids;
+				count = in_count;
+			}
+			public void Update(TrackingInfo_t in_info)
+			{
+				type = in_info.type;
+				if (count != in_info.count && in_info.count > 0)
+				{
+					count = in_info.count;
+					ids = new UInt32[count];
+				}
+				for (UInt32 i = 0; i < count; i++)
+					ids[i] = in_info.ids[i];
+			}
 		}
-		public BodyIKInfo(BodyTrackingMode in_mode, BodyAvatar in_avatar, BodyTrackedDevice in_device)
-		{
-			mode = in_mode;
-			avatar = in_avatar;
-			trackedDevice = in_device;
-		}
-		public void Update(BodyIKInfo in_info)
-		{
-			if (in_info == null) { return; }
 
-			mode = in_info.mode;
-			avatar.Update(in_info.avatar);
-			trackedDevice.Update(in_info.trackedDevice);
-		}
-	}
-	
-	internal struct TrackingInfo
-	{
-		public bool[] initRoles;
-		public bool[] trackedRoles;
-
-		public TrackingInfo(bool[] in_initRoles, bool[] in_trackedRoles)
+		public TrackingInfo_t[] s_info;
+		public UInt32 size;
+		public TrackingInfos_t(TrackingInfo_t[] in_info, UInt32 in_size)
 		{
-			initRoles = in_initRoles;
-			trackedRoles = in_trackedRoles;
+			s_info = in_info;
+			size = in_size;
 		}
-		public void Init()
+		public void Update(TrackingInfos_t in_infos)
 		{
-			initRoles = new bool[(Int32)TrackedDeviceRole.NUMS_OF_ROLE];
-			trackedRoles = new bool[(Int32)TrackedDeviceRole.NUMS_OF_ROLE];
+			if (size != in_infos.size && in_infos.size > 0)
+			{
+				size = in_infos.size;
+				s_info = new TrackingInfo_t[size];
+				for (UInt32 i = 0; i < size; i++)
+					s_info[i].Update(in_infos.s_info[i]);
+			}
 		}
-		public void Update(TrackingInfo info)
+		public void Update(TrackingInfo_t in_info)
 		{
-			if (initRoles == null || initRoles.Length != info.initRoles.Length)
-				initRoles = new bool[info.initRoles.Length];
-			for (int i = 0; i < initRoles.Length; i++)
-				initRoles[i] = info.initRoles[i];
-
-			if (trackedRoles == null || trackedRoles.Length != info.trackedRoles.Length)
-				trackedRoles = new bool[info.trackedRoles.Length];
-			for (int i = 0; i < trackedRoles.Length; i++)
-				trackedRoles[i] = info.trackedRoles[i];
-		}
-		public void ResetInitRoles()
-		{
-			if (initRoles == null) { return; }
-			for (int i = 0; i < initRoles.Length; i++)
-				initRoles[i] = false;
-		}
-		public void ResetTrackedRoles()
-		{
-			if (trackedRoles == null) { return; }
-			for (int i = 0; i < trackedRoles.Length; i++)
-				trackedRoles[i] = false;
-		}
-		public void Reset()
-		{
-			ResetInitRoles();
-			ResetTrackedRoles();
+			for (int i = 0; i < s_info.Length; i++)
+			{
+				if (s_info[i].type == in_info.type)
+					s_info[i].Update(in_info);
+			}
 		}
 	}
 	public class BodyPose
 	{
-		const string LOG_TAG = "VIVE.OpenXR.Toolkits.BodyTracking.BodyPose ";
+		const string LOG_TAG = "VIVE.OpenXR.Toolkits.BodyTracking.BodyPose";
 		StringBuilder m_sb = null;
-		StringBuilder sb {
-			get {
+		StringBuilder sb
+		{
+			get
+			{
 				if (m_sb == null) { m_sb = new StringBuilder(); }
 				return m_sb;
 			}
 		}
-		void DEBUG(StringBuilder msg) { Debug.Log(LOG_TAG + msg); }
-		static int logFrame = 0;
-		bool printIntervalLog = false;
-		void WARNING(StringBuilder msg) { Debug.LogWarning(msg); }
-		void ERROR(StringBuilder msg) { Debug.LogError(LOG_TAG + msg); }
+		void DEBUG(StringBuilder msg) { Rdp.d(LOG_TAG, msg, true); }
+
+		public BodyTrackingMode trackingMode = BodyTrackingMode.UPPERIKANDLEGFK;
 
 		public TrackedDevicePose hip = TrackedDevicePose.identity;
 		public TrackedDevicePose chest = TrackedDevicePose.identity;
@@ -1488,25 +1986,35 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		public TrackedDevicePose rightAnkle = TrackedDevicePose.identity;
 		public TrackedDevicePose rightFoot = TrackedDevicePose.identity;
 
-		private InputActionReference m_HipPose = null;
-		private InputActionReference m_LeftWristPose = null;
-		private InputActionReference m_RightWristPose = null;
+		public const float kUserHeight = 1.6f;
+		public float userCalibrationHeight = kUserHeight;
 
-		private InputActionReference m_LeftKneePose = null;
-		private InputActionReference m_LeftAnklePose = null;
-		private InputActionReference m_LeftFootPose = null;
+		internal TrackedDeviceType[] s_TrackedDeviceTypes = new TrackedDeviceType[(int)TrackedDeviceRole.NUMS_OF_ROLE]
+		{
+			TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid,
+			TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid,
+			TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid,
+			TrackedDeviceType.Invalid, TrackedDeviceType.Invalid
+		};
+		private void InitTrackedDeviceTypes()
+		{
+			s_TrackedDeviceTypes = new TrackedDeviceType[(int)TrackedDeviceRole.NUMS_OF_ROLE]
+			{
+				TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid,
+				TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid,
+				TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid, TrackedDeviceType.Invalid,
+				TrackedDeviceType.Invalid, TrackedDeviceType.Invalid
+			};
+		}
+		private void ResetTrackedDeviceTypes()
+		{
+			if (s_TrackedDeviceTypes == null) { InitTrackedDeviceTypes(); return; }
+			for (int i = 0; i < s_TrackedDeviceTypes.Length; i++)
+				s_TrackedDeviceTypes[i] = TrackedDeviceType.Invalid;
+		}
 
-		private InputActionReference m_RightKneePose = null;
-		private InputActionReference m_RightAnklePose = null;
-		private InputActionReference m_RightFootPose = null;
-
-		internal TrackingInfo trackingInfos;
-
-		public BodyPose(
-			InputActionReference Hip, InputActionReference LeftWrist, InputActionReference RightWrist,
-			InputActionReference LeftKnee, InputActionReference LeftAnkle, InputActionReference LeftFoot,
-			InputActionReference RightKnee, InputActionReference RightAnkle, InputActionReference RightFoot
-		)
+		[Obsolete("This function is deprecated, please use BodyPose(BodyTrackingMode) instead.")]
+		public BodyPose()
 		{
 			hip.trackedDeviceRole = TrackedDeviceRole.ROLE_HIP;
 			chest.trackedDeviceRole = TrackedDeviceRole.ROLE_CHEST;
@@ -1529,25 +2037,37 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			rightKnee.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTKNEE;
 			rightAnkle.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTANKLE;
 			rightFoot.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTFOOT;
+		}
+		public BodyPose(BodyTrackingMode mode)
+		{
+			trackingMode = mode;
 
-			trackingInfos.Init();
+			hip.trackedDeviceRole = TrackedDeviceRole.ROLE_HIP;
+			chest.trackedDeviceRole = TrackedDeviceRole.ROLE_CHEST;
+			head.trackedDeviceRole = TrackedDeviceRole.ROLE_HEAD;
 
-			Reset(
-				Hip: Hip,
-				LeftWrist: LeftWrist,
-				RightWrist: RightWrist,
+			leftElbow.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTELBOW;
+			leftWrist.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTWRIST;
+			leftHand.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTHAND;
+			leftHandheld.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTHANDHELD;
 
-				LeftKnee: LeftKnee,
-				LeftAnkle: LeftAnkle,
-				LeftFoot: LeftFoot,
+			rightElbow.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTELBOW;
+			rightWrist.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTWRIST;
+			rightHand.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTHAND;
+			rightHandheld.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTHANDHELD;
 
-				RightKnee: RightKnee,
-				RightAnkle: RightAnkle,
-				RightFoot: RightFoot
-			);
+			leftKnee.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTKNEE;
+			leftAnkle.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTANKLE;
+			leftFoot.trackedDeviceRole = TrackedDeviceRole.ROLE_LEFTFOOT;
+
+			rightKnee.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTKNEE;
+			rightAnkle.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTANKLE;
+			rightFoot.trackedDeviceRole = TrackedDeviceRole.ROLE_RIGHTFOOT;
 		}
 		public void Update([In] BodyPose in_body)
 		{
+			trackingMode = in_body.trackingMode;
+
 			hip.Update(in_body.hip);
 			chest.Update(in_body.chest);
 			head.Update(in_body.head);
@@ -1570,8 +2090,159 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			rightAnkle.Update(in_body.rightAnkle);
 			rightFoot.Update(in_body.rightFoot);
 
-			trackingInfos.Update(in_body.trackingInfos);
+			userCalibrationHeight = in_body.userCalibrationHeight;
+			s_TrackedDeviceTypes = in_body.s_TrackedDeviceTypes;
 		}
+		public void Update(TrackedDevicePose[] trackedDevicePoses)
+		{
+			if (trackedDevicePoses == null) { return; }
+			string func = "Update() ";
+
+			for (int i = 0; i < trackedDevicePoses.Length; i++)
+			{
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_HIP)
+				{
+					hip.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(hip.trackedDeviceRole.Name()).Append(", poseState: ").Append(hip.poseState)
+						.Append(", position (").Append(hip.translation.x.ToString("N3")).Append(", ").Append(hip.translation.y.ToString("N3")).Append(", ").Append(hip.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(hip.rotation.x.ToString("N3")).Append(", ").Append(hip.rotation.y.ToString("N3")).Append(", ").Append(hip.rotation.z.ToString("N3")).Append(", ").Append(hip.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_CHEST)
+				{
+					chest.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(chest.trackedDeviceRole.Name()).Append(", poseState: ").Append(chest.poseState)
+						.Append(", position (").Append(chest.translation.x.ToString("N3")).Append(", ").Append(chest.translation.y.ToString("N3")).Append(", ").Append(chest.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(chest.rotation.x.ToString("N3")).Append(", ").Append(chest.rotation.y.ToString("N3")).Append(", ").Append(chest.rotation.z.ToString("N3")).Append(", ").Append(chest.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_HEAD)
+				{
+					head.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(head.trackedDeviceRole.Name()).Append(", poseState: ").Append(head.poseState)
+						.Append(", position (").Append(head.translation.x.ToString("N3")).Append(", ").Append(head.translation.y.ToString("N3")).Append(", ").Append(head.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(head.rotation.x.ToString("N3")).Append(", ").Append(head.rotation.y.ToString("N3")).Append(", ").Append(head.rotation.z.ToString("N3")).Append(", ").Append(head.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTELBOW)
+				{
+					leftElbow.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(leftElbow.trackedDeviceRole.Name()).Append(", poseState: ").Append(leftElbow.poseState)
+						.Append(", position (").Append(leftElbow.translation.x.ToString("N3")).Append(", ").Append(leftElbow.translation.y.ToString("N3")).Append(", ").Append(leftElbow.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftElbow.rotation.x.ToString("N3")).Append(", ").Append(leftElbow.rotation.y.ToString("N3")).Append(", ").Append(leftElbow.rotation.z.ToString("N3")).Append(", ").Append(leftElbow.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTWRIST)
+				{
+					leftWrist.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(leftWrist.trackedDeviceRole.Name()).Append(", poseState: ").Append(leftWrist.poseState)
+						.Append(", position (").Append(leftWrist.translation.x.ToString("N3")).Append(", ").Append(leftWrist.translation.y.ToString("N3")).Append(", ").Append(leftWrist.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftWrist.rotation.x.ToString("N3")).Append(", ").Append(leftWrist.rotation.y.ToString("N3")).Append(", ").Append(leftWrist.rotation.z.ToString("N3")).Append(", ").Append(leftWrist.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTHAND)
+				{
+					leftHand.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(leftHand.trackedDeviceRole.Name()).Append(", poseState: ").Append(leftHand.poseState)
+						.Append(", position (").Append(leftHand.translation.x.ToString("N3")).Append(", ").Append(leftHand.translation.y.ToString("N3")).Append(", ").Append(leftHand.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftHand.rotation.x.ToString("N3")).Append(", ").Append(leftHand.rotation.y.ToString("N3")).Append(", ").Append(leftHand.rotation.z.ToString("N3")).Append(", ").Append(leftHand.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTHANDHELD)
+				{
+					leftHandheld.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(leftHandheld.trackedDeviceRole.Name()).Append(", poseState: ").Append(leftHandheld.poseState)
+						.Append(", position (").Append(leftHandheld.translation.x.ToString("N3")).Append(", ").Append(leftHandheld.translation.y.ToString("N3")).Append(", ").Append(leftHandheld.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftHandheld.rotation.x.ToString("N3")).Append(", ").Append(leftHandheld.rotation.y.ToString("N3")).Append(", ").Append(leftHandheld.rotation.z.ToString("N3")).Append(", ").Append(leftHandheld.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTELBOW)
+				{
+					rightElbow.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(rightElbow.trackedDeviceRole.Name()).Append(", poseState: ").Append(rightElbow.poseState)
+						.Append(", position (").Append(rightElbow.translation.x.ToString("N3")).Append(", ").Append(rightElbow.translation.y.ToString("N3")).Append(", ").Append(rightElbow.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightElbow.rotation.x.ToString("N3")).Append(", ").Append(rightElbow.rotation.y.ToString("N3")).Append(", ").Append(rightElbow.rotation.z.ToString("N3")).Append(", ").Append(rightElbow.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTWRIST)
+				{
+					rightWrist.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(rightWrist.trackedDeviceRole.Name()).Append(", poseState: ").Append(rightWrist.poseState)
+						.Append(", position (").Append(rightWrist.translation.x.ToString("N3")).Append(", ").Append(rightWrist.translation.y.ToString("N3")).Append(", ").Append(rightWrist.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightWrist.rotation.x.ToString("N3")).Append(", ").Append(rightWrist.rotation.y.ToString("N3")).Append(", ").Append(rightWrist.rotation.z.ToString("N3")).Append(", ").Append(rightWrist.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTHAND)
+				{
+					rightHand.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(rightHand.trackedDeviceRole.Name()).Append(", poseState: ").Append(rightHand.poseState)
+						.Append(", position (").Append(rightHand.translation.x.ToString("N3")).Append(", ").Append(rightHand.translation.y.ToString("N3")).Append(", ").Append(rightHand.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightHand.rotation.x.ToString("N3")).Append(", ").Append(rightHand.rotation.y.ToString("N3")).Append(", ").Append(rightHand.rotation.z.ToString("N3")).Append(", ").Append(rightHand.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTHANDHELD)
+				{
+					rightHandheld.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(rightHandheld.trackedDeviceRole.Name()).Append(", poseState: ").Append(rightHandheld.poseState)
+						.Append(", position (").Append(rightHandheld.translation.x.ToString("N3")).Append(", ").Append(rightHandheld.translation.y.ToString("N3")).Append(", ").Append(rightHandheld.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightHandheld.rotation.x.ToString("N3")).Append(", ").Append(rightHandheld.rotation.y.ToString("N3")).Append(", ").Append(rightHandheld.rotation.z.ToString("N3")).Append(", ").Append(rightHandheld.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTKNEE)
+				{
+					leftKnee.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(leftKnee.trackedDeviceRole.Name()).Append(", poseState: ").Append(leftKnee.poseState)
+						.Append(", position (").Append(leftKnee.translation.x.ToString("N3")).Append(", ").Append(leftKnee.translation.y.ToString("N3")).Append(", ").Append(leftKnee.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftKnee.rotation.x.ToString("N3")).Append(", ").Append(leftKnee.rotation.y.ToString("N3")).Append(", ").Append(leftKnee.rotation.z.ToString("N3")).Append(", ").Append(leftKnee.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTANKLE)
+				{
+					leftAnkle.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(leftAnkle.trackedDeviceRole.Name()).Append(", poseState: ").Append(leftAnkle.poseState)
+						.Append(", position (").Append(leftAnkle.translation.x.ToString("N3")).Append(", ").Append(leftAnkle.translation.y.ToString("N3")).Append(", ").Append(leftAnkle.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftAnkle.rotation.x.ToString("N3")).Append(", ").Append(leftAnkle.rotation.y.ToString("N3")).Append(", ").Append(leftAnkle.rotation.z.ToString("N3")).Append(", ").Append(leftAnkle.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTFOOT)
+				{
+					leftFoot.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(leftFoot.trackedDeviceRole.Name()).Append(", poseState: ").Append(leftFoot.poseState)
+						.Append(", position (").Append(leftFoot.translation.x.ToString("N3")).Append(", ").Append(leftFoot.translation.y.ToString("N3")).Append(", ").Append(leftFoot.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftFoot.rotation.x.ToString("N3")).Append(", ").Append(leftFoot.rotation.y.ToString("N3")).Append(", ").Append(leftFoot.rotation.z.ToString("N3")).Append(", ").Append(leftFoot.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTKNEE)
+				{
+					rightKnee.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(rightKnee.trackedDeviceRole.Name()).Append(", poseState: ").Append(rightKnee.poseState)
+						.Append(", position (").Append(rightKnee.translation.x.ToString("N3")).Append(", ").Append(rightKnee.translation.y.ToString("N3")).Append(", ").Append(rightKnee.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightKnee.rotation.x.ToString("N3")).Append(", ").Append(rightKnee.rotation.y.ToString("N3")).Append(", ").Append(rightKnee.rotation.z.ToString("N3")).Append(", ").Append(rightKnee.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTANKLE)
+				{
+					rightAnkle.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(rightAnkle.trackedDeviceRole.Name()).Append(", poseState: ").Append(rightAnkle.poseState)
+						.Append(", position (").Append(rightAnkle.translation.x.ToString("N3")).Append(", ").Append(rightAnkle.translation.y.ToString("N3")).Append(", ").Append(rightAnkle.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightAnkle.rotation.x.ToString("N3")).Append(", ").Append(rightAnkle.rotation.y.ToString("N3")).Append(", ").Append(rightAnkle.rotation.z.ToString("N3")).Append(", ").Append(rightAnkle.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (trackedDevicePoses[i].trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTFOOT)
+				{
+					rightFoot.Update(trackedDevicePoses[i]);
+					sb.Clear().Append(func).Append(rightFoot.trackedDeviceRole.Name()).Append(", poseState: ").Append(rightFoot.poseState)
+						.Append(", position (").Append(rightFoot.translation.x.ToString("N3")).Append(", ").Append(rightFoot.translation.y.ToString("N3")).Append(", ").Append(rightFoot.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightFoot.rotation.x.ToString("N3")).Append(", ").Append(rightFoot.rotation.y.ToString("N3")).Append(", ").Append(rightFoot.rotation.z.ToString("N3")).Append(", ").Append(rightFoot.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+		}
+
 		private void ResetPose()
 		{
 			hip.poseState = PoseState.NODATA;
@@ -1595,557 +2266,765 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			rightKnee.poseState = PoseState.NODATA;
 			rightAnkle.poseState = PoseState.NODATA;
 			rightFoot.poseState = PoseState.NODATA;
-
-			trackingInfos.ResetTrackedRoles();
 		}
-		private bool getDevicePosesFirstTime = true;
-		public void Reset(
-			InputActionReference Hip, InputActionReference LeftWrist, InputActionReference RightWrist,
-			InputActionReference LeftKnee, InputActionReference LeftAnkle, InputActionReference LeftFoot,
-			InputActionReference RightKnee, InputActionReference RightAnkle, InputActionReference RightFoot
-		)
+		[Obsolete("This function is deprecated, please use Clear(BodyTrackingMode) instead.")]
+		public void Clear()
 		{
-			getDevicePosesFirstTime = true;
-
 			ResetPose();
-
-			m_HipPose = Hip;
-			if (m_HipPose == null) { sb.Clear().Append(LOG_TAG).Append("Reset() m_HipPose is null."); WARNING(sb); }
-			m_LeftWristPose = LeftWrist;
-			if (m_LeftWristPose == null) { sb.Clear().Append(LOG_TAG).Append("Reset() m_LeftWristPose is null."); WARNING(sb); }
-			m_RightWristPose = RightWrist;
-			if (m_RightWristPose == null) { sb.Clear().Append(LOG_TAG).Append("Reset() m_RightWristPose is null."); WARNING(sb); }
-
-			m_LeftKneePose = LeftKnee;
-			if (m_LeftKneePose == null) { sb.Clear().Append(LOG_TAG).Append("Reset() m_LeftKneePose is null."); WARNING(sb); }
-			m_LeftAnklePose = LeftAnkle;
-			if (m_LeftAnklePose == null) { sb.Clear().Append(LOG_TAG).Append("Reset() m_LeftAnklePose is null."); WARNING(sb); }
-			m_LeftFootPose = LeftFoot;
-			if (m_LeftFootPose == null) { sb.Clear().Append(LOG_TAG).Append("Reset() m_LeftFootPose is null."); WARNING(sb); }
-
-			m_RightKneePose = RightKnee;
-			if (m_RightKneePose == null) { sb.Clear().Append(LOG_TAG).Append("Reset() m_RightKneePose is null."); WARNING(sb); }
-			m_RightAnklePose = RightAnkle;
-			if (m_RightAnklePose == null) { sb.Clear().Append(LOG_TAG).Append("Reset() m_RightAnklePose is null."); WARNING(sb); }
-			m_RightFootPose = RightFoot;
-			if (m_RightFootPose == null) { sb.Clear().Append(LOG_TAG).Append("Reset() m_RightFootPose is null."); WARNING(sb); }
+		}
+		public void Clear(BodyTrackingMode mode)
+		{
+			trackingMode = mode;
+			ResetPose();
 		}
 
-		#region Update Tracking Infos and Standard Pose in content.
-		/// <summary>
-		/// Called from BodyManager.UpdateBodyTrackingOnce() to update Body Poses every frame.
-		/// <br></br>
-		/// Called time: 1. After InitTrackingInfos. 2. Each frame from UpdateBodyTrackingOnce().
-		/// </summary>
-		internal BodyTrackingResult UpdatePose()
-		{
-			logFrame++;
-			logFrame %= 500;
-			printIntervalLog = (logFrame == 0);
+		private int ikFrame = -1;
+		private BodyPoseRole m_IKRoles = BodyPoseRole.Unknown;
 
-			if (trackingInfos.initRoles == null || trackingInfos.initRoles.Length <= 0)
+		private Dictionary<BodyTrackingMode, TrackedDevicePose[]> s_TrackedDevicePose = new Dictionary<BodyTrackingMode, TrackedDevicePose[]>
+		{
+			{ BodyTrackingMode.ARMIK, new TrackedDevicePose[3] },
+			{ BodyTrackingMode.UPPERBODYIK, new TrackedDevicePose[4] },
+			{ BodyTrackingMode.FULLBODYIK, new TrackedDevicePose[6] },
+			{ BodyTrackingMode.UPPERIKANDLEGFK, new TrackedDevicePose[8] },
+		};
+		public bool GetTrackedDevicePoses(bool init, out TrackedDevicePose[] trackedDevicePoses, out UInt32 trackedDevicePoseCount)
+		{
+			string func = "GetTrackedDevicePoses() ";
+			if (init)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdatePose() No pose to update."); ERROR(sb);
-				return BodyTrackingResult.ERROR_IK_NOT_UPDATED;
+				sb.Clear().Append(func).Append(trackingMode.Name());
+				DEBUG(sb);
 			}
-			ResetPose();
 
-			for (int i = 0; i < trackingInfos.initRoles.Length; i++)
+			trackedDevicePoses = null;
+			trackedDevicePoseCount = 0;
+			if (!s_TrackedDevicePose.ContainsKey(trackingMode)) { return false; }
+
+			// head
+			if (head.poseState == PoseState.NODATA) { return false; }
+			s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(head);
+			if (init)
 			{
-				if (!trackingInfos.initRoles[i]) { continue; }
+				sb.Clear().Append(func)
+					.Append("Add ").Append(trackedDevicePoseCount).Append(".head with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+					.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+					.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+				DEBUG(sb);
+			}
 
-				TrackedDeviceRole role = BodyTrackingUtils.GetTrackedDeviceRole(i);
-				if (role == TrackedDeviceRole.ROLE_HIP && BodyTrackingUtils.UpdateTrackedDevicePose(role, m_HipPose, ref hip) == BodyTrackingResult.SUCCESS)
+			// left wrist or handheld or hand
+			trackedDevicePoseCount++;
+			if (leftWrist.poseState != PoseState.NODATA)
+			{
+				s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(leftWrist);
+				if (init)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("UpdatePose() ").Append(role.Name()).Append(", poseState: ").Append(hip.poseState);
-						DEBUG(sb);
-					}
-					trackingInfos.trackedRoles[i] = true;
+					sb.Clear().Append(func)
+						.Append("Add ").Append(trackedDevicePoseCount).Append(".leftWrist with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+						.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
-				if (role == TrackedDeviceRole.ROLE_HEAD && BodyTrackingUtils.UpdateTrackedDevicePose(role, null, ref head) == BodyTrackingResult.SUCCESS)
+			}
+			else if (leftHandheld.poseState != PoseState.NODATA)
+			{
+				s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(leftHandheld);
+				if (init)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
+					sb.Clear().Append(func)
+						.Append("Add ").Append(trackedDevicePoseCount).Append(".leftHandheld with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+						.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			else
+			{
+				// allows hand to be NODATA.
+				s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(leftHand);
+				if (init)
+				{
+					sb.Clear().Append(func)
+						.Append("Add ").Append(trackedDevicePoseCount).Append(".leftHand with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+						.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			// right wrist or handheld or hand
+			trackedDevicePoseCount++;
+			if (rightWrist.poseState != PoseState.NODATA)
+			{
+				s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(rightWrist);
+				if (init)
+				{
+					sb.Clear().Append(func)
+						.Append("Add ").Append(trackedDevicePoseCount).Append(".rightWrist with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+						.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			else if (rightHandheld.poseState != PoseState.NODATA)
+			{
+				s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(rightHandheld);
+				if (init)
+				{
+					sb.Clear().Append(func)
+						.Append("Add ").Append(trackedDevicePoseCount).Append(".rightHandheld with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+						.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			else
+			{
+				// allow hand to be NODATA.
+				s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(rightHand);
+				if (init)
+				{
+					sb.Clear().Append(func)
+						.Append("Add ").Append(trackedDevicePoseCount).Append(".rightHand with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+						.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+
+			// hip
+			if (trackingMode == BodyTrackingMode.UPPERBODYIK || trackingMode == BodyTrackingMode.FULLBODYIK || trackingMode == BodyTrackingMode.UPPERIKANDLEGFK)
+			{
+				trackedDevicePoseCount++;
+				if (hip.poseState == PoseState.NODATA) { return false; }
+				s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(hip);
+				if (init)
+				{
+					sb.Clear().Append(func)
+						.Append("Add ").Append(trackedDevicePoseCount).Append(".hip with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+						.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+
+			// ankle or foot
+			if (trackingMode == BodyTrackingMode.FULLBODYIK)
+			{
+				if (leftAnkle.poseState != PoseState.NODATA)
+				{
+					trackedDevicePoseCount++;
+					s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(leftAnkle);
+					if (init)
 					{
-						sb.Clear().Append(LOG_TAG).Append("UpdatePose() ").Append(role.Name()).Append(", poseState: ").Append(head.poseState);
+						sb.Clear().Append(func)
+							.Append("Add ").Append(trackedDevicePoseCount).Append(".leftAnkle with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+							.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+							.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
 						DEBUG(sb);
 					}
-					trackingInfos.trackedRoles[i] = true;
+				}
+				else
+				{
+					if (leftFoot.poseState == PoseState.NODATA) { return false; }
+					trackedDevicePoseCount++;
+					s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(leftFoot);
+					if (init)
+					{
+						sb.Clear().Append(func)
+							.Append("Add ").Append(trackedDevicePoseCount).Append(".leftFoot with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+							.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+							.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+						DEBUG(sb);
+					}
 				}
 
-				if (role == TrackedDeviceRole.ROLE_LEFTWRIST && BodyTrackingUtils.UpdateTrackedDevicePose(role, m_LeftWristPose, ref leftWrist) == BodyTrackingResult.SUCCESS)
+				if (rightAnkle.poseState != PoseState.NODATA)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
+					trackedDevicePoseCount++;
+					s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(rightAnkle);
+					if (init)
 					{
-						sb.Clear().Append(LOG_TAG).Append("UpdatePose() ").Append(role.Name()).Append(", poseState: ").Append(leftWrist.poseState);
+						sb.Clear().Append(func)
+							.Append("Add ").Append(trackedDevicePoseCount).Append(".rightAnkle with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+							.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+							.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
 						DEBUG(sb);
 					}
-					trackingInfos.trackedRoles[i] = true;
 				}
-				if (role == TrackedDeviceRole.ROLE_LEFTHANDHELD || role == TrackedDeviceRole.ROLE_LEFTHAND)
+				else
 				{
-					if (BodyTrackingUtils.UpdateTrackedDevicePose(TrackedDeviceRole.ROLE_LEFTHANDHELD, null, ref leftHandheld) == BodyTrackingResult.SUCCESS)
+					if (rightFoot.poseState == PoseState.NODATA) { return false; }
+					trackedDevicePoseCount++;
+					s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(rightFoot);
+					if (init)
 					{
-						if (printIntervalLog || getDevicePosesFirstTime)
-						{
-							sb.Clear().Append(LOG_TAG).Append("UpdatePose() ROLE_LEFTHANDHELD, poseState: ").Append(leftHandheld.poseState);
-							DEBUG(sb);
-						}
-						trackingInfos.trackedRoles[(Int32)TrackedDeviceRole.ROLE_LEFTHANDHELD] = true;
+						sb.Clear().Append(func)
+							.Append("Add ").Append(trackedDevicePoseCount).Append(".rightFoot with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+							.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+							.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+						DEBUG(sb);
 					}
-					else
-					{
-						BodyTrackingUtils.UpdateTrackedDevicePose(TrackedDeviceRole.ROLE_LEFTHAND, null, ref leftHand);
-						if (printIntervalLog || getDevicePosesFirstTime)
-						{
-							sb.Clear().Append(LOG_TAG).Append("UpdatePose() ROLE_LEFTHAND poseState: ").Append(leftHand.poseState);
-							DEBUG(sb);
-						}
-						trackingInfos.trackedRoles[(Int32)TrackedDeviceRole.ROLE_LEFTHAND] = true;
-					}
+				}
+			}
+
+			// knee and ankle
+			if (trackingMode == BodyTrackingMode.UPPERIKANDLEGFK)
+			{
+				if (leftKnee.poseState == PoseState.NODATA) { return false; }
+				trackedDevicePoseCount++;
+				s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(leftKnee);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("Add ").Append(trackedDevicePoseCount).Append(".leftKnee with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+						.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
 
-				if (role == TrackedDeviceRole.ROLE_RIGHTWRIST && BodyTrackingUtils.UpdateTrackedDevicePose(role, m_RightWristPose, ref rightWrist) == BodyTrackingResult.SUCCESS)
+				if (rightKnee.poseState == PoseState.NODATA) { return false; }
+				trackedDevicePoseCount++;
+				s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(rightKnee);
+				if (init)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("UpdatePose() ").Append(role.Name()).Append(", poseState: ").Append(rightWrist.poseState);
-						DEBUG(sb);
-					}
-					trackingInfos.trackedRoles[i] = true;
-				}
-				if (role == TrackedDeviceRole.ROLE_RIGHTHANDHELD || role == TrackedDeviceRole.ROLE_RIGHTHAND)
-				{
-					if (BodyTrackingUtils.UpdateTrackedDevicePose(TrackedDeviceRole.ROLE_RIGHTHANDHELD, null, ref rightHandheld) == BodyTrackingResult.SUCCESS)
-					{
-						if (printIntervalLog || getDevicePosesFirstTime)
-						{
-							sb.Clear().Append(LOG_TAG).Append("UpdatePose() ROLE_RIGHTHANDHELD, poseState: ").Append(rightHandheld.poseState);
-							DEBUG(sb);
-						}
-						trackingInfos.trackedRoles[(Int32)TrackedDeviceRole.ROLE_RIGHTHANDHELD] = true;
-					}
-					else
-					{
-						BodyTrackingUtils.UpdateTrackedDevicePose(TrackedDeviceRole.ROLE_RIGHTHAND, null, ref rightHand);
-						if (printIntervalLog || getDevicePosesFirstTime)
-						{
-							sb.Clear().Append(LOG_TAG).Append("UpdatePose() ROLE_RIGHTHAND, poseState: ").Append(rightHand.poseState);
-							DEBUG(sb);
-						}
-						trackingInfos.trackedRoles[(Int32)TrackedDeviceRole.ROLE_RIGHTHAND] = true;
-					}
+					sb.Clear().Append(func).Append("Add ").Append(trackedDevicePoseCount).Append(".rightKnee with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+						.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
 
-				if (role == TrackedDeviceRole.ROLE_LEFTKNEE && BodyTrackingUtils.UpdateTrackedDevicePose(role, m_LeftKneePose, ref leftKnee) == BodyTrackingResult.SUCCESS)
+				if (leftAnkle.poseState == PoseState.NODATA) { return false; }
+				trackedDevicePoseCount++;
+				s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(leftAnkle);
+				if (init)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("UpdatePose() ").Append(role.Name()).Append(", poseState: ").Append(leftKnee.poseState);
-						DEBUG(sb);
-					}
-					trackingInfos.trackedRoles[i] = true;
-				}
-				if (role == TrackedDeviceRole.ROLE_LEFTANKLE && BodyTrackingUtils.UpdateTrackedDevicePose(role, m_LeftAnklePose, ref leftAnkle) == BodyTrackingResult.SUCCESS)
-				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("UpdatePose() ").Append(role.Name()).Append(", poseState: ").Append(leftAnkle.poseState);
-						DEBUG(sb);
-					}
-					trackingInfos.trackedRoles[i] = true;
-				}
-				if (role == TrackedDeviceRole.ROLE_LEFTFOOT && BodyTrackingUtils.UpdateTrackedDevicePose(role, m_LeftFootPose, ref leftFoot) == BodyTrackingResult.SUCCESS)
-				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("UpdatePose() ").Append(role.Name()).Append(", poseState: ").Append(leftFoot.poseState);
-						DEBUG(sb);
-					}
-					trackingInfos.trackedRoles[i] = true;
+					sb.Clear().Append(func).Append("Add ").Append(trackedDevicePoseCount).Append(".leftAnkle with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+						.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
 
-				if (role == TrackedDeviceRole.ROLE_RIGHTKNEE && BodyTrackingUtils.UpdateTrackedDevicePose(role, m_RightKneePose, ref rightKnee) == BodyTrackingResult.SUCCESS)
+				if (rightAnkle.poseState == PoseState.NODATA) { return false; }
+				trackedDevicePoseCount++;
+				s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].Update(rightAnkle);
+				if (init)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("UpdatePose() ").Append(role.Name()).Append(", poseState: ").Append(rightKnee.poseState);
-						DEBUG(sb);
-					}
-					trackingInfos.trackedRoles[i] = true;
+					sb.Clear().Append(func).Append("Add ").Append(trackedDevicePoseCount).Append(".rightAnkle with poseState ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].poseState)
+						.Append(", position (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.x.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.y.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.z.ToString("N3")).Append(", ").Append(s_TrackedDevicePose[trackingMode][trackedDevicePoseCount].rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
-				if (role == TrackedDeviceRole.ROLE_RIGHTANKLE && BodyTrackingUtils.UpdateTrackedDevicePose(role, m_RightAnklePose, ref rightAnkle) == BodyTrackingResult.SUCCESS)
+			}
+
+			trackedDevicePoses = s_TrackedDevicePose[trackingMode];
+			trackedDevicePoseCount = (UInt32)(s_TrackedDevicePose[trackingMode].Length & 0x7FFFFFFF);
+			return true;
+		}
+		public BodyPoseRole GetIKRoles(bool init)
+		{
+			if (init)
+			{
+				sb.Clear().Append("GetIKRoles() ").Append(trackingMode.Name()).Append(", origin: ").Append(m_IKRoles.Name());
+				DEBUG(sb);
+			}
+
+			if (ikFrame == Time.frameCount) { return m_IKRoles; }
+			else { m_IKRoles = BodyPoseRole.Unknown; ikFrame = Time.frameCount; }
+
+			if (GetTrackedDevicePoses(init, out TrackedDevicePose[] trackedDevicePoses, out UInt32 trackedDevicePoseCount))
+				m_IKRoles = BodyTrackingUtils.GetBodyPoseRole(trackedDevicePoses, trackedDevicePoseCount);
+
+			if (init)
+			{
+				sb.Clear().Append("GetIKRoles() ").Append(trackingMode.Name()).Append(", new: ").Append(m_IKRoles.Name());
+				DEBUG(sb);
+			}
+
+			return m_IKRoles;
+		}
+
+		// The Self Trackers used in Body Tracking Mode.
+		private readonly Dictionary<BodyTrackingMode, List<TrackedDeviceRole>> s_SelfTrackerRoles = new Dictionary<BodyTrackingMode, List<TrackedDeviceRole>>()
+		{
+			// Arm uses tracker roles: wrist
+			{ BodyTrackingMode.ARMIK, new List<TrackedDeviceRole>() {
+				TrackedDeviceRole.ROLE_LEFTWRIST, TrackedDeviceRole.ROLE_RIGHTWRIST }
+			},
+			// Upper Body uses self tracker roles: wrist, waist
+			{ BodyTrackingMode.UPPERBODYIK, new List<TrackedDeviceRole>() {
+				TrackedDeviceRole.ROLE_LEFTWRIST, TrackedDeviceRole.ROLE_RIGHTWRIST, TrackedDeviceRole.ROLE_HIP }
+			},
+			// Full Body uses self tracker roles: wrist, waist, ankle, foot
+			{ BodyTrackingMode.FULLBODYIK, new List<TrackedDeviceRole>() {
+				TrackedDeviceRole.ROLE_LEFTWRIST, TrackedDeviceRole.ROLE_RIGHTWRIST, TrackedDeviceRole.ROLE_HIP,
+				TrackedDeviceRole.ROLE_LEFTANKLE, TrackedDeviceRole.ROLE_RIGHTANKLE, TrackedDeviceRole.ROLE_LEFTFOOT, TrackedDeviceRole.ROLE_RIGHTFOOT }
+			},
+			// Upper Body + Leg FK uses self tracker roles: waist
+			{ BodyTrackingMode.UPPERIKANDLEGFK, new List<TrackedDeviceRole>() {
+				TrackedDeviceRole.ROLE_HIP }
+			},
+		};
+		// The Wrist Trackers used in Body Tracking Mode.
+		private readonly Dictionary<BodyTrackingMode, List<TrackedDeviceRole>> s_WristTrackerRoles = new Dictionary<BodyTrackingMode, List<TrackedDeviceRole>>()
+		{
+			// Arm uses wrist tracker roles: wrist
+			{ BodyTrackingMode.ARMIK, new List<TrackedDeviceRole>() {
+				TrackedDeviceRole.ROLE_LEFTWRIST, TrackedDeviceRole.ROLE_RIGHTWRIST }
+			},
+			// Upper Body uses wrist tracker roles: wrist
+			{ BodyTrackingMode.UPPERBODYIK, new List<TrackedDeviceRole>() {
+				TrackedDeviceRole.ROLE_LEFTWRIST, TrackedDeviceRole.ROLE_RIGHTWRIST }
+			},
+			// Full Body uses wrist tracker roles: wrist
+			{ BodyTrackingMode.FULLBODYIK, new List<TrackedDeviceRole>() {
+				TrackedDeviceRole.ROLE_LEFTWRIST, TrackedDeviceRole.ROLE_RIGHTWRIST }
+			},
+			// Upper Body + Leg FK uses self tracker roles: waist
+			{ BodyTrackingMode.UPPERIKANDLEGFK, new List<TrackedDeviceRole>() {
+				TrackedDeviceRole.ROLE_LEFTWRIST, TrackedDeviceRole.ROLE_RIGHTWRIST }
+			},
+		};
+		// The Self IM Trackers used in Body Tracking Mode.
+		private readonly Dictionary<BodyTrackingMode, List<TrackedDeviceRole>> s_SelfIMTrackerRoles = new Dictionary<BodyTrackingMode, List<TrackedDeviceRole>>()
+		{
+			// Only Upper Body + Leg FK uses self im trackers: knee, ankle
+			{ BodyTrackingMode.UPPERIKANDLEGFK, new List<TrackedDeviceRole>() {
+				TrackedDeviceRole.ROLE_LEFTKNEE, TrackedDeviceRole.ROLE_RIGHTKNEE, TrackedDeviceRole.ROLE_LEFTANKLE, TrackedDeviceRole.ROLE_RIGHTANKLE }
+			}
+		};
+
+		/// Initialize the Standard Pose (w/o Redirective Poses)
+		internal BodyTrackingResult UpdatePoseInContent(bool init = false)
+		{
+			if (s_TrackedDeviceTypes == null) { return BodyTrackingResult.ERROR_NOT_CALIBRATED; }
+			string func = "UpdatePoseInContent() ";
+
+			ResetPose();
+			if (s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_HEAD] != TrackedDeviceType.Invalid)
+			{
+				head.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_HEAD).devicePose);
+				if (init)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("UpdatePose() ").Append(role.Name()).Append(", poseState: ").Append(rightAnkle.poseState);
-						DEBUG(sb);
-					}
-					trackingInfos.trackedRoles[i] = true;
+					sb.Clear().Append(func).Append("head poseState: ").Append(head.poseState)
+						.Append(", position (").Append(head.translation.x.ToString("N3")).Append(", ").Append(head.translation.y.ToString("N3")).Append(", ").Append(head.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(head.rotation.x.ToString("N3")).Append(", ").Append(head.rotation.y.ToString("N3")).Append(", ").Append(head.rotation.z.ToString("N3")).Append(", ").Append(head.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
-				if (role == TrackedDeviceRole.ROLE_RIGHTFOOT && BodyTrackingUtils.UpdateTrackedDevicePose(role, m_RightFootPose, ref rightFoot) == BodyTrackingResult.SUCCESS)
+			}
+
+			if (s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_LEFTHANDHELD] != TrackedDeviceType.Invalid ||
+				s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_LEFTHAND] != TrackedDeviceType.Invalid)
+			{
+				leftHandheld.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_LEFTHANDHELD).devicePose);
+				if (init)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("UpdatePose() ").Append(role.Name()).Append(", poseState: ").Append(rightFoot.poseState);
-						DEBUG(sb);
-					}
-					trackingInfos.trackedRoles[i] = true;
+					sb.Clear().Append(func).Append("leftHandheld poseState: ").Append(leftHandheld.poseState)
+						.Append(", position (").Append(leftHandheld.translation.x.ToString("N3")).Append(", ").Append(leftHandheld.translation.y.ToString("N3")).Append(", ").Append(leftHandheld.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftHandheld.rotation.x.ToString("N3")).Append(", ").Append(leftHandheld.rotation.y.ToString("N3")).Append(", ").Append(leftHandheld.rotation.z.ToString("N3")).Append(", ").Append(leftHandheld.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (leftHandheld.poseState == PoseState.NODATA)
+			{
+				leftHand.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_LEFTHAND).devicePose);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftHand poseState: ").Append(leftHand.poseState)
+						.Append(", position (").Append(leftHand.translation.x.ToString("N3")).Append(", ").Append(leftHand.translation.y.ToString("N3")).Append(", ").Append(leftHand.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftHand.rotation.x.ToString("N3")).Append(", ").Append(leftHand.rotation.y.ToString("N3")).Append(", ").Append(leftHand.rotation.z.ToString("N3")).Append(", ").Append(leftHand.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+
+			if (s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_RIGHTHANDHELD] != TrackedDeviceType.Invalid ||
+				s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_RIGHTHAND] != TrackedDeviceType.Invalid)
+			{
+				rightHandheld.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_RIGHTHANDHELD).devicePose);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightHandheld poseState: ").Append(rightHandheld.poseState)
+						.Append(", position (").Append(rightHandheld.translation.x.ToString("N3")).Append(", ").Append(rightHandheld.translation.y.ToString("N3")).Append(", ").Append(rightHandheld.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightHandheld.rotation.x.ToString("N3")).Append(", ").Append(rightHandheld.rotation.y.ToString("N3")).Append(", ").Append(rightHandheld.rotation.z.ToString("N3")).Append(", ").Append(rightHandheld.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (rightHandheld.poseState == PoseState.NODATA)
+			{
+				rightHand.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_RIGHTHAND).devicePose);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightHand poseState: ").Append(rightHand.poseState)
+						.Append(", position (").Append(rightHand.translation.x.ToString("N3")).Append(", ").Append(rightHand.translation.y.ToString("N3")).Append(", ").Append(rightHand.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightHand.rotation.x.ToString("N3")).Append(", ").Append(rightHand.rotation.y.ToString("N3")).Append(", ").Append(rightHand.rotation.z.ToString("N3")).Append(", ").Append(rightHand.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+
+			if (s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_LEFTWRIST] != TrackedDeviceType.Invalid)
+			{
+				leftWrist.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_LEFTWRIST).devicePose);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftWrist poseState: ").Append(leftWrist.poseState)
+						.Append(", position (").Append(leftWrist.translation.x.ToString("N3")).Append(", ").Append(leftWrist.translation.y.ToString("N3")).Append(", ").Append(leftWrist.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftWrist.rotation.x.ToString("N3")).Append(", ").Append(leftWrist.rotation.y.ToString("N3")).Append(", ").Append(leftWrist.rotation.z.ToString("N3")).Append(", ").Append(leftWrist.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_RIGHTWRIST] != TrackedDeviceType.Invalid)
+			{
+				rightWrist.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_RIGHTWRIST).devicePose);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightWrist poseState: ").Append(rightWrist.poseState)
+						.Append(", position (").Append(rightWrist.translation.x.ToString("N3")).Append(", ").Append(rightWrist.translation.y.ToString("N3")).Append(", ").Append(rightWrist.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightWrist.rotation.x.ToString("N3")).Append(", ").Append(rightWrist.rotation.y.ToString("N3")).Append(", ").Append(rightWrist.rotation.z.ToString("N3")).Append(", ").Append(rightWrist.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_HIP] != TrackedDeviceType.Invalid)
+			{
+				hip.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_HIP).devicePose);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("hip poseState: ").Append(hip.poseState)
+						.Append(", position (").Append(hip.translation.x.ToString("N3")).Append(", ").Append(hip.translation.y.ToString("N3")).Append(", ").Append(hip.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(hip.rotation.x.ToString("N3")).Append(", ").Append(hip.rotation.y.ToString("N3")).Append(", ").Append(hip.rotation.z.ToString("N3")).Append(", ").Append(hip.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_LEFTANKLE] != TrackedDeviceType.Invalid)
+			{
+				leftAnkle.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_LEFTANKLE).devicePose);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftAnkle poseState: ").Append(leftAnkle.poseState)
+						.Append(", position (").Append(leftAnkle.translation.x.ToString("N3")).Append(", ").Append(leftAnkle.translation.y.ToString("N3")).Append(", ").Append(leftAnkle.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftAnkle.rotation.x.ToString("N3")).Append(", ").Append(leftAnkle.rotation.y.ToString("N3")).Append(", ").Append(leftAnkle.rotation.z.ToString("N3")).Append(", ").Append(leftAnkle.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_RIGHTANKLE] != TrackedDeviceType.Invalid)
+			{
+				rightAnkle.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_RIGHTANKLE).devicePose);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightAnkle poseState: ").Append(rightAnkle.poseState)
+						.Append(", position (").Append(rightAnkle.translation.x.ToString("N3")).Append(", ").Append(rightAnkle.translation.y.ToString("N3")).Append(", ").Append(rightAnkle.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightAnkle.rotation.x.ToString("N3")).Append(", ").Append(rightAnkle.rotation.y.ToString("N3")).Append(", ").Append(rightAnkle.rotation.z.ToString("N3")).Append(", ").Append(rightAnkle.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_LEFTFOOT] != TrackedDeviceType.Invalid)
+			{
+				leftFoot.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_LEFTFOOT).devicePose);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftFoot poseState: ").Append(leftFoot.poseState)
+						.Append(", position (").Append(leftFoot.translation.x.ToString("N3")).Append(", ").Append(leftFoot.translation.y.ToString("N3")).Append(", ").Append(leftFoot.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftFoot.rotation.x.ToString("N3")).Append(", ").Append(leftFoot.rotation.y.ToString("N3")).Append(", ").Append(leftFoot.rotation.z.ToString("N3")).Append(", ").Append(leftFoot.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_RIGHTFOOT] != TrackedDeviceType.Invalid)
+			{
+				rightFoot.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_RIGHTFOOT).devicePose);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightFoot poseState: ").Append(rightFoot.poseState)
+						.Append(", position (").Append(rightFoot.translation.x.ToString("N3")).Append(", ").Append(rightFoot.translation.y.ToString("N3")).Append(", ").Append(rightFoot.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightFoot.rotation.x.ToString("N3")).Append(", ").Append(rightFoot.rotation.y.ToString("N3")).Append(", ").Append(rightFoot.rotation.z.ToString("N3")).Append(", ").Append(rightFoot.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_LEFTKNEE] != TrackedDeviceType.Invalid)
+			{
+				leftKnee.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_LEFTKNEE).devicePose);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("leftKnee poseState: ").Append(leftKnee.poseState)
+						.Append(", position (").Append(leftKnee.translation.x.ToString("N3")).Append(", ").Append(leftKnee.translation.y.ToString("N3")).Append(", ").Append(leftKnee.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftKnee.rotation.x.ToString("N3")).Append(", ").Append(leftKnee.rotation.y.ToString("N3")).Append(", ").Append(leftKnee.rotation.z.ToString("N3")).Append(", ").Append(leftKnee.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+			}
+			if (s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_RIGHTKNEE] != TrackedDeviceType.Invalid)
+			{
+				rightKnee.Update(BodyRoleData.GetRoleData(TrackedDeviceRole.ROLE_RIGHTKNEE).devicePose);
+				if (init)
+				{
+					sb.Clear().Append(func).Append("rightKnee poseState: ").Append(rightKnee.poseState)
+						.Append(", position (").Append(rightKnee.translation.x.ToString("N3")).Append(", ").Append(rightKnee.translation.y.ToString("N3")).Append(", ").Append(rightKnee.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightKnee.rotation.x.ToString("N3")).Append(", ").Append(rightKnee.rotation.y.ToString("N3")).Append(", ").Append(rightKnee.rotation.z.ToString("N3")).Append(", ").Append(rightKnee.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
 			}
 
 			return BodyTrackingResult.SUCCESS;
 		}
-		private readonly Dictionary<BodyTrackingMode, List<TrackedDeviceRole>> s_TrackingModeRole = new Dictionary<BodyTrackingMode, List<TrackedDeviceRole>>()
+		internal BodyTrackingResult InitPoseInContent(BodyTrackingMode mode)
 		{
-			{
-				BodyTrackingMode.ARMIK, new List<TrackedDeviceRole>() {
-				TrackedDeviceRole.ROLE_HEAD,
-				TrackedDeviceRole.ROLE_LEFTWRIST, TrackedDeviceRole.ROLE_RIGHTWRIST,
-				TrackedDeviceRole.ROLE_LEFTHANDHELD, TrackedDeviceRole.ROLE_RIGHTHANDHELD,
-				TrackedDeviceRole.ROLE_LEFTHAND, TrackedDeviceRole.ROLE_RIGHTHAND }
-			},
-			{
-				BodyTrackingMode.UPPERBODYIK, new List<TrackedDeviceRole>() {
-				TrackedDeviceRole.ROLE_HEAD,
-				TrackedDeviceRole.ROLE_LEFTWRIST, TrackedDeviceRole.ROLE_RIGHTWRIST,
-				TrackedDeviceRole.ROLE_LEFTHANDHELD, TrackedDeviceRole.ROLE_RIGHTHANDHELD,
-				TrackedDeviceRole.ROLE_LEFTHAND, TrackedDeviceRole.ROLE_RIGHTHAND,
-				TrackedDeviceRole.ROLE_HIP }
-			},
-			{
-				BodyTrackingMode.FULLBODYIK, new List<TrackedDeviceRole>() {
-				TrackedDeviceRole.ROLE_HEAD,
-				TrackedDeviceRole.ROLE_LEFTWRIST, TrackedDeviceRole.ROLE_RIGHTWRIST,
-				TrackedDeviceRole.ROLE_LEFTHANDHELD, TrackedDeviceRole.ROLE_RIGHTHANDHELD,
-				TrackedDeviceRole.ROLE_LEFTHAND, TrackedDeviceRole.ROLE_RIGHTHAND,
-				TrackedDeviceRole.ROLE_HIP,
-				TrackedDeviceRole.ROLE_LEFTANKLE, TrackedDeviceRole.ROLE_RIGHTANKLE,
-				TrackedDeviceRole.ROLE_LEFTFOOT, TrackedDeviceRole.ROLE_RIGHTFOOT }
-			},
-			{
-				BodyTrackingMode.UPPERIKANDLEGFK, new List<TrackedDeviceRole>() {
-				TrackedDeviceRole.ROLE_HEAD,
-				TrackedDeviceRole.ROLE_LEFTWRIST, TrackedDeviceRole.ROLE_RIGHTWRIST,
-				TrackedDeviceRole.ROLE_LEFTHANDHELD, TrackedDeviceRole.ROLE_RIGHTHANDHELD,
-				TrackedDeviceRole.ROLE_LEFTHAND, TrackedDeviceRole.ROLE_RIGHTHAND,
-				TrackedDeviceRole.ROLE_HIP,
-				TrackedDeviceRole.ROLE_LEFTKNEE, TrackedDeviceRole.ROLE_RIGHTKNEE,
-				TrackedDeviceRole.ROLE_LEFTANKLE, TrackedDeviceRole.ROLE_RIGHTANKLE }
-			},
-		};
+			string func = "InitPoseInContent() ";
+			ResetTrackedDeviceTypes();
 
-		internal BodyTrackingResult InitTrackingInfos(BodyTrackingMode mode)
-		{
-			trackingInfos.ResetInitRoles();
-			sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() ").Append(mode.Name()); DEBUG(sb);
-
-			bool isTracked = false;
-			string error = "";
-			if (InputDeviceControl.IsTracked(InputDeviceControl.ControlDevice.Head))
+			// Checks Head
+			Vector3 position = Vector3.zero;
+			if (Rdp.Head.IsTracked())
 			{
-				sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() add ROLE_HEAD"); DEBUG(sb);
-				trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_HEAD] = true;
+				s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_HEAD] = TrackedDeviceType.HMD;
+				if (Rdp.Head.GetPosition(ref position)) { userCalibrationHeight = position.y; }
+				sb.Clear().Append(func).Append("add HMD").Append(", userCalibrationHeight: ").Append(userCalibrationHeight); DEBUG(sb);
 			}
 
-			// Checks Wrist first.
 			bool hasLeftHand = false, hasRightHand = false;
-			if (!hasLeftHand && m_LeftWristPose != null && BodyTrackingUtils.GetPoseIsTracked(m_LeftWristPose, out isTracked, out error) && isTracked)
+			bool hasLeftAnkle = false, hasRightAnkle = false;
+
+			// Checks Tracker first.
+			for (int i = 0; i < Rdp.Tracker.s_TrackerIds.Length; i++)
 			{
-				sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() add ROLE_LEFTWRIST"); DEBUG(sb);
-				trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_LEFTWRIST] = true;
+				Rdp.Tracker.Id id = Rdp.Tracker.s_TrackerIds[i];
+				if (!Rdp.Tracker.IsTracked(id)) { continue; }
+
+				TrackedDeviceRole role = (TrackedDeviceRole)Rdp.Tracker.GetTrackerRole(id);
+				TrackedDeviceType btType = TrackedDeviceType.ViveSelfTracker;
+				if (role == TrackedDeviceRole.ROLE_UNDEFINED) { continue; }
+
+				if (role == TrackedDeviceRole.ROLE_LEFTWRIST)
+				{
+					if (hasLeftHand) { continue; }
+					hasLeftHand = true;
+				}
+				if (role == TrackedDeviceRole.ROLE_RIGHTWRIST)
+				{
+					if (hasRightHand) { continue; }
+					hasRightHand = true;
+				}
+				if (role == TrackedDeviceRole.ROLE_LEFTANKLE)
+				{
+					if (hasLeftAnkle) { continue; }
+					hasLeftAnkle = true;
+				}
+				if (role == TrackedDeviceRole.ROLE_RIGHTANKLE)
+				{
+					if (hasRightAnkle) { continue; }
+					hasRightAnkle = true;
+				}
+
+				s_TrackedDeviceTypes[(Int32)role] = btType;
+				sb.Clear().Append(func).Append("add ").Append(role.Name()).Append(" ").Append(btType.Name()).Append(" ").Append(id.Name()); DEBUG(sb);
+			}
+			if (!hasLeftHand || !hasRightHand)
+			{
+				hasLeftHand = false;
+				hasRightHand = false;
+			}
+
+			// Checks Controller next.
+			if (!hasLeftHand && Rdp.Controller.IsTracked(true))
+			{
 				hasLeftHand = true;
+
+				s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_LEFTHANDHELD] = TrackedDeviceType.Controller;
+				sb.Clear().Append(func).Append("add Left Controller"); DEBUG(sb);
 			}
-			if (!hasRightHand && m_RightWristPose != null && BodyTrackingUtils.GetPoseIsTracked(m_RightWristPose, out isTracked, out error) && isTracked)
+			if (!hasRightHand && Rdp.Controller.IsTracked(false))
 			{
-				sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() add ROLE_RIGHTWRIST"); DEBUG(sb);
-				trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_RIGHTWRIST] = true;
 				hasRightHand = true;
+
+				s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_RIGHTHANDHELD] = TrackedDeviceType.Controller;
+				sb.Clear().Append(func).Append("add Right Controller"); DEBUG(sb);
 			}
-			// Checks Handheld next.
-			if (!hasLeftHand && InputDeviceControl.IsTracked(InputDeviceControl.ControlDevice.Left))
-			{
-				sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() add ROLE_LEFTHANDHELD"); DEBUG(sb);
-				trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_LEFTHANDHELD] = true;
-				hasLeftHand = true;
-			}
-			if (!hasRightHand && InputDeviceControl.IsTracked(InputDeviceControl.ControlDevice.Right))
-			{
-				sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() add ROLE_RIGHTHANDHELD"); DEBUG(sb);
-				trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_RIGHTHANDHELD] = true;
-				hasRightHand = true;
-			}
-			// Checks Hand last.
+
+			// Force using Hand if no Tracker & Controller.
 			if (!hasLeftHand)
 			{
-				sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() FORCE add ROLE_LEFTHAND"); DEBUG(sb);
-				trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_LEFTHAND] = true;
+				s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_LEFTHAND] = TrackedDeviceType.Hand;
+				sb.Clear().Append(func).Append("FORCE add Left Hand"); DEBUG(sb);
 			}
 			if (!hasRightHand)
 			{
-				sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() FORCE add ROLE_RIGHTHAND"); DEBUG(sb);
-				trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_RIGHTHAND] = true;
+				s_TrackedDeviceTypes[(Int32)TrackedDeviceRole.ROLE_RIGHTHAND] = TrackedDeviceType.Hand;
+				sb.Clear().Append(func).Append("FORCE add Right Hand"); DEBUG(sb);
 			}
 
-			// UpperBody mode uses HIP.
-			if (s_TrackingModeRole[mode].Contains(TrackedDeviceRole.ROLE_HIP))
+			BodyTrackingResult result = UpdatePoseInContent(true);
+			if (result != BodyTrackingResult.SUCCESS)
 			{
-				if (m_HipPose != null && BodyTrackingUtils.GetPoseIsTracked(m_HipPose, out isTracked, out error) && isTracked)
-				{
-					sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() add ROLE_HIP"); DEBUG(sb);
-					trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_HIP] = true;
-				}
+				sb.Clear().Append(func).Append("UpdatePoseInContent failed, result: ").Append(result.Name());
+				return result;
 			}
 
-			// UpperBodyLeg mode uses KNEE.
-			if (s_TrackingModeRole[mode].Contains(TrackedDeviceRole.ROLE_LEFTKNEE) && s_TrackingModeRole[mode].Contains(TrackedDeviceRole.ROLE_RIGHTKNEE))
-			{
-				if (m_LeftKneePose != null && BodyTrackingUtils.GetPoseIsTracked(m_LeftKneePose, out isTracked, out error) && isTracked)
-				{
-					sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() add ROLE_LEFTKNEE"); DEBUG(sb);
-					trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_LEFTKNEE] = true;
-				}
-				if (m_RightKneePose != null && BodyTrackingUtils.GetPoseIsTracked(m_RightKneePose, out isTracked, out error) && isTracked)
-				{
-					sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() add ROLE_RIGHTKNEE"); DEBUG(sb);
-					trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_RIGHTKNEE] = true;
-				}
-			}
+			BodyPoseRole ikRoles = GetIKRoles(true);
+			sb.Clear().Append(func).Append("ikRoles: ").Append(ikRoles.Name()); DEBUG(sb);
 
-			// FullBody & UpperBodyLeg modes use either ANKLE or FOOT.
-			bool hasLeftLeg = false, hasRightLeg = false;
-			if (s_TrackingModeRole[mode].Contains(TrackedDeviceRole.ROLE_LEFTANKLE) && s_TrackingModeRole[mode].Contains(TrackedDeviceRole.ROLE_RIGHTANKLE))
-			{
-				if (!hasLeftLeg && m_LeftAnklePose != null && BodyTrackingUtils.GetPoseIsTracked(m_LeftAnklePose, out isTracked, out error) && isTracked)
-				{
-					sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() add ROLE_LEFTANKLE"); DEBUG(sb);
-					trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_LEFTANKLE] = true;
-					hasLeftLeg = true;
-				}
-				if (!hasRightLeg && m_RightAnklePose != null && BodyTrackingUtils.GetPoseIsTracked(m_RightAnklePose, out isTracked, out error) && isTracked)
-				{
-					sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() add ROLE_RIGHTANKLE"); DEBUG(sb);
-					trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_RIGHTANKLE] = true;
-					hasRightLeg = true;
-				}
-			}
-			if (s_TrackingModeRole[mode].Contains(TrackedDeviceRole.ROLE_LEFTFOOT) && s_TrackingModeRole[mode].Contains(TrackedDeviceRole.ROLE_RIGHTFOOT))
-			{
-				if (!hasLeftLeg && m_LeftFootPose != null && BodyTrackingUtils.GetPoseIsTracked(m_LeftFootPose, out isTracked, out error) && isTracked)
-				{
-					sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() add ROLE_LEFTFOOT"); DEBUG(sb);
-					trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_LEFTFOOT] = true;
-				}
-				if (!hasRightLeg && m_RightFootPose != null && BodyTrackingUtils.GetPoseIsTracked(m_RightFootPose, out isTracked, out error) && isTracked)
-				{
-					sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() add ROLE_RIGHTFOOT"); DEBUG(sb);
-					trackingInfos.initRoles[(UInt32)TrackedDeviceRole.ROLE_RIGHTFOOT] = true;
-				}
-			}
-
-			BodyTrackingResult result = UpdatePose();
-			if (result == BodyTrackingResult.SUCCESS)
-			{
-				BodyPoseRole ikRoles = GetIKRoles(mode);
-				sb.Clear().Append(LOG_TAG).Append("InitTrackingInfos() ikRoles: ").Append(ikRoles.Name()); DEBUG(sb);
-			}
-
-			return result;
+			return (ikRoles == BodyPoseRole.Unknown ? BodyTrackingResult.ERROR_INPUTPOSE_NOT_VALID : BodyTrackingResult.SUCCESS);
 		}
-		#endregion
 
-		private List<TrackedDevicePose> poses = new List<TrackedDevicePose>();
-		private TrackedDevicePose[] poseArray = null;
-		private void UpdatePoseArray()
+#if WAVE_BODY_CALIBRATION
+		internal BodyTrackingResult InitPoseFromRuntime(float height, [In] WVR_BodyTracking_DeviceInfo_t[] info, UInt32 count)
 		{
-			if (poses == null || poses.Count <= 0) { return; }
-			if (poseArray == null || poseArray.Length != poses.Count) { poseArray = new TrackedDevicePose[poses.Count]; }
-			for (int i = 0; i < poseArray.Length; i++) { poseArray[i] = poses[i]; }
-		}
-		public bool GetTrackedDevicePoses(BodyTrackingMode mode, out TrackedDevicePose[] trackedDevicePoses, out UInt32 trackedDevicePoseCount)
-		{
-			poses.Clear();
-
-			for (int i = 0; i < trackingInfos.trackedRoles.Length; i++)
+			string func = "InitPoseFromRuntime() ";
+			if (info == null || info.Length != count)
 			{
-				if (!trackingInfos.trackedRoles[i]) { continue; }
+				sb.Clear().Append(func).Append("Incorrect WVR_BodyTracking_DeviceInfo_t array size "); ERROR(sb);
+				return BodyTrackingResult.ERROR_INVALID_ARGUMENT;
+			}
 
-				TrackedDeviceRole role = BodyTrackingUtils.GetTrackedDeviceRole(i);
-				if (role == TrackedDeviceRole.ROLE_HEAD && BodyTrackingUtils.PoseStateAvailable(mode, head))
-				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add head with poseState ").Append(head.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(head);
-				}
-				if (role == TrackedDeviceRole.ROLE_CHEST && BodyTrackingUtils.PoseStateAvailable(mode, chest)) { poses.Add(chest); }
-				if (role == TrackedDeviceRole.ROLE_HIP && BodyTrackingUtils.PoseStateAvailable(mode, hip))
-				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add hip with poseState ").Append(hip.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(hip);
-				}
+			userCalibrationHeight = height;
+			sb.Clear().Append(func).Append("height: ").Append(userCalibrationHeight).Append(", count: ").Append(count); DEBUG(sb);
+			for (int i = 0; i < count; i++)
+			{
+				TrackedDeviceRole role = info[i].role.FromRdp();
+				s_TrackedDeviceTypes[(Int32)role] = info[i].type.FromRdp(info[i].trackerId);
 
-				if (role == TrackedDeviceRole.ROLE_LEFTELBOW && BodyTrackingUtils.PoseStateAvailable(mode, leftElbow)) { poses.Add(leftElbow); }
-				if (role == TrackedDeviceRole.ROLE_LEFTWRIST && BodyTrackingUtils.PoseStateAvailable(mode, leftWrist))
+				if (role == TrackedDeviceRole.ROLE_HIP)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add leftWrist with poseState ").Append(leftWrist.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(leftWrist);
+					Rdp.Update(ref hip, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("hip poseState: ").Append(hip.poseState)
+						.Append(", position (").Append(hip.translation.x.ToString("N3")).Append(", ").Append(hip.translation.y.ToString("N3")).Append(", ").Append(hip.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(hip.rotation.x.ToString("N3")).Append(", ").Append(hip.rotation.y.ToString("N3")).Append(", ").Append(hip.rotation.z.ToString("N3")).Append(", ").Append(hip.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
-				// LeftHand uses Natural Hand pose which can be ignored in calibration.
-				if (role == TrackedDeviceRole.ROLE_LEFTHAND && BodyTrackingUtils.PoseStateAvailable(mode, leftHand, true))
+				if (role == TrackedDeviceRole.ROLE_CHEST)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add leftHand with poseState ").Append(leftHand.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(leftHand);
+					Rdp.Update(ref chest, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("chest poseState: ").Append(chest.poseState)
+						.Append(", position (").Append(chest.translation.x.ToString("N3")).Append(", ").Append(chest.translation.y.ToString("N3")).Append(", ").Append(chest.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(chest.rotation.x.ToString("N3")).Append(", ").Append(chest.rotation.y.ToString("N3")).Append(", ").Append(chest.rotation.z.ToString("N3")).Append(", ").Append(chest.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
-				if (role == TrackedDeviceRole.ROLE_LEFTHANDHELD && BodyTrackingUtils.PoseStateAvailable(mode, leftHandheld))
+				if (role == TrackedDeviceRole.ROLE_HEAD)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add leftHandheld with poseState ").Append(leftHandheld.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(leftHandheld);
+					Rdp.Update(ref head, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("head poseState: ").Append(head.poseState)
+						.Append(", position (").Append(head.translation.x.ToString("N3")).Append(", ").Append(head.translation.y.ToString("N3")).Append(", ").Append(head.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(head.rotation.x.ToString("N3")).Append(", ").Append(head.rotation.y.ToString("N3")).Append(", ").Append(head.rotation.z.ToString("N3")).Append(", ").Append(head.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
 
-				if (role == TrackedDeviceRole.ROLE_RIGHTELBOW && BodyTrackingUtils.PoseStateAvailable(mode, rightElbow)) { poses.Add(rightElbow); }
-				if (role == TrackedDeviceRole.ROLE_RIGHTWRIST && BodyTrackingUtils.PoseStateAvailable(mode, rightWrist))
+				if (role == TrackedDeviceRole.ROLE_LEFTELBOW)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add rightWrist with poseState ").Append(rightWrist.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(rightWrist);
+					Rdp.Update(ref leftElbow, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("leftElbow poseState: ").Append(leftElbow.poseState)
+						.Append(", position (").Append(leftElbow.translation.x.ToString("N3")).Append(", ").Append(leftElbow.translation.y.ToString("N3")).Append(", ").Append(leftElbow.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftElbow.rotation.x.ToString("N3")).Append(", ").Append(leftElbow.rotation.y.ToString("N3")).Append(", ").Append(leftElbow.rotation.z.ToString("N3")).Append(", ").Append(leftElbow.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
-				// RightHand uses Natural Hand pose which can be ignored in calibration.
-				if (role == TrackedDeviceRole.ROLE_RIGHTHAND && BodyTrackingUtils.PoseStateAvailable(mode, rightHand, true))
+				if (role == TrackedDeviceRole.ROLE_LEFTWRIST)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add rightHand with poseState ").Append(rightHand.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(rightHand);
+					Rdp.Update(ref leftWrist, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("leftWrist poseState: ").Append(leftWrist.poseState)
+						.Append(", position (").Append(leftWrist.translation.x.ToString("N3")).Append(", ").Append(leftWrist.translation.y.ToString("N3")).Append(", ").Append(leftWrist.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftWrist.rotation.x.ToString("N3")).Append(", ").Append(leftWrist.rotation.y.ToString("N3")).Append(", ").Append(leftWrist.rotation.z.ToString("N3")).Append(", ").Append(leftWrist.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
-				if (role == TrackedDeviceRole.ROLE_RIGHTHANDHELD && BodyTrackingUtils.PoseStateAvailable(mode, rightHandheld))
+				if (role == TrackedDeviceRole.ROLE_LEFTHAND)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add rightHandheld with poseState ").Append(rightHandheld.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(rightHandheld);
+					Rdp.Update(ref leftHand, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("leftHand poseState: ").Append(leftHand.poseState)
+						.Append(", position (").Append(leftHand.translation.x.ToString("N3")).Append(", ").Append(leftHand.translation.y.ToString("N3")).Append(", ").Append(leftHand.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftHand.rotation.x.ToString("N3")).Append(", ").Append(leftHand.rotation.y.ToString("N3")).Append(", ").Append(leftHand.rotation.z.ToString("N3")).Append(", ").Append(leftHand.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
-
-				// LeftKnee uses SelfTrackerIM which has rotation only.
-				if (role == TrackedDeviceRole.ROLE_LEFTKNEE && BodyTrackingUtils.PoseStateAvailable(mode, leftKnee))
+				if (role == TrackedDeviceRole.ROLE_LEFTHANDHELD)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add leftKnee with poseState ").Append(leftKnee.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(leftKnee);
-				}
-				// LeftAnkle uses SelfTracker 6DoF pose or SelfTrackerIM pose which has rotation only.
-				if (role == TrackedDeviceRole.ROLE_LEFTANKLE && BodyTrackingUtils.PoseStateAvailable(mode, leftAnkle))
-				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add leftAnkle with poseState ").Append(leftAnkle.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(leftAnkle);
-				}
-				if (role == TrackedDeviceRole.ROLE_LEFTFOOT && BodyTrackingUtils.PoseStateAvailable(mode, leftFoot))
-				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add leftFoot with poseState ").Append(leftFoot.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(leftFoot);
+					Rdp.Update(ref leftHandheld, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("leftHandheld poseState: ").Append(leftHandheld.poseState)
+						.Append(", position (").Append(leftHandheld.translation.x.ToString("N3")).Append(", ").Append(leftHandheld.translation.y.ToString("N3")).Append(", ").Append(leftHandheld.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftHandheld.rotation.x.ToString("N3")).Append(", ").Append(leftHandheld.rotation.y.ToString("N3")).Append(", ").Append(leftHandheld.rotation.z.ToString("N3")).Append(", ").Append(leftHandheld.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
 
-				// RightKnee uses SelfTrackerIM which has rotation only.
-				if (role == TrackedDeviceRole.ROLE_RIGHTKNEE && BodyTrackingUtils.PoseStateAvailable(mode, rightKnee))
+				if (role == TrackedDeviceRole.ROLE_RIGHTELBOW)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add rightKnee with poseState ").Append(rightKnee.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(rightKnee);
+					Rdp.Update(ref rightElbow, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("rightElbow poseState: ").Append(rightElbow.poseState)
+						.Append(", position (").Append(rightElbow.translation.x.ToString("N3")).Append(", ").Append(rightElbow.translation.y.ToString("N3")).Append(", ").Append(rightElbow.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightElbow.rotation.x.ToString("N3")).Append(", ").Append(rightElbow.rotation.y.ToString("N3")).Append(", ").Append(rightElbow.rotation.z.ToString("N3")).Append(", ").Append(rightElbow.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
-				// RightAnkle uses SelfTracker 6DoF pose or SelfTrackerIM pose which has rotation only.
-				if (role == TrackedDeviceRole.ROLE_RIGHTANKLE && BodyTrackingUtils.PoseStateAvailable(mode, rightAnkle))
+				if (role == TrackedDeviceRole.ROLE_RIGHTWRIST)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add rightAnkle with poseState ").Append(rightAnkle.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(rightAnkle);
+					Rdp.Update(ref rightWrist, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("rightWrist poseState: ").Append(rightWrist.poseState)
+						.Append(", position (").Append(rightWrist.translation.x.ToString("N3")).Append(", ").Append(rightWrist.translation.y.ToString("N3")).Append(", ").Append(rightWrist.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightWrist.rotation.x.ToString("N3")).Append(", ").Append(rightWrist.rotation.y.ToString("N3")).Append(", ").Append(rightWrist.rotation.z.ToString("N3")).Append(", ").Append(rightWrist.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
-				if (role == TrackedDeviceRole.ROLE_RIGHTFOOT && BodyTrackingUtils.PoseStateAvailable(mode, rightFoot))
+				if (role == TrackedDeviceRole.ROLE_RIGHTHAND)
 				{
-					if (printIntervalLog || getDevicePosesFirstTime)
-					{
-						sb.Clear().Append(LOG_TAG).Append("GetTrackedDevicePoses() Add rightFoot with poseState ").Append(rightFoot.poseState);
-						DEBUG(sb);
-					}
-					poses.Add(rightFoot);
+					Rdp.Update(ref rightHand, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("rightHand poseState: ").Append(rightHand.poseState)
+						.Append(", position (").Append(rightHand.translation.x.ToString("N3")).Append(", ").Append(rightHand.translation.y.ToString("N3")).Append(", ").Append(rightHand.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightHand.rotation.x.ToString("N3")).Append(", ").Append(rightHand.rotation.y.ToString("N3")).Append(", ").Append(rightHand.rotation.z.ToString("N3")).Append(", ").Append(rightHand.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (role == TrackedDeviceRole.ROLE_RIGHTHANDHELD)
+				{
+					Rdp.Update(ref rightHandheld, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("rightHandheld poseState: ").Append(rightHandheld.poseState)
+						.Append(", position (").Append(rightHandheld.translation.x.ToString("N3")).Append(", ").Append(rightHandheld.translation.y.ToString("N3")).Append(", ").Append(rightHandheld.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightHandheld.rotation.x.ToString("N3")).Append(", ").Append(rightHandheld.rotation.y.ToString("N3")).Append(", ").Append(rightHandheld.rotation.z.ToString("N3")).Append(", ").Append(rightHandheld.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+
+				if (role == TrackedDeviceRole.ROLE_LEFTKNEE)
+				{
+					Rdp.Update(ref leftKnee, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("leftKnee poseState: ").Append(leftKnee.poseState)
+						.Append(", position (").Append(leftKnee.translation.x.ToString("N3")).Append(", ").Append(leftKnee.translation.y.ToString("N3")).Append(", ").Append(leftKnee.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftKnee.rotation.x.ToString("N3")).Append(", ").Append(leftKnee.rotation.y.ToString("N3")).Append(", ").Append(leftKnee.rotation.z.ToString("N3")).Append(", ").Append(leftKnee.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (role == TrackedDeviceRole.ROLE_LEFTANKLE)
+				{
+					Rdp.Update(ref leftAnkle, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("leftAnkle poseState: ").Append(leftAnkle.poseState)
+						.Append(", position (").Append(leftAnkle.translation.x.ToString("N3")).Append(", ").Append(leftAnkle.translation.y.ToString("N3")).Append(", ").Append(leftAnkle.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftAnkle.rotation.x.ToString("N3")).Append(", ").Append(leftAnkle.rotation.y.ToString("N3")).Append(", ").Append(leftAnkle.rotation.z.ToString("N3")).Append(", ").Append(leftAnkle.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (role == TrackedDeviceRole.ROLE_LEFTFOOT)
+				{
+					Rdp.Update(ref leftFoot, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("leftFoot poseState: ").Append(leftFoot.poseState)
+						.Append(", position (").Append(leftFoot.translation.x.ToString("N3")).Append(", ").Append(leftFoot.translation.y.ToString("N3")).Append(", ").Append(leftFoot.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(leftFoot.rotation.x.ToString("N3")).Append(", ").Append(leftFoot.rotation.y.ToString("N3")).Append(", ").Append(leftFoot.rotation.z.ToString("N3")).Append(", ").Append(leftFoot.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+
+				if (role == TrackedDeviceRole.ROLE_RIGHTKNEE)
+				{
+					Rdp.Update(ref rightKnee, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("rightKnee poseState: ").Append(rightKnee.poseState)
+						.Append(", position (").Append(rightKnee.translation.x.ToString("N3")).Append(", ").Append(rightKnee.translation.y.ToString("N3")).Append(", ").Append(rightKnee.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightKnee.rotation.x.ToString("N3")).Append(", ").Append(rightKnee.rotation.y.ToString("N3")).Append(", ").Append(rightKnee.rotation.z.ToString("N3")).Append(", ").Append(rightKnee.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (role == TrackedDeviceRole.ROLE_RIGHTANKLE)
+				{
+					Rdp.Update(ref rightAnkle, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("rightAnkle poseState: ").Append(rightAnkle.poseState)
+						.Append(", position (").Append(rightAnkle.translation.x.ToString("N3")).Append(", ").Append(rightAnkle.translation.y.ToString("N3")).Append(", ").Append(rightAnkle.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightAnkle.rotation.x.ToString("N3")).Append(", ").Append(rightAnkle.rotation.y.ToString("N3")).Append(", ").Append(rightAnkle.rotation.z.ToString("N3")).Append(", ").Append(rightAnkle.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
+				}
+				if (role == TrackedDeviceRole.ROLE_RIGHTFOOT)
+				{
+					Rdp.Update(ref rightFoot, info[i].role, info[i].standardPose);
+					sb.Clear().Append(func).Append("rightFoot poseState: ").Append(rightFoot.poseState)
+						.Append(", position (").Append(rightFoot.translation.x.ToString("N3")).Append(", ").Append(rightFoot.translation.y.ToString("N3")).Append(", ").Append(rightFoot.translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(rightFoot.rotation.x.ToString("N3")).Append(", ").Append(rightFoot.rotation.y.ToString("N3")).Append(", ").Append(rightFoot.rotation.z.ToString("N3")).Append(", ").Append(rightFoot.rotation.w.ToString("N3")).Append(")");
+					DEBUG(sb);
 				}
 			}
 
-			getDevicePosesFirstTime = false;
-			if (poses.Count > 0)
-			{
-				UpdatePoseArray();
-				trackedDevicePoses = poseArray;
-				trackedDevicePoseCount = (UInt32)(poseArray.Length & 0x7FFFFFFF);
-				return true;
-			}
+			BodyPoseRole ikRoles = GetIKRoles(true);
+			sb.Clear().Append(func).Append("ikRoles: ").Append(ikRoles.Name()); DEBUG(sb);
 
-			trackedDevicePoses = null;
-			trackedDevicePoseCount = 0;
-			return false;
+			return (ikRoles == BodyPoseRole.Unknown ? BodyTrackingResult.ERROR_INPUTPOSE_NOT_VALID : BodyTrackingResult.SUCCESS);
 		}
-
-		private int ikFrame = -1;
-		private BodyPoseRole m_BodyPoseRole = BodyPoseRole.Unknown;
-		public BodyPoseRole GetIKRoles(BodyTrackingMode mode)
-		{
-			if (printIntervalLog || getDevicePosesFirstTime)
-			{
-				sb.Clear().Append(LOG_TAG).Append("GetIKRoles() mode: ").Append(mode.Name())
-					.Append(", last m_BodyPoseRole: ").Append(m_BodyPoseRole.Name());
-				DEBUG(sb);
-			}
-
-			if (ikFrame == Time.frameCount) { return m_BodyPoseRole; }
-			else { m_BodyPoseRole = BodyPoseRole.Unknown; ikFrame = Time.frameCount; }
-
-			if (GetTrackedDevicePoses(mode, out TrackedDevicePose[] trackedDevicePoses, out UInt32 trackedDevicePoseCount))
-				m_BodyPoseRole = BodyTrackingUtils.GetBodyPoseRole(trackedDevicePoses, trackedDevicePoseCount);
-
-			return m_BodyPoseRole;
-		}
+#endif
 	}
 
 	internal struct BodyRotationSpace_t
@@ -2320,10 +3199,12 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			velocity = in_velocity;
 			angularVelocity = in_angularVelocity;
 			rotation = in_rotation;
-			BodyTrackingUtils.Validate(ref rotation);
+			Rdp.Validate(ref rotation);
 		}
-		public static Joint identity {
-			get {
+		public static Joint identity
+		{
+			get
+			{
 				return new Joint(JointType.UNKNOWN, PoseState.NODATA, Vector3.zero, Vector3.zero, Vector3.zero, Quaternion.identity);
 			}
 		}
@@ -2334,22 +3215,30 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			translation = in_joint.translation;
 			velocity = in_joint.velocity;
 			angularVelocity = in_joint.angularVelocity;
-			BodyTrackingUtils.Update(ref rotation, in_joint.rotation);
+			rotation = in_joint.rotation;
+			Rdp.Validate(ref rotation);
+		}
+		public void Update(PoseState in_poseState, Vector3 in_translation, Vector3 in_velocity, Vector3 in_angularVelocity, Quaternion in_rotation)
+		{
+			poseState = in_poseState;
+			translation = in_translation;
+			velocity = in_velocity;
+			angularVelocity = in_angularVelocity;
+			rotation = in_rotation;
+			Rdp.Validate(ref rotation);
 		}
 		public static Joint init(JointType type)
 		{
 			return new Joint(type, PoseState.NODATA, Vector3.zero, Vector3.zero, Vector3.zero, Quaternion.identity);
 		}
-		public string Log()
+#if WAVE_BODY_IK
+		public void Update(ref WVR_BodyLocationPose_t pose)
 		{
-			string log = "jointType: " + jointType;
-			log += ", poseState: " + poseState;
-			log += ", position(" + translation.x.ToString() + ", " + translation.y.ToString() + ", " + translation.z.ToString() + ")";
-			log += ", rotation(" + rotation.x.ToString() + ", " + rotation.y.ToString() + ", " + rotation.z.ToString() + ", " + rotation.w.ToString() + ")";
-			log += ", velocity(" + velocity.x.ToString() + ", " + velocity.y.ToString() + ", " + velocity.z.ToString() + ")";
-			log += ", angularVelocity(" + angularVelocity.x.ToString() + ", " + angularVelocity.y.ToString() + ", " + angularVelocity.z.ToString() + ")";
-			return log;
+			pose.locationFlags = (UInt64)poseState;
+			Rdp.GetVector3fFromUnity(translation, out pose.position);
+			Rdp.GetQuatfFromUnity(rotation, out pose.orientation);
 		}
+#endif
 	}
 
 	[StructLayout(LayoutKind.Explicit)]
@@ -2363,24 +3252,20 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		{
 			translation = in_translation;
 			rotation = in_rotation;
-			BodyTrackingUtils.Validate(ref rotation);
+			Rdp.Validate(ref rotation);
 		}
-		public static Extrinsic identity { 
-			get {
+		public static Extrinsic identity
+		{
+			get
+			{
 				return new Extrinsic(Vector3.zero, Quaternion.identity);
 			}
 		}
 		public void Update(Extrinsic in_ext)
 		{
 			translation = in_ext.translation;
-			BodyTrackingUtils.Update(ref rotation, in_ext.rotation);
-		}
-
-		public string Log()
-		{
-			string log = "position(" + translation.x.ToString() + ", " + translation.y.ToString() + ", " + translation.z.ToString() + ")";
-			log += ", rotation(" + rotation.x.ToString() + ", " + rotation.y.ToString() + ", " + rotation.z.ToString() + ", " + rotation.w.ToString() + ")";
-			return log;
+			rotation = in_ext.rotation;
+			Rdp.Validate(ref rotation);
 		}
 	}
 
@@ -2395,8 +3280,10 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			trackedDeviceRole = in_trackedDeviceRole;
 			extrinsic = in_extrinsic;
 		}
-		public static TrackedDeviceExtrinsic identity {
-			get {
+		public static TrackedDeviceExtrinsic identity
+		{
+			get
+			{
 				return new TrackedDeviceExtrinsic(TrackedDeviceRole.ROLE_UNDEFINED, Extrinsic.identity);
 			}
 		}
@@ -2409,11 +3296,10 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			trackedDeviceRole = in_ext.trackedDeviceRole;
 			extrinsic.Update(in_ext.extrinsic);
 		}
-		public string Log()
+		public void Update(TrackedDeviceRole in_role, Extrinsic in_ext)
 		{
-			string log = "Role: " + trackedDeviceRole;
-			log += ", extrinsic: " + extrinsic.Log();
-			return log;
+			trackedDeviceRole = in_role;
+			extrinsic.Update(in_ext);
 		}
 	}
 
@@ -2437,10 +3323,12 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			angularVelocity = in_angularVelocity;
 			acceleration = in_acceleration;
 			rotation = in_rotation;
-			BodyTrackingUtils.Validate(ref rotation);
+			Rdp.Validate(ref rotation);
 		}
-		public static TrackedDevicePose identity {
-			get {
+		public static TrackedDevicePose identity
+		{
+			get
+			{
 				return new TrackedDevicePose(TrackedDeviceRole.ROLE_UNDEFINED, PoseState.NODATA, Vector3.zero, Vector3.zero, Vector3.zero, Vector3.zero, Quaternion.identity);
 			}
 		}
@@ -2450,20 +3338,10 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			poseState = in_pose.poseState;
 			translation = in_pose.translation;
 			velocity = in_pose.velocity;
-			angularVelocity = in_pose.angularVelocity;
 			acceleration = in_pose.acceleration;
-			BodyTrackingUtils.Update(ref rotation, in_pose.rotation);
-		}
-		public string Log()
-		{
-			string log = "trackedDeviceRole: " + trackedDeviceRole.Name();
-			log += ", poseState: " + poseState;
-			log += ", translation(" + translation.x.ToString() + ", " + translation.y.ToString() + ", " + translation.z.ToString() + ")";
-			log += ", velocity(" + velocity.x.ToString() + ", " + velocity.y.ToString() + ", " + velocity.z.ToString() + ")";
-			log += ", angularVelocity(" + angularVelocity.x.ToString() + ", " + angularVelocity.y.ToString() + ", " + angularVelocity.z.ToString() + ")";
-			log += ", acceleration(" + acceleration.x.ToString() + ", " + acceleration.y.ToString() + ", " + acceleration.z.ToString() + ")";
-			log += ", rotation(" + rotation.x.ToString() + ", " + rotation.y.ToString() + ", " + rotation.z.ToString() + ", " + rotation.w.ToString() + ")";
-			return log;
+			rotation = in_pose.rotation;
+			Rdp.Validate(ref rotation);
+			angularVelocity = in_pose.angularVelocity;
 		}
 	}
 
@@ -2477,30 +3355,231 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		{
 			jointType = in_jointType;
 			rotation = in_rotation;
-			BodyTrackingUtils.Validate(ref rotation);
+			Rdp.Validate(ref rotation);
 		}
-		public static RotateSpace identity {
-			get {
+		public static RotateSpace identity
+		{
+			get
+			{
 				return new RotateSpace(JointType.UNKNOWN, Quaternion.identity);
 			}
 		}
 	}
+	#endregion
+
+	#region API v1.0.0.6
+	public enum CalibrationStatus : Int32
+	{
+		STATUS_UNINITIAL = -1,
+		STATUS_WAITING_STATIC = 0,
+		STATUS_WAITING_POSE_MODE = 1,
+		STATUS_READY = 2,
+		STATUS_COLLECTING = 3,
+		STATUS_COLLECTED = 4,
+		STATUS_COLLECTED_AND_COMPUTING = 5,
+		STATUS_FINISHED = 6,
+		STATUS_WALKFAILED_DISTANCE = 7,
+		STATUS_WALKFAILED_TIME = 8,
+		STATUS_WAIT_STATIC_FAILED_TIME = 9,
+		STATUS_WAIT_POSEMODE_FAILED_TIME = 10,
+		STATUS_READYFAILED_TIME = 11,
+		STATUS_COMPUTEFAILED_TIME = 12,
+		STATUS_COMPUTEFAILED = 13,
+		STATUS_REASON_NONSTATIC_START = 32,
+		STATUS_REASON_NOTRIGGER = 64,
+		STATUS_REASON_NONSTATIC_END = 96,
+	}
+	public delegate void CalibrationStatusDelegate(object sender, CalibrationStatus status);
+
+	[StructLayout(LayoutKind.Explicit)]
+	public struct TrackedDeviceRedirectExtrinsic
+	{
+		[FieldOffset(0)] public TrackedDeviceRole trackedDeviceRole;
+		[FieldOffset(4)] public Quaternion rotation;
+
+		public TrackedDeviceRedirectExtrinsic(TrackedDeviceRole in_role, Quaternion in_rot)
+		{
+			trackedDeviceRole = in_role;
+			rotation = in_rot;
+		}
+		public static TrackedDeviceRedirectExtrinsic identity
+		{
+			get
+			{
+				return new TrackedDeviceRedirectExtrinsic(TrackedDeviceRole.ROLE_UNDEFINED, Quaternion.identity);
+			}
+		}
+		public static TrackedDeviceRedirectExtrinsic init(TrackedDeviceRole role)
+		{
+			return new TrackedDeviceRedirectExtrinsic(role, Quaternion.identity);
+		}
+		public void Update(TrackedDeviceRedirectExtrinsic in_ext)
+		{
+			trackedDeviceRole = in_ext.trackedDeviceRole;
+			rotation = in_ext.rotation;
+		}
+	};
+
+	/// <summary>
+	/// The database used to store the Function Calibration data.
+	/// Note that the coordinate of data in this struct depend on FBT.
+	/// In FBT 1.0.0.8 the coordinate is OpenGL.
+	/// </summary>
+	public class BodyRedirectives
+	{
+		#region Log
+		const string LOG_TAG = "VIVE.OpenXR.Toolkits.BodyTracking.BodyRedirectives";
+		StringBuilder m_sb = null;
+		StringBuilder sb
+		{
+			get
+			{
+				if (m_sb == null) { m_sb = new StringBuilder(); }
+				return m_sb;
+			}
+		}
+		void DEBUG(StringBuilder msg) { Rdp.d(LOG_TAG, msg, true); }
+		#endregion
+
+		public bool InUse = false;
+		public TrackedDeviceExtrinsic[] DeviceExts = null;
+		public TrackedDeviceRedirectExtrinsic[] RedirectExts = null;
+		public UInt32 ExtrinsicCount = 0;
+		public TrackedDevicePose[] DevicePoses = null;
+		public UInt32 PoseCount = 0;
+
+		public void UpdateExts([In] TrackedDeviceExtrinsic[] in_exts, [In] TrackedDeviceRedirectExtrinsic[] in_redirect, UInt32 in_count)
+		{
+			if (in_exts == null || in_exts.Length != in_count ||
+				in_redirect == null || in_redirect.Length != in_count)
+			{
+				return;
+			}
+
+			ExtrinsicCount = in_count;
+
+			if (DeviceExts == null || DeviceExts.Length != ExtrinsicCount) { DeviceExts = new TrackedDeviceExtrinsic[ExtrinsicCount]; }
+			if (RedirectExts == null || RedirectExts.Length != ExtrinsicCount) { RedirectExts = new TrackedDeviceRedirectExtrinsic[ExtrinsicCount]; }
+			for (int i = 0; i < ExtrinsicCount; i++)
+			{
+				DeviceExts[i].Update(in_exts[i]);
+				RedirectExts[i].Update(in_redirect[i]);
+			}
+		}
+		public void UpdatePoses([In] TrackedDevicePose[] in_poses, UInt32 in_count)
+		{
+			if (in_poses == null || in_poses.Length != in_count) { return; }
+
+			PoseCount = in_count;
+
+			if (DevicePoses == null || DevicePoses.Length != PoseCount) { DevicePoses = new TrackedDevicePose[PoseCount]; }
+			for (int i = 0; i < PoseCount; i++)
+			{
+				DevicePoses[i].Update(in_poses[i]);
+			}
+		}
+		public void Update(BodyRedirectives in_ext)
+		{
+			InUse = in_ext.InUse;
+			UpdateExts(in_ext.DeviceExts, in_ext.RedirectExts, in_ext.ExtrinsicCount);
+			UpdatePoses(in_ext.DevicePoses, in_ext.PoseCount);
+		}
+		public void Reset()
+		{
+			InUse = false;
+			DeviceExts = null;
+			RedirectExts = null;
+			ExtrinsicCount = 0;
+			DevicePoses = null;
+			PoseCount = 0;
+		}
+#if WAVE_BODY_CALIBRATION
+		public BodyTrackingResult InitBodyRedirectivesFromRuntime([In] WVR_BodyTracking_DeviceInfo_t[] in_infos, UInt32 infoCount, [In] WVR_BodyTracking_RedirectExtrinsic_t[] in_exts, UInt32 extCount)
+		{
+			string func = "InitBodyRedirectivesFromRuntime() ";
+			if (in_infos == null || in_infos.Length != infoCount || in_exts == null || in_exts.Length != extCount) { return BodyTrackingResult.ERROR_INVALID_ARGUMENT; }
+
+			PoseCount = infoCount;
+			DevicePoses = new TrackedDevicePose[PoseCount];
+			for (int i = 0; i < PoseCount; i++)
+			{
+				Rdp.Update(ref DevicePoses[i], in_infos[i].role, in_infos[i].standardPose);
+				sb.Clear().Append(func).Append("DevicePoses[").Append(i).Append("] ").Append(DevicePoses[i].trackedDeviceRole.Name())
+					.Append(", poseState: ").Append(DevicePoses[i].poseState)
+					.Append(", position (").Append(DevicePoses[i].translation.x.ToString("N3")).Append(", ").Append(DevicePoses[i].translation.y.ToString("N3")).Append(", ").Append(DevicePoses[i].translation.z.ToString("N3")).Append(")")
+					.Append(", rotation (").Append(DevicePoses[i].rotation.x.ToString("N3")).Append(", ").Append(DevicePoses[i].rotation.y.ToString("N3")).Append(", ").Append(DevicePoses[i].rotation.z.ToString("N3")).Append(", ").Append(DevicePoses[i].rotation.w.ToString("N3")).Append(")");
+				DEBUG(sb);
+			}
+
+			ExtrinsicCount = extCount;
+			DeviceExts = new TrackedDeviceExtrinsic[ExtrinsicCount];
+			RedirectExts = new TrackedDeviceRedirectExtrinsic[ExtrinsicCount];
+			for (int i = 0; i < ExtrinsicCount; i++)
+			{
+				for (int info_index = 0; info_index < in_infos.Length; info_index++)
+				{
+					if (in_exts[i].role == in_infos[info_index].role)
+					{
+						Rdp.Update(ref DeviceExts[i], in_infos[info_index].role, in_infos[info_index].extrinsic);
+						sb.Clear().Append(func).Append("DeviceExts[").Append(i).Append("] ").Append(DeviceExts[i].trackedDeviceRole.Name())
+							.Append(", position (").Append(DeviceExts[i].extrinsic.translation.x.ToString("N3")).Append(", ").Append(DeviceExts[i].extrinsic.translation.y.ToString("N3")).Append(", ").Append(DeviceExts[i].extrinsic.translation.z.ToString("N3")).Append(")")
+							.Append(", rotation (").Append(DeviceExts[i].extrinsic.rotation.x.ToString("N3")).Append(", ").Append(DeviceExts[i].extrinsic.rotation.y.ToString("N3")).Append(", ").Append(DeviceExts[i].extrinsic.rotation.z.ToString("N3")).Append(", ").Append(DeviceExts[i].extrinsic.rotation.w.ToString("N3")).Append(")");
+						DEBUG(sb);
+					}
+				}
+
+				Rdp.Update(ref RedirectExts[i], in_exts[i]);
+				sb.Clear().Append(func).Append("RedirectExts[").Append(i).Append("] ").Append(RedirectExts[i].trackedDeviceRole.Name())
+					.Append(", rotation (").Append(RedirectExts[i].rotation.x.ToString("N3")).Append(", ").Append(RedirectExts[i].rotation.y.ToString("N3")).Append(", ").Append(RedirectExts[i].rotation.z.ToString("N3")).Append(", ").Append(RedirectExts[i].rotation.w.ToString("N3")).Append(")");
+				DEBUG(sb);
+			}
+
+			return BodyTrackingResult.SUCCESS;
+		}
+		public bool GetExtrinsicsWVR(out WVR_BodyTracking_RedirectExtrinsic_t[] exts)
+		{
+			exts = null;
+			if (RedirectExts == null) { return false; }
+
+			exts = new WVR_BodyTracking_RedirectExtrinsic_t[RedirectExts.Length];
+			for (int i = 0; i < exts.Length; i++)
+			{
+				exts[i].role = RedirectExts[i].trackedDeviceRole.wvrRole();
+				exts[i].rotation = Rdp.GetQuatfFromUnity(RedirectExts[i].rotation);
+			}
+			return true;
+		}
+#endif
+	}
+	#endregion
 
 	public class fbt
 	{
 		const string LOG_TAG = "VIVE.OpenXR.Toolkits.BodyTracking.fbt";
 		static StringBuilder m_sb = null;
-		static StringBuilder sb {
-			get {
+		static StringBuilder sb
+		{
+			get
+			{
 				if (m_sb == null) { m_sb = new StringBuilder(); }
 				return m_sb;
 			}
 		}
-		static void DEBUG(StringBuilder msg) { Debug.Log(msg); }
-		static int logFrame = -1;
-		static bool fbtIntervalLog = false;
+		static void DEBUG(StringBuilder msg) { Rdp.d(LOG_TAG, msg, true); }
+		static void ERROR(StringBuilder msg) { Rdp.e(LOG_TAG, msg, true); }
 
-		[DllImport("bodytracking")]
+#if UNITY_EDITOR
+		const string kBodyTrackingLib = "BodyTracking";
+#else
+#if CoordinateOpenGL
+		const string kBodyTrackingLib = "bodytracking";
+#else
+		const string kBodyTrackingLib = "bodytracking1.0.0.7";
+#endif
+#endif
+
+		#region API v1.0.0.1
+		[DllImport(kBodyTrackingLib)]
 		/**
 		 *  @brief Initial body tracking algorithm with custom skeleton
 		 *  @param[in] timestamp (unit:us)
@@ -2525,38 +3604,38 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			ref int skeletonId,
 			AvatarType avatarType = AvatarType.TPOSE)
 		{
-			sb.Clear().Append(LOG_TAG).Append("InitBodyTracking() ").Append(ts).Append(" bodyTrackingMode: ").Append(bodyTrackingMode.Name()); DEBUG(sb);
+			string func = "InitBodyTracking() ";
+			sb.Clear().Append(func).Append(ts).Append(" bodyTrackingMode: ").Append(bodyTrackingMode.Name()); DEBUG(sb);
 
-			sb.Clear().Append(LOG_TAG).Append("deviceCount: ").Append(deviceCount); DEBUG(sb);
+			sb.Clear().Append(func).Append("deviceCount: ").Append(deviceCount); DEBUG(sb);
 			for (UInt32 i = 0; i < deviceCount; i++)
 			{
-				sb.Clear().Append(LOG_TAG).Append("InitBodyTracking() trackedDeviceExt[").Append(i).Append("] role: ").Append(trackedDeviceExt[i].trackedDeviceRole.Name())
-					.Append(", position (").Append(trackedDeviceExt[i].extrinsic.translation.x.ToString("N2")).Append(", ").Append(trackedDeviceExt[i].extrinsic.translation.y.ToString("N2")).Append(", ").Append(trackedDeviceExt[i].extrinsic.translation.z.ToString("N2")).Append(")")
-					.Append(", rotation (").Append(trackedDeviceExt[i].extrinsic.rotation.x.ToString("N2")).Append(", ").Append(trackedDeviceExt[i].extrinsic.rotation.y.ToString("N2")).Append(", ").Append(trackedDeviceExt[i].extrinsic.rotation.z.ToString("N2")).Append(", ").Append(trackedDeviceExt[i].extrinsic.rotation.w.ToString("N2")).Append(")");
+				sb.Clear().Append(func).Append("trackedDeviceExt[").Append(i).Append("] role: ").Append(trackedDeviceExt[i].trackedDeviceRole.Name())
+					.Append(", position (").Append(trackedDeviceExt[i].extrinsic.translation.x.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.translation.y.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.translation.z.ToString("N3")).Append(")")
+					.Append(", rotation (").Append(trackedDeviceExt[i].extrinsic.rotation.x.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.rotation.y.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.rotation.z.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.rotation.w.ToString("N3")).Append(")");
 				DEBUG(sb);
 			}
 
-			sb.Append("InitBodyTracking() avatarJointCount: ").Append(avatarJointCount); DEBUG(sb);
+			sb.Clear().Append(func).Append("avatarJointCount: ").Append(avatarJointCount); DEBUG(sb);
 			for (UInt32 i = 0; i < avatarJointCount; i++)
 			{
-				sb.Clear().Append(LOG_TAG).Append("InitBodyTracking() avatarJoints[").Append(i).Append("] jointType: ").Append(avatarJoints[i].jointType.Name())
+				sb.Clear().Append(func).Append("avatarJoints[").Append(i).Append("] jointType: ").Append(avatarJoints[i].jointType.Name())
 					.Append(", poseState: ").Append(avatarJoints[i].poseState)
-					.Append(", position (").Append(avatarJoints[i].translation.x.ToString("N2")).Append(", ").Append(avatarJoints[i].translation.y.ToString("N2")).Append(", ").Append(avatarJoints[i].translation.z.ToString("N2")).Append(")")
-					.Append(", rotation (").Append(avatarJoints[i].rotation.x.ToString("N2")).Append(", ").Append(avatarJoints[i].rotation.y.ToString("N2")).Append(", ").Append(avatarJoints[i].rotation.z.ToString("N2")).Append(", ").Append(avatarJoints[i].rotation.w.ToString("N2")).Append(")")
-					.Append(", velocity (").Append(avatarJoints[i].velocity.x.ToString("N2")).Append(", ").Append(avatarJoints[i].velocity.y.ToString("N2")).Append(", ").Append(avatarJoints[i].velocity.z.ToString("N2")).Append(")")
-					.Append(", angularVelocity (").Append(avatarJoints[i].angularVelocity.x.ToString("N2")).Append(", ").Append(avatarJoints[i].angularVelocity.y.ToString("N2")).Append(", ").Append(avatarJoints[i].angularVelocity.z.ToString("N2")).Append(")");
+					.Append(", position (").Append(avatarJoints[i].translation.x.ToString("N3")).Append(", ").Append(avatarJoints[i].translation.y.ToString("N3")).Append(", ").Append(avatarJoints[i].translation.z.ToString("N3")).Append(")")
+					.Append(", rotation (").Append(avatarJoints[i].rotation.x.ToString("N3")).Append(", ").Append(avatarJoints[i].rotation.y.ToString("N3")).Append(", ").Append(avatarJoints[i].rotation.z.ToString("N3")).Append(", ").Append(avatarJoints[i].rotation.w.ToString("N3")).Append(")")
+					.Append(", velocity (").Append(avatarJoints[i].velocity.x.ToString("N3")).Append(", ").Append(avatarJoints[i].velocity.y.ToString("N3")).Append(", ").Append(avatarJoints[i].velocity.z.ToString("N3")).Append(")")
+					.Append(", angularVelocity (").Append(avatarJoints[i].angularVelocity.x.ToString("N3")).Append(", ").Append(avatarJoints[i].angularVelocity.y.ToString("N3")).Append(", ").Append(avatarJoints[i].angularVelocity.z.ToString("N3")).Append(")");
 				DEBUG(sb);
 			}
 
-			sb.Clear().Append(LOG_TAG).Append("InitBodyTracking() avatarHeight: ").Append(avatarHeight)
-				.Append("skeletonId: ").Append(skeletonId)
-				.Append("avatarType: ").Append(avatarType);
+			sb.Clear().Append(func).Append("avatarHeight: ").Append(avatarHeight)
+				.Append(", skeletonId: ").Append(skeletonId)
+				.Append(", avatarType: ").Append(avatarType);
 			DEBUG(sb);
-
 			return InitBodyTracking(ts, bodyTrackingMode, trackedDeviceExt, deviceCount, avatarJoints, avatarJointCount, avatarHeight, ref skeletonId);
 		}
 
-		[DllImport("bodytracking")]
+		[DllImport(kBodyTrackingLib)]
 		/**
 		 *  @brief Initial body trahcking algorithm with default skeleton
 		 *  @param[in] timestamp (unit:us)
@@ -2569,8 +3648,27 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		public static extern Result InitDefaultBodyTracking(UInt64 ts, BodyTrackingMode bodyTrackingMode,
 			TrackedDeviceExtrinsic[] trackedDeviceExt, UInt32 deviceCount,
 			ref int skeletonId);
+		public static Result InitDefaultBodyTrackingLog(UInt64 ts, BodyTrackingMode bodyTrackingMode,
+			TrackedDeviceExtrinsic[] trackedDeviceExt, UInt32 deviceCount,
+			ref int skeletonId)
+		{
+			sb.Clear().Append("InitDefaultBodyTracking() ").Append(ts)
+				.Append(", bodyTrackingMode: ").Append(bodyTrackingMode.Name())
+				.Append(", deviceCount: ").Append(deviceCount);
+			DEBUG(sb);
 
-		[DllImport("bodytracking")]
+			for (int i = 0; i < deviceCount; i++)
+			{
+				sb.Clear().Append("InitDefaultBodyTracking() trackedDeviceExt[").Append(i).Append("] role: ").Append(trackedDeviceExt[i].trackedDeviceRole.Name())
+					.Append(", position (").Append(trackedDeviceExt[i].extrinsic.translation.x.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.translation.y.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.translation.z.ToString("N3")).Append(")")
+					.Append(", rotation (").Append(trackedDeviceExt[i].extrinsic.rotation.x.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.rotation.y.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.rotation.z.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.rotation.w.ToString("N3")).Append(")");
+				DEBUG(sb);
+			}
+
+			return InitDefaultBodyTracking(ts, bodyTrackingMode, trackedDeviceExt, deviceCount, ref skeletonId);
+		}
+
+		[DllImport(kBodyTrackingLib)]
 		/**
 		 *  @brief Calibrate Body Tracking. Must be called after initail. User needs to stand L pose(stand straight, two arms straight forward and let the palm down)
 		 *  @param[in] timestamp (unit:us)
@@ -2591,29 +3689,28 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			TrackedDevicePose[] trackedDevicePose, UInt32 deviceCount,
 			ref float scale, CalibrationType calibrationType = CalibrationType.DEFAULTCALIBRATION)
 		{
-			sb.Clear().Append(LOG_TAG).Append("CalibrateBodyTracking() ").Append(ts).Append(", id: ").Append(skeletonId)
-				.Append("bodyTrackingMode: ").Append(bodyTrackingMode.Name());
+			sb.Clear().Append("CalibrateBodyTracking() ").Append(ts).Append(", id: ").Append(skeletonId).Append(", bodyTrackingMode: ").Append(bodyTrackingMode.Name());
 			DEBUG(sb);
 
-			sb.Clear().Append(LOG_TAG).Append("deviceCount: ").Append(deviceCount); DEBUG(sb);
+			sb.Clear().Append("CalibrateBodyTracking() deviceCount: ").Append(deviceCount); DEBUG(sb);
 			for (UInt32 i = 0; i < deviceCount; i++)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateBodyTracking() trackedDevicePose[").Append(i).Append("] role: ").Append(trackedDevicePose[i].trackedDeviceRole.Name())
-					.Append(", position (").Append(trackedDevicePose[i].translation.x.ToString("N2")).Append(", ").Append(trackedDevicePose[i].translation.y.ToString("N2")).Append(", ").Append(trackedDevicePose[i].translation.z.ToString("N2")).Append(")")
-					.Append(", rotation (").Append(trackedDevicePose[i].rotation.x.ToString("N2")).Append(", ").Append(trackedDevicePose[i].rotation.y.ToString("N2")).Append(", ").Append(trackedDevicePose[i].rotation.z.ToString("N2")).Append(", ").Append(trackedDevicePose[i].rotation.w.ToString("N2")).Append(")")
-					.Append(", velocity (").Append(trackedDevicePose[i].velocity.x.ToString("N2")).Append(", ").Append(trackedDevicePose[i].velocity.y.ToString("N2")).Append(", ").Append(trackedDevicePose[i].velocity.z.ToString("N2")).Append(")")
-					.Append(", acceleration (").Append(trackedDevicePose[i].acceleration.x.ToString("N2")).Append(", ").Append(trackedDevicePose[i].acceleration.y.ToString("N2")).Append(", ").Append(trackedDevicePose[i].acceleration.z.ToString("N2")).Append(")")
-					.Append(", angularVelocity (").Append(trackedDevicePose[i].angularVelocity.x.ToString("N2")).Append(", ").Append(trackedDevicePose[i].angularVelocity.y.ToString("N2")).Append(", ").Append(trackedDevicePose[i].angularVelocity.z.ToString("N2")).Append(")");
+				sb.Clear().Append("CalibrateBodyTracking() trackedDevicePose[").Append(i).Append("] role: ").Append(trackedDevicePose[i].trackedDeviceRole.Name())
+					.Append(", position (").Append(trackedDevicePose[i].translation.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].translation.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].translation.z.ToString("N3")).Append(")")
+					.Append(", rotation (").Append(trackedDevicePose[i].rotation.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].rotation.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].rotation.z.ToString("N3")).Append(", ").Append(trackedDevicePose[i].rotation.w.ToString("N3")).Append(")")
+					.Append(", velocity (").Append(trackedDevicePose[i].velocity.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].velocity.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].velocity.z.ToString("N3")).Append(")")
+					.Append(", acceleration (").Append(trackedDevicePose[i].acceleration.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].acceleration.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].acceleration.z.ToString("N3")).Append(")")
+					.Append(", angularVelocity (").Append(trackedDevicePose[i].angularVelocity.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].angularVelocity.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].angularVelocity.z.ToString("N3")).Append(")");
 				DEBUG(sb);
 			}
 
-			sb.Clear().Append(LOG_TAG).Append("scale: ").Append(scale).Append(", calibrationType: ").Append(calibrationType.Name());
+			sb.Clear().Append("scale: ").Append(scale).Append(", calibrationType: ").Append(calibrationType.Name());
 			DEBUG(sb);
 
 			return CalibrateBodyTracking(ts, skeletonId, userHeight, bodyTrackingMode, trackedDevicePose, deviceCount, ref scale, calibrationType);
 		}
 
-		[DllImport("bodytracking")]
+		[DllImport(kBodyTrackingLib)]
 		/**
 		 *  @brief Get the amount of output skeleton joints.
 		 *  @param[in] timestamp (unit:us)
@@ -2623,7 +3720,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		 **/
 		public static extern Result GetOutputJointCount(UInt64 ts, int skeletonId, ref UInt32 jointCount);
 
-		[DllImport("bodytracking")]
+		[DllImport(kBodyTrackingLib)]
 		/**
 		 *  @brief Update and get skeleton joints pose every frame. Must be called after calibrate.
 		 *  @param[in] timestamp (unit:us)
@@ -2641,31 +3738,31 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			TrackedDevicePose[] trackedDevicePose, UInt32 deviceCount,
 			[In, Out] Joint[] outJoint, UInt32 jointCount)
 		{
-			sb.Clear().Append(LOG_TAG).Append("UpdateBodyTracking() ").Append(ts).Append(", id: ").Append(skeletonId).Append(", deviceCount: ").Append(deviceCount);
+			sb.Clear().Append("UpdateBodyTracking() ").Append(ts).Append(", id: ").Append(skeletonId).Append(", deviceCount: ").Append(deviceCount);
 			DEBUG(sb);
 			for (UInt32 i = 0; i < deviceCount; i++)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateBodyTracking() trackedDevicePose[").Append(i).Append("] role: ").Append(trackedDevicePose[i].trackedDeviceRole.Name())
-					.Append(", position (").Append(trackedDevicePose[i].translation.x.ToString("N2")).Append(", ").Append(trackedDevicePose[i].translation.y.ToString("N2")).Append(", ").Append(trackedDevicePose[i].translation.z.ToString("N2")).Append(")")
-					.Append(", rotation (").Append(trackedDevicePose[i].rotation.x.ToString("N2")).Append(", ").Append(trackedDevicePose[i].rotation.y.ToString("N2")).Append(", ").Append(trackedDevicePose[i].rotation.z.ToString("N2")).Append(", ").Append(trackedDevicePose[i].rotation.w.ToString("N2")).Append(")")
-					.Append(", velocity (").Append(trackedDevicePose[i].velocity.x.ToString("N2")).Append(", ").Append(trackedDevicePose[i].velocity.y.ToString("N2")).Append(", ").Append(trackedDevicePose[i].velocity.z.ToString("N2")).Append(")")
-					.Append(", acceleration (").Append(trackedDevicePose[i].acceleration.x.ToString("N2")).Append(", ").Append(trackedDevicePose[i].acceleration.y.ToString("N2")).Append(", ").Append(trackedDevicePose[i].acceleration.z.ToString("N2")).Append(")")
-					.Append(", angularVelocity (").Append(trackedDevicePose[i].angularVelocity.x.ToString("N2")).Append(", ").Append(trackedDevicePose[i].angularVelocity.y.ToString("N2")).Append(", ").Append(trackedDevicePose[i].angularVelocity.z.ToString("N2")).Append(")");
+				sb.Clear().Append("UpdateBodyTracking() trackedDevicePose[").Append(i).Append("] role: ").Append(trackedDevicePose[i].trackedDeviceRole.Name())
+					.Append(", position (").Append(trackedDevicePose[i].translation.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].translation.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].translation.z.ToString("N3")).Append(")")
+					.Append(", rotation (").Append(trackedDevicePose[i].rotation.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].rotation.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].rotation.z.ToString("N3")).Append(", ").Append(trackedDevicePose[i].rotation.w.ToString("N3")).Append(")")
+					.Append(", velocity (").Append(trackedDevicePose[i].velocity.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].velocity.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].velocity.z.ToString("N3")).Append(")")
+					.Append(", acceleration (").Append(trackedDevicePose[i].acceleration.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].acceleration.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].acceleration.z.ToString("N3")).Append(")")
+					.Append(", angularVelocity (").Append(trackedDevicePose[i].angularVelocity.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].angularVelocity.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].angularVelocity.z.ToString("N3")).Append(")");
 				DEBUG(sb);
 			}
 
 			Result result = UpdateBodyTracking(ts, skeletonId, trackedDevicePose, deviceCount, outJoint, jointCount);
 			if (result == Result.SUCCESS)
 			{
-				sb.Clear().Append(LOG_TAG).Append("UpdateBodyTracking() jointCount: ").Append(jointCount);
+				sb.Clear().Append("UpdateBodyTracking() jointCount: ").Append(jointCount);
 				DEBUG(sb);
 				for (UInt32 i = 0; i < jointCount; i++)
 				{
-					sb.Clear().Append(LOG_TAG).Append("UpdateBodyTracking() outJoint[").Append(i).Append("] jointType: ").Append(outJoint[i].jointType.Name())
-						.Append(", position (").Append(outJoint[i].translation.x.ToString("N2")).Append(", ").Append(outJoint[i].translation.y.ToString("N2")).Append(", ").Append(outJoint[i].translation.z.ToString("N2")).Append(")")
-						.Append(", rotation (").Append(outJoint[i].rotation.x.ToString("N2")).Append(", ").Append(outJoint[i].rotation.y.ToString("N2")).Append(", ").Append(outJoint[i].rotation.z.ToString("N2")).Append(", ").Append(outJoint[i].rotation.w.ToString("N2")).Append(")")
-						.Append(", velocity (").Append(outJoint[i].velocity.x.ToString("N2")).Append(", ").Append(outJoint[i].velocity.y.ToString("N2")).Append(", ").Append(outJoint[i].velocity.z.ToString("N2")).Append(")")
-						.Append(", angularVelocity (").Append(outJoint[i].angularVelocity.x.ToString("N2")).Append(", ").Append(outJoint[i].angularVelocity.y.ToString("N2")).Append(", ").Append(outJoint[i].angularVelocity.z.ToString("N2")).Append(")");
+					sb.Clear().Append("UpdateBodyTracking() outJoint[").Append(i).Append("] jointType: ").Append(outJoint[i].jointType.Name())
+						.Append(", position (").Append(outJoint[i].translation.x.ToString("N3")).Append(", ").Append(outJoint[i].translation.y.ToString("N3")).Append(", ").Append(outJoint[i].translation.z.ToString("N3")).Append(")")
+						.Append(", rotation (").Append(outJoint[i].rotation.x.ToString("N3")).Append(", ").Append(outJoint[i].rotation.y.ToString("N3")).Append(", ").Append(outJoint[i].rotation.z.ToString("N3")).Append(", ").Append(outJoint[i].rotation.w.ToString("N3")).Append(")")
+						.Append(", velocity (").Append(outJoint[i].velocity.x.ToString("N3")).Append(", ").Append(outJoint[i].velocity.y.ToString("N3")).Append(", ").Append(outJoint[i].velocity.z.ToString("N3")).Append(")")
+						.Append(", angularVelocity (").Append(outJoint[i].angularVelocity.x.ToString("N3")).Append(", ").Append(outJoint[i].angularVelocity.y.ToString("N3")).Append(", ").Append(outJoint[i].angularVelocity.z.ToString("N3")).Append(")");
 					DEBUG(sb);
 				}
 			}
@@ -2673,7 +3770,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			return result;
 		}
 
-		[DllImport("bodytracking")]
+		[DllImport(kBodyTrackingLib)]
 		/**
 		 *  @brief Destroy body tracking.
 		 *  @param[in] timestamp (unit:us)
@@ -2681,8 +3778,13 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		 *  @param[out] success or not.
 		 **/
 		public static extern Result DestroyBodyTracking(UInt64 ts, int skeletonId);
+		public static Result DestroyBodyTrackingLog(UInt64 ts, int skeletonId)
+		{
+			sb.Clear().Append("DestroyBodyTracking() ").Append(ts).Append(", id: ").Append(skeletonId); DEBUG(sb);
+			return DestroyBodyTracking(ts, skeletonId);
+		}
 
-		[DllImport("bodytracking")]
+		[DllImport(kBodyTrackingLib)]
 		/**
 		 *  @brief Get the amount of default skeleton joints.
 		 *  @param[out] the amount of default skeleton joints.
@@ -2690,221 +3792,284 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 		 **/
 		public static extern Result GetDefaultSkeletonJointCount(ref UInt32 jointCount);
 
-		[DllImport("bodytracking")]
+		[DllImport(kBodyTrackingLib)]
 		/**
 		 *  @brief Get default skeleton rotate space.
 		 *  @param[out] the rotate space of default skeleton.
 		 *  @param[out] success or not.
 		 * */
 		public static extern Result GetDefaultSkeletonRotateSpace([In, Out] RotateSpace[] rotateSpace, UInt32 jointCount);
+		#endregion
+
+		#region API v1.0.0.6
+		[DllImport(kBodyTrackingLib)]
+		public static extern Result StartFunctionalCalibration(UInt64 ts, BodyTrackingMode bodyTrackingMode);
+		public static Result StartFunctionalCalibrationLog(UInt64 ts, BodyTrackingMode bodyTrackingMode)
+		{
+			sb.Clear().Append("StartFunctionalCalibration() bodyTrackingMode: ").Append(bodyTrackingMode.Name()); DEBUG(sb);
+			return StartFunctionalCalibration(ts, bodyTrackingMode);
+		}
+		[DllImport(kBodyTrackingLib)]
+		public static extern Result UpdateFunctionalCalibration(UInt64 ts, TrackedDevicePose[] trackedDevicePose, UInt32 deviceCount, ref CalibrationStatus status);
+		public static Result UpdateFunctionalCalibrationLog(UInt64 ts, TrackedDevicePose[] trackedDevicePose, UInt32 deviceCount, ref CalibrationStatus status)
+		{
+			if (trackedDevicePose.Length != deviceCount)
+			{
+				sb.Clear().Append("UpdateFunctionalCalibrationLog() trackedDevicePose length and deviceCount is not matched."); ERROR(sb);
+				return Result.ERROR_INPUTPOSE_NOT_VALID;
+			}
+
+			for (int i = 0; i < trackedDevicePose.Length; i++)
+			{
+				sb.Clear().Append("UpdateFunctionalCalibration() status: ").Append(status.Name())
+					.Append(", trackedDevicePose[").Append(i).Append("] role: ").Append(trackedDevicePose[i].trackedDeviceRole.Name())
+					.Append(", poseState: ").Append(trackedDevicePose[i].poseState)
+					.Append(", position (").Append(trackedDevicePose[i].translation.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].translation.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].translation.z.ToString("N3")).Append(")")
+					.Append(", velocity (").Append(trackedDevicePose[i].velocity.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].velocity.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].velocity.z.ToString("N3")).Append(")")
+					.Append(", acceleration (").Append(trackedDevicePose[i].acceleration.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].acceleration.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].acceleration.z.ToString("N3")).Append(")")
+					.Append(", rotation (").Append(trackedDevicePose[i].rotation.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].rotation.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].rotation.z.ToString("N3")).Append(", ").Append(trackedDevicePose[i].rotation.w.ToString("N3")).Append(")")
+					.Append(", angularVelocity (").Append(trackedDevicePose[i].angularVelocity.x.ToString("N3")).Append(", ").Append(trackedDevicePose[i].angularVelocity.y.ToString("N3")).Append(", ").Append(trackedDevicePose[i].angularVelocity.z.ToString("N3")).Append(")");
+				DEBUG(sb);
+			}
+
+			return UpdateFunctionalCalibration(ts, trackedDevicePose, deviceCount, ref status);
+		}
+		[DllImport(kBodyTrackingLib)]
+		public static extern Result DestroyFunctionalCalibration(UInt64 ts);
+		public static Result DestroyFunctionalCalibrationLog(UInt64 ts)
+		{
+			sb.Clear().Append("DestroyFunctionalCalibrationLog()"); DEBUG(sb);
+			return DestroyFunctionalCalibration(ts);
+		}
+
+		[DllImport(kBodyTrackingLib)]
+		public static extern Result GetCalibratedPoseCount(UInt64 ts, ref UInt32 poseCount);
+		public static Result GetCalibratedPoseCountLog(UInt64 ts, ref UInt32 poseCount)
+		{
+			Result ret = GetCalibratedPoseCount(ts, ref poseCount);
+			sb.Clear().Append("GetCalibratedPoseCount() poseCount: ").Append(poseCount).Append(", result: ").Append(ret); DEBUG(sb);
+			return ret;
+		}
+		[DllImport(kBodyTrackingLib)]
+		public static extern Result GetCalibratedExtrinsicCount(UInt64 ts, ref UInt32 deviceCount);
+		public static Result GetCalibratedExtrinsicCountLog(UInt64 ts, ref UInt32 deviceCount)
+		{
+			Result ret = GetCalibratedExtrinsicCount(ts, ref deviceCount);
+			sb.Clear().Append("GetCalibratedExtrinsicCount() deviceCount: ").Append(deviceCount).Append(", result: ").Append(ret); DEBUG(sb);
+			return ret;
+		}
+		[DllImport(kBodyTrackingLib)]
+		public static extern Result GetFunctionalCalibrationResult(UInt64 ts, [In, Out] TrackedDeviceExtrinsic[] trackedDeviceExt, [In, Out] TrackedDeviceRedirectExtrinsic[] trackedDeviceRedirectExt, UInt32 deviceCount, [In, Out] TrackedDevicePose[] calibratedTrackedDevicePose, UInt32 poseCount);
+		public static Result GetFunctionalCalibrationResultLog(UInt64 ts, [In, Out] TrackedDeviceExtrinsic[] trackedDeviceExt, [In, Out] TrackedDeviceRedirectExtrinsic[] trackedDeviceRedirectExt, UInt32 deviceCount, [In, Out] TrackedDevicePose[] calibratedTrackedDevicePose, UInt32 poseCount)
+		{
+			Result ret = GetFunctionalCalibrationResult(ts, trackedDeviceExt, trackedDeviceRedirectExt, deviceCount, calibratedTrackedDevicePose, poseCount);
+
+			for (int i = 0; i < deviceCount; i++)
+			{
+				sb.Clear().Append("GetFunctionalCalibrationResult(").Append(ts).Append(")")
+					.Append(" trackedDeviceExt[").Append(i).Append("] role: ").Append(trackedDeviceExt[i].trackedDeviceRole.Name())
+					.Append(", position (").Append(trackedDeviceExt[i].extrinsic.translation.x.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.translation.y.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.translation.z.ToString("N3")).Append(")")
+					.Append(", rotation (").Append(trackedDeviceExt[i].extrinsic.rotation.x.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.rotation.y.ToString("N3")).Append(", ").Append(trackedDeviceExt[i].extrinsic.rotation.z.ToString()).Append(", ").Append(trackedDeviceExt[i].extrinsic.rotation.w.ToString("N3")).Append(")")
+					.Append("\ntrackedDeviceRedirectExt[").Append(i).Append("] role: ").Append(trackedDeviceRedirectExt[i].trackedDeviceRole.Name())
+					.Append(", rotation (").Append(trackedDeviceRedirectExt[i].rotation.x.ToString("N3")).Append(", ").Append(trackedDeviceRedirectExt[i].rotation.y.ToString("N3")).Append(", ").Append(trackedDeviceRedirectExt[i].rotation.z.ToString("N3")).Append(", ").Append(trackedDeviceRedirectExt[i].rotation.w.ToString("N3")).Append(")");
+				DEBUG(sb);
+			}
+			for (int i = 0; i < poseCount; i++)
+			{
+				sb.Clear().Append("GetFunctionalCalibrationResult(").Append(ts).Append(")")
+					.Append(" calibratedTrackedDevicePose[").Append(i).Append("] role: ").Append(calibratedTrackedDevicePose[i].trackedDeviceRole.Name())
+					.Append(", position (").Append(calibratedTrackedDevicePose[i].translation.x.ToString("N3")).Append(", ").Append(calibratedTrackedDevicePose[i].translation.y.ToString("N3")).Append(", ").Append(calibratedTrackedDevicePose[i].translation.z.ToString("N3")).Append(")");
+				DEBUG(sb);
+			}
+
+			return ret;
+		}
+
+		[DllImport(kBodyTrackingLib)]
+		public static extern Result RedirectTrackedDevice(UInt64 ts, int skeletonId, UInt32 deviceCount, TrackedDeviceRedirectExtrinsic[] trackedDeviceRedirectExt);
+		public static Result RedirectTrackedDeviceLog(UInt64 ts, int skeletonId, UInt32 deviceCount, TrackedDeviceRedirectExtrinsic[] trackedDeviceRedirectExt)
+		{
+			sb.Clear().Append("RedirectTrackedDevice(").Append(ts)
+				.Append(") skeletonId: ").Append(skeletonId)
+				.Append(", deviceCount: ").Append(deviceCount)
+				.Append(", trackedDeviceRedirectExt.length: ").Append(trackedDeviceRedirectExt.Length);
+			for (int i = 0; i < trackedDeviceRedirectExt.Length; i++)
+			{
+				sb.Append("\ntrackedDeviceRedirectExt[").Append(i)
+					.Append("] Role: ").Append(trackedDeviceRedirectExt[i].trackedDeviceRole.Name())
+					.Append(", rotation (").Append(trackedDeviceRedirectExt[i].rotation.x.ToString("N3")).Append(", ").Append(trackedDeviceRedirectExt[i].rotation.y.ToString("N3")).Append(", ").Append(trackedDeviceRedirectExt[i].rotation.z.ToString("N3")).Append(", ").Append(trackedDeviceRedirectExt[i].rotation.w.ToString("N3")).Append(")");
+			}
+			DEBUG(sb);
+
+			return RedirectTrackedDevice(ts, skeletonId, deviceCount, trackedDeviceRedirectExt);
+		}
+		#endregion
+
+		#region API v1.0.0.8
+		private static void ConvertTranslationFromToGL(ref Vector3 value)
+		{
+			Vector3 vec3 = value;
+			value.x = vec3.x;
+			value.y = vec3.y;
+			value.z = -vec3.z;
+		}
+		private static void ConvertRotationFromToGL(ref Quaternion value)
+		{
+			Quaternion quat = value;
+			value.x = quat.x;
+			value.y = quat.y;
+			value.z = -quat.z;
+			value.w = -quat.w;
+			Rdp.Validate(ref value);
+		}
+		private static void ConvertAngularFromToGL(ref Vector3 value)
+		{
+			Vector3 vec3 = value;
+			value.x = -vec3.x;
+			value.y = -vec3.y;
+			value.z = vec3.z;
+		}
+		private static void ConvertDataFromToFBT(ref TrackedDeviceExtrinsic ext)
+		{
+			ConvertTranslationFromToGL(ref ext.extrinsic.translation);
+			ConvertRotationFromToGL(ref ext.extrinsic.rotation);
+		}
+		private static void ConvertDataFromToFBT(ref Joint joint)
+		{
+			ConvertTranslationFromToGL(ref joint.translation);
+			ConvertTranslationFromToGL(ref joint.velocity);
+			ConvertRotationFromToGL(ref joint.rotation);
+			ConvertAngularFromToGL(ref joint.angularVelocity);
+		}
+		private static void ConvertDataFromToFBT(ref TrackedDevicePose pose)
+		{
+			ConvertTranslationFromToGL(ref pose.translation);
+			ConvertTranslationFromToGL(ref pose.velocity);
+			ConvertTranslationFromToGL(ref pose.acceleration);
+			ConvertRotationFromToGL(ref pose.rotation);
+			ConvertAngularFromToGL(ref pose.angularVelocity);
+		}
+		private static void ConvertDataFromToFBT(ref TrackedDeviceRedirectExtrinsic ext)
+		{
+			ConvertRotationFromToGL(ref ext.rotation);
+		}
+		public static Result InitBodyTrackingT(UInt64 ts, BodyTrackingMode bodyTrackingMode,
+			TrackedDeviceExtrinsic[] trackedDeviceExt, UInt32 deviceCount,
+			Joint[] avatarJoints, UInt32 avatarJointCount, float avatarHeight,
+			ref int skeletonId,
+			AvatarType avatarType = AvatarType.TPOSE)
+		{
+			for (int i = 0; i < trackedDeviceExt.Length; i++) { ConvertDataFromToFBT(ref trackedDeviceExt[i]); }
+			for (int i = 0; i < avatarJoints.Length; i++) { ConvertDataFromToFBT(ref avatarJoints[i]); }
+
+			Result result = InitBodyTrackingLog(ts, bodyTrackingMode, trackedDeviceExt, deviceCount, avatarJoints, avatarJointCount, avatarHeight, ref skeletonId);
+
+			return result;
+		}
+
+		public static Result InitDefaultBodyTrackingT(UInt64 ts, BodyTrackingMode bodyTrackingMode,
+			TrackedDeviceExtrinsic[] trackedDeviceExt, UInt32 deviceCount,
+			ref int skeletonId)
+		{
+			for (int i = 0; i < trackedDeviceExt.Length; i++) { ConvertDataFromToFBT(ref trackedDeviceExt[i]); }
+
+			Result result = InitDefaultBodyTrackingLog(ts, bodyTrackingMode, trackedDeviceExt, deviceCount, ref skeletonId);
+
+			return result;
+		}
+
+		public static Result CalibrateBodyTrackingT(UInt64 ts, int skeletonId, float userHeight,
+			BodyTrackingMode bodyTrackingMode,
+			TrackedDevicePose[] trackedDevicePose, UInt32 deviceCount,
+			ref float scale, CalibrationType calibrationType = CalibrationType.DEFAULTCALIBRATION)
+		{
+			for (int i = 0; i < trackedDevicePose.Length; i++) { ConvertDataFromToFBT(ref trackedDevicePose[i]); }
+
+			Result result = CalibrateBodyTrackingLog(ts, skeletonId, userHeight, bodyTrackingMode, trackedDevicePose, deviceCount, ref scale, calibrationType);
+
+			return result;
+		}
+
+		public static Result UpdateBodyTrackingT(bool printLog,
+			UInt64 ts, int skeletonId,
+			TrackedDevicePose[] trackedDevicePose, UInt32 deviceCount,
+			[In, Out] Joint[] outJoint, UInt32 jointCount)
+		{
+			for (int i = 0; i < trackedDevicePose.Length; i++) { ConvertDataFromToFBT(ref trackedDevicePose[i]); }
+
+			Result result = Result.ERROR_CALIBRATE_FAILED;
+
+			if (printLog)
+			{
+				result = UpdateBodyTrackingLog(ts, skeletonId, trackedDevicePose, deviceCount, outJoint, jointCount);
+			}
+			else
+			{
+				result = UpdateBodyTracking(ts, skeletonId, trackedDevicePose, deviceCount, outJoint, jointCount);
+			}
+
+			for (int i = 0; i < outJoint.Length; i++) { ConvertDataFromToFBT(ref outJoint[i]); }
+
+			return result;
+		}
+
+		public static Result UpdateFunctionalCalibrationT(bool printLog, UInt64 ts, TrackedDevicePose[] trackedDevicePose, UInt32 deviceCount, ref CalibrationStatus status)
+		{
+			for (int i = 0; i < trackedDevicePose.Length; i++) { ConvertDataFromToFBT(ref trackedDevicePose[i]); }
+
+			Result result = Result.ERROR_NOT_CALIBRATED; ;
+			if (printLog)
+			{
+				result = UpdateFunctionalCalibrationLog(ts, trackedDevicePose, deviceCount, ref status);
+			}
+			else
+			{
+				result = UpdateFunctionalCalibration(ts, trackedDevicePose, deviceCount, ref status);
+			}
+
+			return result;
+		}
+
+		public static Result GetFunctionalCalibrationResultT(UInt64 ts,
+			[In, Out] TrackedDeviceExtrinsic[] trackedDeviceExt,
+			[In, Out] TrackedDeviceRedirectExtrinsic[] trackedDeviceRedirectExt, UInt32 deviceCount,
+			[In, Out] TrackedDevicePose[] calibratedTrackedDevicePose, UInt32 poseCount)
+		{
+			Result result = GetFunctionalCalibrationResultLog(ts, trackedDeviceExt, trackedDeviceRedirectExt, deviceCount, calibratedTrackedDevicePose, poseCount);
+
+			for (int i = 0; i < trackedDeviceExt.Length; i++) { ConvertDataFromToFBT(ref trackedDeviceExt[i]); }
+			for (int i = 0; i < trackedDeviceRedirectExt.Length; i++) { ConvertDataFromToFBT(ref trackedDeviceRedirectExt[i]); }
+			for (int i = 0; i < calibratedTrackedDevicePose.Length; i++) { ConvertDataFromToFBT(ref calibratedTrackedDevicePose[i]); }
+
+			return result;
+		}
+
+		public static Result RedirectTrackedDeviceT(UInt64 ts, int skeletonId, UInt32 deviceCount, TrackedDeviceRedirectExtrinsic[] trackedDeviceRedirectExt)
+		{
+			for (int i = 0; i < trackedDeviceRedirectExt.Length; i++) { ConvertDataFromToFBT(ref trackedDeviceRedirectExt[i]); }
+
+			Result result = RedirectTrackedDeviceLog(ts, skeletonId, deviceCount, trackedDeviceRedirectExt);
+
+			for (int i = 0; i < trackedDeviceRedirectExt.Length; i++) { ConvertDataFromToFBT(ref trackedDeviceRedirectExt[i]); }
+
+			return result;
+		}
+		#endregion
 	}
-	#endregion
 
 	public static class BodyTrackingUtils
 	{
 		const string LOG_TAG = "VIVE.OpenXR.Toolkits.BodyTracking.BodyTrackingUtils";
 		static StringBuilder m_sb = null;
-		static StringBuilder sb {
-			get {
+		static StringBuilder sb
+		{
+			get
+			{
 				if (m_sb == null) { m_sb = new StringBuilder(); }
 				return m_sb;
 			}
 		}
-		static void DEBUG(StringBuilder msg) { Debug.Log(msg); }
-		static void ERROR(StringBuilder msg) { Debug.LogError(msg); }
-
-		#region Input System
-		public enum ActionRefError : UInt32
-		{
-			NONE = 0,
-			REFERENCE_NULL = 1,
-			ACTION_NULL = 2,
-			DISABLED = 3,
-			ACTIVECONTROL_NULL = 4,
-			NO_CONTROLS_COUNT = 5,
-		}
-		public static string Name(this ActionRefError error)
-		{
-			if (error == ActionRefError.REFERENCE_NULL) { return "Null reference."; }
-			if (error == ActionRefError.ACTION_NULL) { return "Null reference action."; }
-			if (error == ActionRefError.DISABLED) { return "Reference action disabled."; }
-			if (error == ActionRefError.ACTIVECONTROL_NULL) { return "No active control of the reference action."; }
-			if (error == ActionRefError.NO_CONTROLS_COUNT) { return "No action control count."; }
-
-			return "";
-		}
-		private static ActionRefError VALIDATE(InputActionReference actionReference)
-		{
-			if (actionReference == null) { return ActionRefError.REFERENCE_NULL; }
-			if (actionReference.action == null) { return ActionRefError.ACTION_NULL; }
-			if (!actionReference.action.enabled) { return ActionRefError.DISABLED; }
-			if (actionReference.action.activeControl == null) { return ActionRefError.ACTIVECONTROL_NULL; }
-			else if (actionReference.action.controls.Count <= 0) { return ActionRefError.NO_CONTROLS_COUNT; }
-
-			return ActionRefError.NONE;
-		}
-		public static bool GetPoseIsTracked(InputActionReference actionReference, out bool value, out string msg)
-		{
-			var result = VALIDATE(actionReference);
-
-			value = false;
-			msg = result.Name();
-
-			if (result == ActionRefError.NONE)
-			{
-#if USE_INPUT_SYSTEM_POSE_CONTROL // Scripting Define Symbol added by using OpenXR Plugin 1.6.0.
-                if (actionReference.action.activeControl.valueType == typeof(UnityEngine.InputSystem.XR.PoseState))
-#else
-				if (actionReference.action.activeControl.valueType == typeof(UnityEngine.XR.OpenXR.Input.Pose))
-#endif
-				{
-#if USE_INPUT_SYSTEM_POSE_CONTROL // Scripting Define Symbol added by using OpenXR Plugin 1.6.0.
-                    value = actionReference.action.ReadValue<UnityEngine.InputSystem.XR.PoseState>().isTracked;
-#else
-					value = actionReference.action.ReadValue<UnityEngine.XR.OpenXR.Input.Pose>().isTracked;
-#endif
-					return true;
-				}
-			}
-
-			return false;
-		}
-		public static bool GetPoseTrackingState(InputActionReference actionReference, out InputTrackingState value, out string msg)
-		{
-			var result = VALIDATE(actionReference);
-
-			value = InputTrackingState.None;
-			msg = result.Name();
-
-			if (result == ActionRefError.NONE)
-			{
-#if USE_INPUT_SYSTEM_POSE_CONTROL // Scripting Define Symbol added by using OpenXR Plugin 1.6.0.
-                if (actionReference.action.activeControl.valueType == typeof(UnityEngine.InputSystem.XR.PoseState))
-#else
-				if (actionReference.action.activeControl.valueType == typeof(UnityEngine.XR.OpenXR.Input.Pose))
-#endif
-				{
-#if USE_INPUT_SYSTEM_POSE_CONTROL // Scripting Define Symbol added by using OpenXR Plugin 1.6.0.
-                    value = actionReference.action.ReadValue<UnityEngine.InputSystem.XR.PoseState>().trackingState;
-#else
-					value = actionReference.action.ReadValue<UnityEngine.XR.OpenXR.Input.Pose>().trackingState;
-#endif
-					return true;
-				}
-			}
-
-			return false;
-		}
-		public static bool GetPosePosition(InputActionReference actionReference, out Vector3 value, out string msg)
-		{
-			var result = VALIDATE(actionReference);
-
-			value = Vector3.zero;
-			msg = result.Name();
-
-			if (result == ActionRefError.NONE)
-			{
-#if USE_INPUT_SYSTEM_POSE_CONTROL // Scripting Define Symbol added by using OpenXR Plugin 1.6.0.
-                if (actionReference.action.activeControl.valueType == typeof(UnityEngine.InputSystem.XR.PoseState))
-#else
-				if (actionReference.action.activeControl.valueType == typeof(UnityEngine.XR.OpenXR.Input.Pose))
-#endif
-				{
-#if USE_INPUT_SYSTEM_POSE_CONTROL // Scripting Define Symbol added by using OpenXR Plugin 1.6.0.
-                    value = actionReference.action.ReadValue<UnityEngine.InputSystem.XR.PoseState>().position;
-#else
-					value = actionReference.action.ReadValue<UnityEngine.XR.OpenXR.Input.Pose>().position;
-#endif
-					return true;
-				}
-			}
-
-			return false;
-		}
-		public static bool GetPoseRotation(InputActionReference actionReference, out Quaternion value, out string msg)
-		{
-			var result = VALIDATE(actionReference);
-
-			value = Quaternion.identity;
-			msg = result.Name();
-
-			if (result == ActionRefError.NONE)
-			{
-#if USE_INPUT_SYSTEM_POSE_CONTROL // Scripting Define Symbol added by using OpenXR Plugin 1.6.0.
-                if (actionReference.action.activeControl.valueType == typeof(UnityEngine.InputSystem.XR.PoseState))
-#else
-				if (actionReference.action.activeControl.valueType == typeof(UnityEngine.XR.OpenXR.Input.Pose))
-#endif
-				{
-#if USE_INPUT_SYSTEM_POSE_CONTROL // Scripting Define Symbol added by using OpenXR Plugin 1.6.0.
-                    value = actionReference.action.ReadValue<UnityEngine.InputSystem.XR.PoseState>().rotation;
-#else
-					value = actionReference.action.ReadValue<UnityEngine.XR.OpenXR.Input.Pose>().rotation;
-#endif
-					return true;
-				}
-			}
-
-			return false;
-		}
-		#endregion
-
-		public static bool isZero(this Quaternion qua)
-		{
-			if (qua.x == 0 &&
-				qua.y == 0 &&
-				qua.z == 0 &&
-				qua.w == 0)
-			{
-				return true;
-			}
-
-			return false;
-		}
-		public static void Validate(ref Quaternion qua)
-		{
-			if (qua.isZero()) { qua = Quaternion.identity; }
-		}
-		public static bool IsValid(this Quaternion quat)
-		{
-			if (quat.x > 1 || quat.x < -1 || float.IsNaN(quat.x)) { return false; }
-			if (quat.y > 1 || quat.y < -1 || float.IsNaN(quat.y)) { return false; }
-			if (quat.z > 1 || quat.z < -1 || float.IsNaN(quat.z)) { return false; }
-			if (quat.w > 1 || quat.w < -1 || float.IsNaN(quat.w)) { return false; }
-			return true;
-		}
-		public static void Update(ref Quaternion qua, Quaternion in_qua)
-		{
-			qua = in_qua;
-			Validate(ref qua);
-		}
-		public static bool GetQuaternionDiff(Quaternion src, Quaternion dst, out Quaternion diff)
-		{
-			if (src.IsValid() && dst.IsValid())
-			{
-				diff = Quaternion.Inverse(src) * dst;
-				Validate(ref diff);
-				return true;
-			}
-
-			diff = Quaternion.identity;
-			return false;
-		}
-		public static void Update(Quaternion qua, ref Vector4 vec)
-		{
-			vec.x = qua.x;
-			vec.y = qua.y;
-			vec.z = qua.z;
-			vec.w = qua.w;
-		}
-		public static void Update(Vector4 vec, ref Quaternion qua)
-		{
-			qua.x = vec.x;
-			qua.y = vec.y;
-			qua.z = vec.z;
-			qua.w = vec.w;
-			Validate(ref qua);
-		}
+		static void DEBUG(StringBuilder msg) { Rdp.d(LOG_TAG, msg, true); }
 
 		public static string Name(this TrackedDeviceRole role)
 		{
@@ -2930,7 +4095,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 
 			if (role == TrackedDeviceRole.ROLE_UNDEFINED) { return "UNDEFINED"; }
 
-			sb.Clear().Append(LOG_TAG).Append("TrackedDeviceRole = ").Append(role); DEBUG(sb);
+			sb.Clear().Append("TrackedDeviceRole = ").Append(role); DEBUG(sb);
 			return "";
 		}
 		public static string Name(this DeviceExtRole role)
@@ -2950,7 +4115,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 
 			if (role == DeviceExtRole.Unknown) { return "Unknown"; }
 
-			sb.Clear().Append(LOG_TAG).Append("DeviceExtRole = ").Append(role); DEBUG(sb);
+			sb.Clear().Append("DeviceExtRole = ").Append(role); DEBUG(sb);
 			return "";
 		}
 		public static string Name(this BodyPoseRole role)
@@ -2975,7 +4140,21 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 
 			if (role == BodyPoseRole.Unknown) { return "Unknown"; }
 
-			sb.Clear().Append(LOG_TAG).Append("BodyPoseRole = ").Append(role); DEBUG(sb);
+			sb.Clear().Append("BodyPoseRole = ").Append(role); DEBUG(sb);
+			return "";
+		}
+		public static string Name(this TrackedDeviceType type)
+		{
+			if (type == TrackedDeviceType.Controller) { return "Controller"; }
+			if (type == TrackedDeviceType.Hand) { return "Hand"; }
+			if (type == TrackedDeviceType.HMD) { return "HMD"; }
+			if (type == TrackedDeviceType.ViveSelfTracker) { return "ViveSelfTracker"; }
+			if (type == TrackedDeviceType.ViveSelfTrackerIM) { return "ViveSelfTrackerIM"; }
+			if (type == TrackedDeviceType.ViveWristTracker) { return "WristTracker"; }
+
+			if (type == TrackedDeviceType.Invalid) { return "Invalid"; }
+
+			sb.Clear().Append("TrackedDeviceType = ").Append(type); DEBUG(sb);
 			return "";
 		}
 		public static string Name(this BodyTrackingMode mode)
@@ -2989,7 +4168,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			if (mode == BodyTrackingMode.UPPERBODYIK) { return "UPPERBODYIK"; }
 			if (mode == BodyTrackingMode.UPPERIKANDLEGFK) { return "UPPERIKANDLEGFK"; }
 
-			sb.Clear().Append(LOG_TAG).Append("BodyTrackingMode = ").Append(mode); DEBUG(sb);
+			sb.Clear().Append("BodyTrackingMode = ").Append(mode); DEBUG(sb);
 			return "";
 		}
 		public static string Name(this BodyTrackingResult result)
@@ -3012,7 +4191,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			if (result == BodyTrackingResult.ERROR_TRACKER_AMOUNT_FAILED) { return "ERROR_TRACKER_AMOUNT_FAILED"; }
 			if (result == BodyTrackingResult.SUCCESS) { return "SUCCESS"; }
 
-			sb.Clear().Append(LOG_TAG).Append("BodyTrackingResult = ").Append(result); DEBUG(sb);
+			sb.Clear().Append("BodyTrackingResult = ").Append(result); DEBUG(sb);
 			return "";
 		}
 		public static string Name(this JointType type)
@@ -3051,7 +4230,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			if (type == JointType.RIGHTFOREARM) { return "RIGHTFOREARM"; }
 			if (type == JointType.RIGHTHAND) { return "RIGHTHAND"; }
 
-			sb.Clear().Append(LOG_TAG).Append("JointType = ").Append(type); DEBUG(sb);
+			sb.Clear().Append("JointType = ").Append(type); DEBUG(sb);
 			return "";
 		}
 		public static string Name(this CalibrationType type)
@@ -3060,9 +4239,47 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			if (type == CalibrationType.HEIGHTCALIBRATION) { return "HEIGHTCALIBRATION"; }
 			if (type == CalibrationType.TOFFSETCALIBRATION) { return "TOFFSETCALIBRATION"; }
 
-			sb.Clear().Append(LOG_TAG).Append("CalibrationType = ").Append(type); DEBUG(sb);
+			sb.Clear().Append("CalibrationType = ").Append(type); DEBUG(sb);
 			return "";
 		}
+
+		public static bool GetQuaternionDiff(Quaternion src, Quaternion dst, out Quaternion diff)
+		{
+			if (src.IsValid() && dst.IsValid())
+			{
+				diff = Quaternion.Inverse(src) * dst;
+				Rdp.Validate(ref diff);
+				return true;
+			}
+
+			diff = Quaternion.identity;
+			return false;
+		}
+
+		#region API v1.0.0.6
+		public static string Name(this CalibrationStatus status)
+		{
+			if (status == CalibrationStatus.STATUS_UNINITIAL) { return "Uninitial"; }
+
+			if (status == CalibrationStatus.STATUS_WAITING_STATIC) { return "Waiting Static"; }
+			if (status == CalibrationStatus.STATUS_WAITING_POSE_MODE) { return "Waiting Pose Mode"; }
+			if (status == CalibrationStatus.STATUS_READY) { return "Ready"; }
+			if (status == CalibrationStatus.STATUS_COLLECTING) { return "Collecting"; }
+			if (status == CalibrationStatus.STATUS_COLLECTED) { return "Collected"; }
+			if (status == CalibrationStatus.STATUS_COLLECTED_AND_COMPUTING) { return "Collected and Computing"; }
+			if (status == CalibrationStatus.STATUS_FINISHED) { return "Finished"; }
+
+			if (status == CalibrationStatus.STATUS_WALKFAILED_DISTANCE) { return "Walk Failed Distance"; }
+			if (status == CalibrationStatus.STATUS_WALKFAILED_TIME) { return "Walk Failed Time"; }
+			if (status == CalibrationStatus.STATUS_WAIT_STATIC_FAILED_TIME) { return "Wait Static Failed Time"; }
+			if (status == CalibrationStatus.STATUS_WAIT_POSEMODE_FAILED_TIME) { return "Wait Pose Mode Failed Time"; }
+			if (status == CalibrationStatus.STATUS_READYFAILED_TIME) { return "Ready Failed Time"; }
+			if (status == CalibrationStatus.STATUS_COMPUTEFAILED_TIME) { return "Compute Failed Time"; }
+			if (status == CalibrationStatus.STATUS_COMPUTEFAILED) { return "Compute Failed"; }
+
+			return "";
+		}
+		#endregion
 
 		public static BodyTrackingResult Type(this Result result)
 		{
@@ -3084,12 +4301,6 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			return BodyTrackingResult.SUCCESS;
 		}
 
-		public static void Update([In] Joint joint, ref Extrinsic ext)
-		{
-			ext.translation = joint.translation;
-			BodyTrackingUtils.Update(ref ext.rotation, joint.rotation);
-		}
-
 		readonly static DateTime kBeginTime = new DateTime(1970, 1, 1, 0, 0, 0, 0);
 		public static UInt64 GetTimeStamp(bool bflag = true)
 		{
@@ -3097,11 +4308,21 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			return Convert.ToUInt64(ts.TotalMilliseconds);
 		}
 
+		public readonly static TrackedDeviceType[] s_BodyTrackingTypes =
+		{
+			TrackedDeviceType.HMD,
+			TrackedDeviceType.Controller,
+			TrackedDeviceType.Hand,
+			TrackedDeviceType.ViveWristTracker,
+			TrackedDeviceType.ViveSelfTracker,
+			TrackedDeviceType.ViveSelfTrackerIM,
+		};
+
 		/// <summary> Retrieves the body pose role according to the currently tracked device poses. </summary>
-		public static BodyPoseRole GetBodyPoseRole([In] TrackedDevicePose[] trackedDevicePoses, [In] UInt32 trackedDevicePoseCount)
+		public static BodyPoseRole GetBodyPoseRole([In] TrackedDevicePose[] trackedDevicePoses, [In] UInt32 trackedDevicePoseCount, bool printLog = true)
 		{
 			UInt64 ikRoles = 0;
-			sb.Clear().Append(LOG_TAG);
+			sb.Clear();
 			for (UInt32 i = 0; i < trackedDevicePoseCount; i++)
 			{
 				sb.Append("GetBodyPoseRole() pose ").Append(i)
@@ -3111,7 +4332,7 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 				ikRoles |= (UInt64)(1 << (Int32)trackedDevicePoses[i].trackedDeviceRole);
 #pragma warning restore CS0675 // Bitwise-or operator used on a sign-extended operand
 			}
-			DEBUG(sb);
+			if (printLog) DEBUG(sb);
 
 			BodyPoseRole m_IKRoles = BodyPoseRole.Unknown;
 
@@ -3153,13 +4374,13 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			else if ((ikRoles & (UInt64)BodyPoseRole.Arm_Hand) == (UInt64)BodyPoseRole.Arm_Hand)
 				m_IKRoles = BodyPoseRole.Arm_Hand;
 
-			sb.Clear().Append(LOG_TAG).Append("GetBodyPoseRole() role: ").Append(m_IKRoles.Name()); DEBUG(sb);
+			if (printLog) { sb.Clear().Append("GetBodyPoseRole() role: ").Append(m_IKRoles.Name()); DEBUG(sb); }
 			return m_IKRoles;
 		}
 		/// <summary> Checks if the body pose role and body tracking mode are matched./// </summary>
-		public static bool MatchBodyTrackingMode(BodyTrackingMode mode, BodyPoseRole poseRole)
+		public static bool MatchBodyTrackingMode(BodyTrackingMode mode, BodyPoseRole poseRole, bool printLog = true)
 		{
-			sb.Clear().Append(LOG_TAG).Append("MatchBodyTrackingMode() mode: ").Append(mode.Name()).Append(", poseRole: ").Append(poseRole.Name()); DEBUG(sb);
+			if (printLog) { sb.Clear().Append("MatchBodyTrackingMode() mode: ").Append(mode.Name()).Append(", poseRole: ").Append(poseRole.Name()); DEBUG(sb); }
 
 			if (poseRole == BodyPoseRole.UpperBody_Handheld_Knee_Ankle || poseRole == BodyPoseRole.UpperBody_Hand_Knee_Ankle)
 			{
@@ -3187,13 +4408,14 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			return false;
 		}
 
+
 		/// <summary> Retrievs the device extrinsic role according to the calibration pose role and tracked device extrinsics in use. </summary>
 		public static DeviceExtRole GetDeviceExtRole(BodyPoseRole calibRole, [In] TrackedDeviceExtrinsic[] bodyTrackedDevices, [In] UInt32 bodyTrackedDeviceCount)
 		{
-			sb.Clear().Append(LOG_TAG).Append("GetDeviceExtRole() calibRole: ").Append(calibRole.Name()); DEBUG(sb);
+			sb.Clear().Append("GetDeviceExtRole() calibRole: ").Append(calibRole.Name()); DEBUG(sb);
 
 			UInt64 ikRoles = 0;
-			sb.Clear().Append(LOG_TAG);
+			sb.Clear();
 			for (UInt32 i = 0; i < bodyTrackedDeviceCount; i++)
 			{
 				sb.Append("GetDeviceExtRole() device ").Append(i)
@@ -3260,13 +4482,13 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 					m_IKRoles = DeviceExtRole.Arm_Handheld_Hand;
 			}
 
-			sb.Clear().Append(LOG_TAG).Append("GetDeviceExtRole() role: ").Append(m_IKRoles.Name()); DEBUG(sb);
+			sb.Clear().Append("GetDeviceExtRole() role: ").Append(m_IKRoles.Name()); DEBUG(sb);
 			return m_IKRoles;
 		}
 		/// <summary> Checks if the device extrinsic role and body tracking mode are matched./// </summary>
 		public static bool MatchBodyTrackingMode(BodyTrackingMode mode, DeviceExtRole extRole)
 		{
-			sb.Clear().Append(LOG_TAG).Append("MatchBodyTrackingMode() mode: ").Append(mode.Name()).Append(", extRole: ").Append(extRole.Name()); DEBUG(sb);
+			sb.Clear().Append("MatchBodyTrackingMode() mode: ").Append(mode.Name()).Append(", extRole: ").Append(extRole.Name()); DEBUG(sb);
 
 			if (mode == BodyTrackingMode.ARMIK)
 			{
@@ -3295,727 +4517,581 @@ namespace VIVE.OpenXR.Toolkits.BodyTracking
 			return false;
 		}
 
-		private static TrackedDeviceRole[] s_DeviceRoleTracked =
+		public static JointType GetJointType(int index)
 		{
-			TrackedDeviceRole.ROLE_HIP,
-			TrackedDeviceRole.ROLE_CHEST,
-			TrackedDeviceRole.ROLE_HEAD,
+			if (index == 0) { return JointType.HIP; }
+			if (index == 1) { return JointType.LEFTTHIGH; }
+			if (index == 2) { return JointType.LEFTLEG; }
+			if (index == 3) { return JointType.LEFTANKLE; }
+			if (index == 4) { return JointType.LEFTFOOT; }
 
-			TrackedDeviceRole.ROLE_LEFTELBOW,
-			TrackedDeviceRole.ROLE_LEFTWRIST,
-			TrackedDeviceRole.ROLE_LEFTHAND, // 5
-			TrackedDeviceRole.ROLE_LEFTHANDHELD,
+			if (index == 5) { return JointType.RIGHTTHIGH; }
+			if (index == 6) { return JointType.RIGHTLEG; }
+			if (index == 7) { return JointType.RIGHTANKLE; }
+			if (index == 8) { return JointType.RIGHTFOOT; }
 
-			TrackedDeviceRole.ROLE_RIGHTELBOW,
-			TrackedDeviceRole.ROLE_RIGHTWRIST,
-			TrackedDeviceRole.ROLE_RIGHTHAND,
-			TrackedDeviceRole.ROLE_RIGHTHANDHELD, // 10
+			if (index == 9) { return JointType.WAIST; }
 
-			TrackedDeviceRole.ROLE_LEFTKNEE,
-			TrackedDeviceRole.ROLE_LEFTANKLE,
-			TrackedDeviceRole.ROLE_LEFTFOOT,
+			if (index == 10) { return JointType.SPINELOWER; }
+			if (index == 11) { return JointType.SPINEMIDDLE; }
+			if (index == 12) { return JointType.SPINEHIGH; }
 
-			TrackedDeviceRole.ROLE_RIGHTKNEE,
-			TrackedDeviceRole.ROLE_RIGHTANKLE, // 15
-			TrackedDeviceRole.ROLE_RIGHTFOOT,
-		};
-		public static TrackedDeviceRole GetTrackedDeviceRole(int id)
+			if (index == 13) { return JointType.CHEST; }
+			if (index == 14) { return JointType.NECK; }
+			if (index == 15) { return JointType.HEAD; }
+
+			if (index == 16) { return JointType.LEFTCLAVICLE; }
+			if (index == 17) { return JointType.LEFTSCAPULA; }
+			if (index == 18) { return JointType.LEFTUPPERARM; }
+			if (index == 19) { return JointType.LEFTFOREARM; }
+			if (index == 20) { return JointType.LEFTHAND; }
+
+			if (index == 21) { return JointType.RIGHTCLAVICLE; }
+			if (index == 22) { return JointType.RIGHTSCAPULA; }
+			if (index == 23) { return JointType.RIGHTUPPERARM; }
+			if (index == 24) { return JointType.RIGHTFOREARM; }
+			if (index == 25) { return JointType.RIGHTHAND; }
+
+			return JointType.UNKNOWN;
+		}
+		public static string GetBodyJointName(int index)
 		{
-			if (id >= 0) { return s_DeviceRoleTracked[id]; }
+			if (index == 0) { return "Hip"; }
+			if (index == 1) { return "Left_Thigh"; }
+			if (index == 2) { return "Left_Leg"; }
+			if (index == 3) { return "Left_Ankle"; }
+			if (index == 4) { return "Left_Foot"; }
+			if (index == 5) { return "Right_Thigh"; }
+			if (index == 6) { return "Right_Leg"; }
+			if (index == 7) { return "Right_Ankle"; }
+			if (index == 8) { return "Right_Foot"; }
+			if (index == 9) { return "Waist"; }
+			if (index == 10) { return "Spine_Lower"; }
+			if (index == 11) { return "Spine_Middle"; }
+			if (index == 12) { return "Spine_High"; }
+			if (index == 13) { return "Chest"; }
+			if (index == 14) { return "Neck"; }
+			if (index == 15) { return "Head"; }
+			if (index == 16) { return "Left_Clavicle"; }
+			if (index == 17) { return "Left_Scapula"; }
+			if (index == 18) { return "Left_Upper_Arm"; }
+			if (index == 19) { return "Left_Forearm"; }
+			if (index == 20) { return "Left_Hand"; }
+			if (index == 21) { return "Right_Clavicle"; }
+			if (index == 22) { return "Right_Scapula"; }
+			if (index == 23) { return "Right_Upper_Arm"; }
+			if (index == 24) { return "Right_Forearm"; }
+			if (index == 25) { return "Right_Hand"; }
+
+			return "Unknown";
+		}
+
+		#region API v1.0.0.8
+		// Translation
+		public static float ConvertTranslation([In] Vector3 vec3, [In] AxisDefine axis)
+		{
+			if (axis == AxisDefine.Right) { return vec3.x; }
+			if (axis == AxisDefine.Up) { return vec3.y; }
+			if (axis == AxisDefine.Forward) { return vec3.z; }
+
+			if (axis == AxisDefine.Left) { return -vec3.x; }
+			if (axis == AxisDefine.Down) { return -vec3.y; }
+			if (axis == AxisDefine.Backward) { return -vec3.z; }
+
+			return 0;
+		}
+		public static void TransformCoordinate(ref Vector3 vec3, CoordinateDefine coor)
+		{
+			Vector3 v = vec3;
+			v.x = ConvertTranslation(vec3, coor.x);
+			v.y = ConvertTranslation(vec3, coor.y);
+			v.z = ConvertTranslation(vec3, coor.z);
+			vec3 = v;
+		}
+		// Rotation
+		private static Matrix4x4 rotationMat = new Matrix4x4();
+		/// <summary>
+		/// Matrix layout
+		/// x | x' y' z' 0
+		/// y | x' y' z' 0
+		/// z | x' y' z' 0
+		/// w | 0  0  0  1
+		/// 
+		/// Row 0: Unity X axis mappings.
+		/// Row 1: Unity Y axis mappings.
+		/// Row 2: Unity Z axis mappings.
+		/// 
+		/// x', y', z': new coordinate axis.
+		/// 
+		/// For example 1: Unity x-axis is right, new coordinate y' is left.
+		/// => -x = y', so row 0 is 0 -1 0 0
+		/// For example 2: Unity y-axis is up, new coordinate z' is up.
+		/// => y = z', sow row 1 is 0 0 1 0
+		/// </summary>
+		/// <param name="coor"></param>
+		/// <returns></returns>
+		public static Matrix4x4 GetRotationConvertMatrix(CoordinateDefine coor)
+		{
+			/// Row 0: axis right or left.
+			// row0: 1 0 0 0
+			if (coor.x == AxisDefine.Right)
+			{
+				rotationMat.m00 = 1;
+				rotationMat.m01 = 0;
+				rotationMat.m02 = 0;
+				rotationMat.m03 = 0;
+			}
+			// row0: 0 1 0 0
+			if (coor.y == AxisDefine.Right)
+			{
+				rotationMat.m00 = 0;
+				rotationMat.m01 = 1;
+				rotationMat.m02 = 0;
+				rotationMat.m03 = 0;
+			}
+			// row0: 0 0 1 0
+			if (coor.z == AxisDefine.Right)
+			{
+				rotationMat.m00 = 0;
+				rotationMat.m01 = 0;
+				rotationMat.m02 = 1;
+				rotationMat.m03 = 0;
+			}
+
+			// row0: -1 0 0 0
+			if (coor.x == AxisDefine.Left)
+			{
+				rotationMat.m00 = -1;
+				rotationMat.m01 = 0;
+				rotationMat.m02 = 0;
+				rotationMat.m03 = 0;
+			}
+			// row0: 0 -1 0 0
+			if (coor.y == AxisDefine.Left)
+			{
+				rotationMat.m00 = 0;
+				rotationMat.m01 = -1;
+				rotationMat.m02 = 0;
+				rotationMat.m03 = 0;
+			}
+			// row0: 0 0 -1 0
+			if (coor.z == AxisDefine.Left)
+			{
+				rotationMat.m00 = 0;
+				rotationMat.m01 = 0;
+				rotationMat.m02 = -1;
+				rotationMat.m03 = 0;
+			}
+
+			/// Row 1: axis up or down
+			// row1: 1 0 0 0
+			if (coor.x == AxisDefine.Up)
+			{
+				rotationMat.m10 = 1;
+				rotationMat.m11 = 0;
+				rotationMat.m12 = 0;
+				rotationMat.m13 = 0;
+			}
+			// row1: 0 1 0 0
+			if (coor.y == AxisDefine.Up)
+			{
+				rotationMat.m10 = 0;
+				rotationMat.m11 = 1;
+				rotationMat.m12 = 0;
+				rotationMat.m13 = 0;
+			}
+			// row1: 0 0 1 0
+			if (coor.z == AxisDefine.Up)
+			{
+				rotationMat.m10 = 0;
+				rotationMat.m11 = 0;
+				rotationMat.m12 = 1;
+				rotationMat.m13 = 0;
+			}
+
+			// row1: -1 0 0 0
+			if (coor.x == AxisDefine.Down)
+			{
+				rotationMat.m10 = -1;
+				rotationMat.m11 = 0;
+				rotationMat.m12 = 0;
+				rotationMat.m13 = 0;
+			}
+			// row1: 0 -1 0 0
+			if (coor.y == AxisDefine.Down)
+			{
+				rotationMat.m10 = 0;
+				rotationMat.m11 = -1;
+				rotationMat.m12 = 0;
+				rotationMat.m13 = 0;
+			}
+			// row1: 0 0 -1 0
+			if (coor.z == AxisDefine.Down)
+			{
+				rotationMat.m10 = 0;
+				rotationMat.m11 = 0;
+				rotationMat.m12 = -1;
+				rotationMat.m13 = 0;
+			}
+
+			// row2: 1 0 0 0
+			if (coor.x == AxisDefine.Forward)
+			{
+				rotationMat.m20 = 1;
+				rotationMat.m21 = 0;
+				rotationMat.m22 = 0;
+				rotationMat.m23 = 0;
+			}
+			// row2: 0 1 0 0
+			if (coor.y == AxisDefine.Forward)
+			{
+				rotationMat.m20 = 0;
+				rotationMat.m21 = 1;
+				rotationMat.m22 = 0;
+				rotationMat.m23 = 0;
+			}
+			// row2: 0 0 1 0
+			if (coor.z == AxisDefine.Forward)
+			{
+				rotationMat.m20 = 0;
+				rotationMat.m21 = 0;
+				rotationMat.m22 = 1;
+				rotationMat.m23 = 0;
+			}
+
+			// row2: -1 0 0 0
+			if (coor.x == AxisDefine.Backward)
+			{
+				rotationMat.m20 = -1;
+				rotationMat.m21 = 0;
+				rotationMat.m22 = 0;
+				rotationMat.m23 = 0;
+			}
+			// row2: 0 -1 0 0
+			if (coor.y == AxisDefine.Backward)
+			{
+				rotationMat.m20 = 0;
+				rotationMat.m21 = -1;
+				rotationMat.m22 = 0;
+				rotationMat.m23 = 0;
+			}
+			// row2: 0 0 -1 0
+			if (coor.z == AxisDefine.Backward)
+			{
+				rotationMat.m20 = 0;
+				rotationMat.m21 = 0;
+				rotationMat.m22 = -1;
+				rotationMat.m23 = 0;
+			}
+
+			rotationMat.m30 = 0;
+			rotationMat.m31 = 0;
+			rotationMat.m32 = 0;
+			rotationMat.m33 = 1;
+
+			return rotationMat;
+		}
+		public static void TransformCoordinate(ref Quaternion quat, CoordinateDefine coor)
+		{
+			Matrix4x4 inMatrix = Matrix4x4.TRS(Vector3.zero, quat, Vector3.one);
+
+			Matrix4x4 convertMatrix = GetRotationConvertMatrix(coor);
+
+			Matrix4x4 outMatrix = convertMatrix * inMatrix;
+
+			quat = outMatrix.rotation;
+			Rdp.Validate(ref quat);
+		}
+		// Angular Velocity
+		public static Quaternion GetRotationQuaternion(float angleZ, float angleX, float angleY)
+		{
+			Quaternion rotationZ = Quaternion.Euler(0, 0, angleZ);
+			Quaternion rotationX = Quaternion.Euler(angleX, 0, 0);
+			Quaternion rotationY = Quaternion.Euler(0, angleY, 0);
+
+			Quaternion toRotation = rotationY * rotationX * rotationZ;
+			return toRotation;
+		}
+		public static void TransformCoordinate(ref Vector3 angularVelocity, Quaternion toRotation)
+		{
+			Quaternion inverseRotation = Quaternion.Inverse(toRotation);
+			angularVelocity = inverseRotation * angularVelocity;
+		}
+
+		public static void TransformCoordinate(ref Joint joint, CoordinateDefine coorTranslation)
+		{
+			TransformCoordinate(ref joint.translation, coorTranslation);
+			TransformCoordinate(ref joint.rotation, coorTranslation);
+		}
+		#endregion
+
+#if WAVE_BODY_CALIBRATION
+		public static string Name(this WVR_BodyTrackingDeviceRole role)
+		{
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Chest) { return "Chest"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Head) { return "Head"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Hip) { return "Hip"; }
+
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftAnkle) { return "LeftAnkle"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftElbow) { return "LeftElbow"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftFoot) { return "LeftFoot"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftHand) { return "LeftHand"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftHandheld) { return "LeftHandheld"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftKnee) { return "LeftKnee"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftWrist) { return "LeftWrist"; }
+
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightAnkle) { return "RightAnkle"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightElbow) { return "RightElbow"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightFoot) { return "RightFoot"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightHand) { return "RightHand"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightHandheld) { return "RightHandheld"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightKnee) { return "RightKnee"; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightWrist) { return "RightWrist"; }
+
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Max) { return "Max"; }
+
+			return "Invalid";
+		}
+		public static string Name(this WVR_BodyTrackingCalibrationMode mode)
+		{
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_ArmIK) { return "ArmIK"; }
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_FullBodyIK) { return "FullBodyIK"; }
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_LegFK) { return "LegFK"; }
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_LegIK) { return "LegIK"; }
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_SpineIK) { return "SpineIK"; }
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_SpineIKAndLegFK) { return "SpineIKAndLegFK"; }
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_Unknown) { return "Unknown"; }
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_UpperBodyIK) { return "UpperBodyIK"; }
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_UpperIKAndLegFK) { return "UpperIKAndLegFK"; }
+
+			return "";
+		}
+
+		public static bool UseDeviceExtrinsic(BodyPoseRole calibRole, WVR_BodyTrackingDeviceRole wvrRole, TrackedDeviceType wvrType)
+		{
+			if (wvrRole == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Head)
+				return true;
+
+			if (wvrRole == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftWrist || wvrRole == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightWrist)
+			{
+				if (calibRole == BodyPoseRole.Arm_Wrist ||
+					calibRole == BodyPoseRole.UpperBody_Wrist ||
+					calibRole == BodyPoseRole.FullBody_Wrist_Ankle ||
+					calibRole == BodyPoseRole.FullBody_Wrist_Foot)
+				{
+					if (wvrType == TrackedDeviceType.ViveSelfTracker ||
+						wvrType == TrackedDeviceType.ViveWristTracker)
+						return true;
+				}
+			}
+			if (wvrRole == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Hip)
+			{
+				if (calibRole == BodyPoseRole.UpperBody_Wrist || calibRole == BodyPoseRole.UpperBody_Handheld || calibRole == BodyPoseRole.UpperBody_Hand ||
+					
+					calibRole == BodyPoseRole.UpperBody_Handheld_Knee_Ankle || calibRole == BodyPoseRole.UpperBody_Hand_Knee_Ankle ||
+					
+					calibRole == BodyPoseRole.FullBody_Wrist_Ankle || calibRole == BodyPoseRole.FullBody_Wrist_Foot ||
+					calibRole == BodyPoseRole.FullBody_Handheld_Ankle || calibRole == BodyPoseRole.FullBody_Handheld_Foot ||
+					calibRole == BodyPoseRole.FullBody_Hand_Ankle || calibRole == BodyPoseRole.FullBody_Handheld_Foot)
+				{
+					if (wvrType == TrackedDeviceType.ViveSelfTracker)
+						return true;
+				}
+			}
+
+			return false;
+		}
+
+		public static TrackedDeviceRole Role(this WVR_BodyTrackingDeviceRole role)
+		{
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Hip) { return TrackedDeviceRole.ROLE_HIP; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Chest) { return TrackedDeviceRole.ROLE_CHEST; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Head) { return TrackedDeviceRole.ROLE_HEAD; }
+
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftElbow) { return TrackedDeviceRole.ROLE_LEFTELBOW; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftWrist) { return TrackedDeviceRole.ROLE_LEFTWRIST; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftHand) { return TrackedDeviceRole.ROLE_LEFTHAND; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftHandheld) { return TrackedDeviceRole.ROLE_LEFTHANDHELD; }
+
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightElbow) { return TrackedDeviceRole.ROLE_RIGHTELBOW; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightWrist) { return TrackedDeviceRole.ROLE_RIGHTWRIST; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightHand) { return TrackedDeviceRole.ROLE_RIGHTHAND; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightHandheld) { return TrackedDeviceRole.ROLE_RIGHTHANDHELD; }
+
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftKnee) { return TrackedDeviceRole.ROLE_LEFTKNEE; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftAnkle) { return TrackedDeviceRole.ROLE_LEFTANKLE; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftFoot) { return TrackedDeviceRole.ROLE_LEFTFOOT; }
+
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightKnee) { return TrackedDeviceRole.ROLE_RIGHTKNEE; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightAnkle) { return TrackedDeviceRole.ROLE_RIGHTANKLE; }
+			if (role == WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightFoot) { return TrackedDeviceRole.ROLE_RIGHTFOOT; }
+
 			return TrackedDeviceRole.ROLE_UNDEFINED;
 		}
-
-		public static void GetQuaternion(this XrQuaternionf xrQuat, out Quaternion quat)
+		public static WVR_BodyTrackingDeviceRole wvrRole(this TrackedDeviceRole role)
 		{
-			quat.x = xrQuat.x;
-			quat.y = xrQuat.y;
-			quat.z = -xrQuat.z;
-			quat.w = -xrQuat.w;
-			Validate(ref quat);
+			if (role == TrackedDeviceRole.ROLE_HIP) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Hip; }
+			if (role == TrackedDeviceRole.ROLE_CHEST) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Chest; }
+			if (role == TrackedDeviceRole.ROLE_HEAD) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Head; }
+
+			if (role == TrackedDeviceRole.ROLE_LEFTELBOW) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftElbow; }
+			if (role == TrackedDeviceRole.ROLE_LEFTWRIST) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftWrist; }
+			if (role == TrackedDeviceRole.ROLE_LEFTHAND) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftHand; }
+			if (role == TrackedDeviceRole.ROLE_LEFTHANDHELD) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftHandheld; }
+
+			if (role == TrackedDeviceRole.ROLE_RIGHTELBOW) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightElbow; }
+			if (role == TrackedDeviceRole.ROLE_RIGHTWRIST) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightWrist; }
+			if (role == TrackedDeviceRole.ROLE_RIGHTHAND) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightHand; }
+			if (role == TrackedDeviceRole.ROLE_RIGHTHANDHELD) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightHandheld; }
+
+			if (role == TrackedDeviceRole.ROLE_LEFTKNEE) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftKnee; }
+			if (role == TrackedDeviceRole.ROLE_LEFTANKLE) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftAnkle; }
+			if (role == TrackedDeviceRole.ROLE_LEFTFOOT) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_LeftFoot; }
+
+			if (role == TrackedDeviceRole.ROLE_RIGHTKNEE) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightKnee; }
+			if (role == TrackedDeviceRole.ROLE_RIGHTANKLE) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightAnkle; }
+			if (role == TrackedDeviceRole.ROLE_RIGHTFOOT) { return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_RightFoot; }
+
+			return WVR_BodyTrackingDeviceRole.WVR_BodyTrackingDeviceRole_Invalid;
 		}
-		public static void GetVector3(this XrVector3f xrVec3, out Vector3 vec3)
-		{
-			vec3.x = xrVec3.x;
-			vec3.y = xrVec3.y;
-			vec3.z = -xrVec3.z;
-		}
-		public static BodyTrackingResult UpdateTrackedDevicePose(TrackedDeviceRole role, InputActionReference action, ref TrackedDevicePose pose)
-		{
-			if (role == TrackedDeviceRole.ROLE_UNDEFINED) { return BodyTrackingResult.ERROR_INVALID_ARGUMENT; }
 
-			string func = "UpdateTrackedDevicePose() ";
-			if (action != null)
-			{
-				if (GetPoseIsTracked(action, out bool isTracked, out string error) && isTracked &&
-					GetPoseTrackingState(action, out InputTrackingState state, out error))
-				{
-					if (state.HasFlag(InputTrackingState.Rotation))
-					{
-						if (!GetPoseRotation(action, out pose.rotation, out error))
-						{
-							sb.Clear().Append(LOG_TAG).Append(func).Append("Invalid ").Append(role.Name()).Append(" rotation, error: ").Append(error); ERROR(sb);
-							return BodyTrackingResult.ERROR_INPUTPOSE_NOT_VALID;
-						}
-						pose.poseState |= PoseState.ROTATION;
-					}
-					if (state.HasFlag(InputTrackingState.Position))
-					{
-						if (!GetPosePosition(action, out pose.translation, out error))
-						{
-							sb.Clear().Append(LOG_TAG).Append(func).Append("Invalid ").Append(role.Name()).Append(" position, error: ").Append(error); ERROR(sb);
-							return BodyTrackingResult.ERROR_INPUTPOSE_NOT_VALID;
-						}
-						pose.poseState |= PoseState.TRANSLATION;
-					}
-				}
-			}
-			else
-			{
-				if (role == TrackedDeviceRole.ROLE_HEAD || role == TrackedDeviceRole.ROLE_LEFTHANDHELD || role == TrackedDeviceRole.ROLE_RIGHTHANDHELD)
-				{
-					InputDeviceControl.ControlDevice device = InputDeviceControl.ControlDevice.Head;
-					if (role == TrackedDeviceRole.ROLE_LEFTHANDHELD) { device = InputDeviceControl.ControlDevice.Left; }
-					if (role == TrackedDeviceRole.ROLE_RIGHTHANDHELD) { device = InputDeviceControl.ControlDevice.Right; }
-
-					if (!InputDeviceControl.IsTracked(device) ||
-						!InputDeviceControl.GetRotation(device, out Quaternion rotation) ||
-						!InputDeviceControl.GetPosition(device, out Vector3 position))
-					{
-						return BodyTrackingResult.ERROR_INPUTPOSE_NOT_VALID;
-					}
-
-					pose.rotation = rotation;
-					pose.translation = position;
-					pose.poseState |= PoseState.ROTATION | PoseState.TRANSLATION;
-				}
-				if (role == TrackedDeviceRole.ROLE_LEFTHAND || role == TrackedDeviceRole.ROLE_RIGHTHAND)
-				{
-					bool isLeft = (role == TrackedDeviceRole.ROLE_LEFTHAND);
-					if (XR_EXT_hand_tracking.Interop.GetJointLocations(isLeft, out XrHandJointLocationEXT[] handJointLocation))
-					{
-						int palm = (int)XrHandJointEXT.XR_HAND_JOINT_PALM_EXT;
-						if (((UInt64)handJointLocation[palm].locationFlags & (UInt64)XrSpaceLocationFlags.XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT) != 0)
-						{
-							handJointLocation[palm].pose.orientation.GetQuaternion(out pose.rotation);
-							pose.poseState |= PoseState.ROTATION;
-						}
-						if (((UInt64)handJointLocation[palm].locationFlags & (UInt64)XrSpaceLocationFlags.XR_SPACE_LOCATION_POSITION_TRACKED_BIT) != 0)
-						{
-							handJointLocation[(int)XrHandJointEXT.XR_HAND_JOINT_PALM_EXT].pose.position.GetVector3(out pose.translation);
-							pose.poseState |= PoseState.TRANSLATION;
-						}
-					}
-					// Hand pose can be NODATA.
-				}
-			}
-			return BodyTrackingResult.SUCCESS;
-		}
-		public static bool PoseStateAvailable(BodyTrackingMode mode, [In] TrackedDevicePose pose, bool canIgnorePose = false)
+		public static WVR_BodyTrackingCalibrationMode GetBodyTrackingMode(this BodyPoseRole role)
 		{
-			// Only Controller and Hand pose can be ignored.
-			if (pose.trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTHANDHELD ||
-				pose.trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTHANDHELD ||
-				pose.trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTHAND ||
-				pose.trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTHAND)
+			if (role == BodyPoseRole.Arm_Wrist ||
+				role == BodyPoseRole.Arm_Handheld ||
+				role == BodyPoseRole.Arm_Hand)
 			{
-				if (canIgnorePose)
-					return true;
+				return WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_ArmIK;
 			}
-			// 6DoF pose is allowed.
-			if (pose.poseState == (PoseState.ROTATION | PoseState.TRANSLATION))
-				return true;
-			// Tracker can be rotation-only in UPPERIKANDLEGFK mode.
-			if (mode == BodyTrackingMode.UPPERIKANDLEGFK)
+			if (role == BodyPoseRole.UpperBody_Wrist ||
+				role == BodyPoseRole.UpperBody_Handheld ||
+				role == BodyPoseRole.UpperBody_Hand)
 			{
-				if (pose.trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTKNEE ||
-					pose.trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTKNEE ||
-					pose.trackedDeviceRole == TrackedDeviceRole.ROLE_LEFTANKLE ||
-					pose.trackedDeviceRole == TrackedDeviceRole.ROLE_RIGHTANKLE)
-				{
-					if ((pose.poseState & PoseState.ROTATION) == PoseState.ROTATION)
-						return true;
-				}
+				return WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_UpperBodyIK;
+			}
+			if (role == BodyPoseRole.FullBody_Wrist_Ankle ||
+				role == BodyPoseRole.FullBody_Wrist_Foot ||
+				role == BodyPoseRole.FullBody_Handheld_Ankle ||
+				role == BodyPoseRole.FullBody_Handheld_Foot ||
+				role == BodyPoseRole.FullBody_Hand_Ankle ||
+				role == BodyPoseRole.FullBody_Hand_Foot)
+			{
+				return WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_FullBodyIK;
+			}
+			if (role == BodyPoseRole.UpperBody_Handheld_Knee_Ankle ||
+				role == BodyPoseRole.UpperBody_Hand_Knee_Ankle)
+			{
+				return WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_UpperIKAndLegFK;
 			}
 
-			return false;
+			return WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_Unknown;
 		}
+
+		public static BodyTrackingMode Mode(this WVR_BodyTrackingCalibrationMode mode)
+		{
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_ArmIK) { return BodyTrackingMode.ARMIK; }
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_UpperBodyIK) { return BodyTrackingMode.UPPERBODYIK; }
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_FullBodyIK) { return BodyTrackingMode.FULLBODYIK; }
+			if (mode == WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_UpperIKAndLegFK) { return BodyTrackingMode.UPPERIKANDLEGFK; }
+			// Other modes are not supported.
+
+			return BodyTrackingMode.UNKNOWNMODE;
+		}
+		public static WVR_BodyTrackingCalibrationMode wvrMode(this BodyTrackingMode mode)
+		{
+			if (mode == BodyTrackingMode.ARMIK) { return WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_ArmIK; }
+			if (mode == BodyTrackingMode.UPPERBODYIK) { return WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_UpperBodyIK; }
+			if (mode == BodyTrackingMode.FULLBODYIK) { return WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_FullBodyIK; }
+			if (mode == BodyTrackingMode.UPPERIKANDLEGFK) { return WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_UpperIKAndLegFK; }
+			// Other modes are not supported.
+
+			return WVR_BodyTrackingCalibrationMode.WVR_BodyTrackingCalibrationMode_Unknown;
+		}
+#endif
+
+#if WAVE_BODY_IK
+		public static string Name(this WVR_BodyJoint joint)
+		{
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Hip) { return "Hip"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Left_Thigh) { return "Left_Thigh"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Left_Leg) { return "Left_Leg"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Left_Ankle) { return "Left_Ankle"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Left_Foot) { return "Left_Foot"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Right_Thigh) { return "Right_Thigh"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Right_Leg) { return "Right_Leg"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Right_Ankle) { return "Right_Ankle"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Right_Foot) { return "Right_Foot"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Waist) { return "Waist"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Spine_Lower) { return "Spine_Lower"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Spine_Middle) { return "Spine_Middle"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Spine_High) { return "Spine_High"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Chest) { return "Chest"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Neck) { return "Neck"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Head) { return "Head"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Left_Clavicle) { return "Left_Clavicle"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Left_Scapula) { return "Left_Scapula"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Left_Upper_Arm) { return "Left_Upper_Arm"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Left_Forearm) { return "Left_Forearm"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Left_Hand) { return "Left_Hand"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Right_Clavicle) { return "Right_Clavicle"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Right_Scapula) { return "Right_Scapula"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Right_Upper_Arm) { return "Right_Upper_Arm"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Right_Forearm) { return "Right_Forearm"; }
+			if (joint == WVR_BodyJoint.WVR_BodyJoint_Right_Hand) { return "Right_Hand"; }
+
+			return "Unknown";
+		}
+#endif
 	}
 
-	public static class InputDeviceControl
+	public static class Numeric
 	{
-		public enum ControlDevice
+		public static bool IsBoolean(string value)
 		{
-			Head = 1,
-			Right = 2,
-			Left = 3,
-		}
-
-		/// <summary> Wave Head Mounted Device Characteristics </summary>
-		public const InputDeviceCharacteristics kHMDCharacteristics = (
-			InputDeviceCharacteristics.HeadMounted |
-			InputDeviceCharacteristics.TrackedDevice
-		);
-		public const uint kHMDCharacteristicsValue = (uint)kHMDCharacteristics;
-		/// <summary> Wave Left Controller Characteristics </summary>
-		public const InputDeviceCharacteristics kControllerLeftCharacteristics = (
-			InputDeviceCharacteristics.Left |
-			InputDeviceCharacteristics.TrackedDevice |
-			InputDeviceCharacteristics.Controller |
-			InputDeviceCharacteristics.HeldInHand
-		);
-		public const uint kControllerLeftCharacteristicsValue = (uint)kControllerLeftCharacteristics;
-		/// <summary> Wave Right Controller Characteristics </summary>
-		public const InputDeviceCharacteristics kControllerRightCharacteristics = (
-			InputDeviceCharacteristics.Right |
-			InputDeviceCharacteristics.TrackedDevice |
-			InputDeviceCharacteristics.Controller |
-			InputDeviceCharacteristics.HeldInHand
-		);
-		public const uint kControllerRightCharacteristicsValue = (uint)kControllerRightCharacteristics;
-		private static uint GetIndex(uint value)
-		{
-			if (value == kHMDCharacteristicsValue) { return 1; }
-			if (value == kControllerLeftCharacteristicsValue) { return 2; }
-			if (value == kControllerRightCharacteristicsValue) { return 3; }
-			return 0;
-		}
-
-		public static InputDeviceCharacteristics characteristic(this ControlDevice cd)
-		{
-			return (
-				cd == ControlDevice.Head ? kHMDCharacteristics : (
-					cd == ControlDevice.Right ? kControllerRightCharacteristics : kControllerLeftCharacteristics
-				)
-			);
-		}
-
-		internal static List<InputDevice> m_InputDevices = new List<InputDevice>();
-		internal static int inputDeviceFrame = -1;
-		private static void UpdateInputDevices()
-		{
-			if (inputDeviceFrame != Time.frameCount)
+			try
 			{
-				inputDeviceFrame = Time.frameCount;
-				InputDevices.GetDevices(m_InputDevices);
-			}
-		}
-
-		/// Tracking state
-		private static bool[] s_IsConnected = new bool[4] { false, false, false, false };
-		private static int[] isConnectedFrame = new int[4] { -1, -1, -1, -1 };
-		private static bool UpdateConnectedDevice(InputDeviceCharacteristics device, out uint index)
-		{
-			index = GetIndex((uint)device);
-			if (index == 0) { return false; }
-
-			if (isConnectedFrame[index] != Time.frameCount)
-			{
-				isConnectedFrame[index] = Time.frameCount;
+				bool i = Convert.ToBoolean(value);
 				return true;
 			}
-			return false;
-		}
-		public static bool IsConnected(InputDeviceCharacteristics device)
-		{
-			if (!UpdateConnectedDevice(device, out uint index)) { return s_IsConnected[index]; }
-
-			UpdateInputDevices();
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
+			catch (Exception)
 			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						s_IsConnected[index] = true;
-						return s_IsConnected[index];
-					}
-				}
+				return false;
 			}
-
-			s_IsConnected[index] = false;
-			return s_IsConnected[index];
 		}
-		public static bool IsConnected(ControlDevice device) { return IsConnected(device.characteristic()); }
 
-		private static bool[] s_IsTracked = new bool[4] { false, false, false, false };
-		private static int[] isTrackedFrame = new int[4] { -1, -1, -1, -1 };
-		private static bool UpdateTrackedDevice(InputDeviceCharacteristics device, out uint index)
+		public static bool IsFloat(string value)
 		{
-			index = GetIndex((uint)device);
-			if (index == 0) { return false; }
-
-			if (isTrackedFrame[index] != Time.frameCount)
+			try
 			{
-				isTrackedFrame[index] = Time.frameCount;
+				float i = Convert.ToSingle(value);
 				return true;
 			}
-			return false;
-		}
-		public static bool IsTracked(InputDeviceCharacteristics device)
-		{
-			if (!UpdateTrackedDevice(device, out uint index)) { return s_IsTracked[index]; }
-			if (!IsConnected(device)) { return false; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
+			catch (Exception)
 			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						if (m_InputDevices[i].TryGetFeatureValue(CommonUsages.isTracked, out s_IsTracked[index]))
-							return s_IsTracked[index];
-					}
-				}
+				return false;
 			}
-
-			return false;
 		}
-		public static bool IsTracked(ControlDevice device) { return IsTracked(device.characteristic()); }
 
-		/// Button
-		public static bool KeyDown(InputDeviceCharacteristics device, InputFeatureUsage<bool> button)
+		public static bool IsNumeric(string value)
 		{
-			if (!IsConnected(device)) { return false; }
-
-			bool isDown = false;
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
+			try
 			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						if (m_InputDevices[i].TryGetFeatureValue(button, out bool value))
-							isDown = value;
-					}
-				}
-			}
-
-			return isDown;
-		}
-		public static bool KeyDown(ControlDevice device, InputFeatureUsage<bool> button) { return KeyDown(device.characteristic(), button); }
-		public static bool KeyAxis1D(InputDeviceCharacteristics device, InputFeatureUsage<float> button, out float axis1d)
-		{
-			axis1d = 0;
-			if (!IsConnected(device)) { return false; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
-			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						if (m_InputDevices[i].TryGetFeatureValue(button, out float value))
-						{
-							axis1d = value;
-							return true;
-						}
-					}
-				}
-			}
-
-			return false;
-		}
-		public static bool KeyAxis1D(ControlDevice device, InputFeatureUsage<float> button, out float axis1d) { return KeyAxis1D(device.characteristic(), button, out axis1d); }
-		public static bool KeyAxis2D(InputDeviceCharacteristics device, InputFeatureUsage<Vector2> button, out Vector2 axis2d)
-		{
-			axis2d = Vector2.zero;
-			if (!IsConnected(device)) { return false; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
-			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						if (m_InputDevices[i].TryGetFeatureValue(button, out Vector2 value))
-						{
-							axis2d = value;
-							return true;
-						}
-					}
-				}
-			}
-
-			return false;
-		}
-		public static bool KeyAxis2D(ControlDevice device, InputFeatureUsage<Vector2> button, out Vector2 axis2d) { return KeyAxis2D(device.characteristic(), button, out axis2d); }
-
-		/// Haptic
-		static readonly HapticCapabilities emptyHapticCapabilities = new HapticCapabilities();
-		private static HapticCapabilities[] s_HapticCaps = new HapticCapabilities[4] { emptyHapticCapabilities, emptyHapticCapabilities, emptyHapticCapabilities, emptyHapticCapabilities };
-		private static int[] hapticCapFrame = new int[4] { -1, -1, -1, -1 };
-		private static bool UpdateHapticCapabilities(InputDeviceCharacteristics device, out uint index)
-		{
-			index = GetIndex((uint)device);
-			if (index == 0) { return false; }
-
-			if (hapticCapFrame[index] != Time.frameCount)
-			{
-				hapticCapFrame[index] = Time.frameCount;
+				int i = Convert.ToInt32(value);
 				return true;
 			}
-			return false;
-		}
-		public static bool TryGetHapticCapabilities(InputDeviceCharacteristics device, out HapticCapabilities hapticCaps)
-		{
-			hapticCaps = emptyHapticCapabilities;
-			if (!IsConnected(device)) { return false; }
-			if (!UpdateHapticCapabilities(device, out uint index)) { hapticCaps = s_HapticCaps[index]; return true; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
+			catch (Exception)
 			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						if (m_InputDevices[i].TryGetHapticCapabilities(out s_HapticCaps[index]))
-						{
-							hapticCaps = s_HapticCaps[index];
-							return true;
-						}
-					}
-				}
+				return false;
 			}
-
-			return false;
 		}
-		public static bool TryGetHapticCapabilities(ControlDevice device, out HapticCapabilities hapticCaps) { return TryGetHapticCapabilities(device.characteristic(), out hapticCaps); }
-		public static bool SendHapticImpulse(InputDeviceCharacteristics device, float amplitude, float duration)
+
+		public static bool IsValid(this Quaternion quat)
 		{
-			if (!IsConnected(device)) { return false; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
-			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						if (m_InputDevices[i].TryGetHapticCapabilities(out HapticCapabilities value))
-						{
-							if (value.supportsImpulse)
-							{
-								amplitude = Mathf.Clamp(amplitude, 0, 1);
-								return m_InputDevices[i].SendHapticImpulse(0, amplitude, duration);
-							}
-						}
-					}
-				}
-			}
-
-			return false;
+			if (quat.x > 1 || quat.x < -1 || float.IsNaN(quat.x)) { return false; }
+			if (quat.y > 1 || quat.y < -1 || float.IsNaN(quat.y)) { return false; }
+			if (quat.z > 1 || quat.z < -1 || float.IsNaN(quat.z)) { return false; }
+			if (quat.w > 1 || quat.w < -1 || float.IsNaN(quat.w)) { return false; }
+			return true;
 		}
-		public static bool SendHapticImpulse(ControlDevice device, float amplitude, float duration) { return SendHapticImpulse(device.characteristic(), amplitude, duration); }
-
-		/// Pose
-		private static Vector3[] s_Positions = new Vector3[4] { Vector3.zero, Vector3.zero, Vector3.zero, Vector3.zero };
-		private static int[] positionFrame = new int[4] { -1, -1, -1, -1 };
-		private static bool UpdatePosition(InputDeviceCharacteristics device, out uint index)
-		{
-			index = GetIndex((uint)device);
-			if (index == 0) { return false; }
-
-			if (positionFrame[index] != Time.frameCount)
-			{
-				positionFrame[index] = Time.frameCount;
-				return true;
-			}
-			return false;
-		}
-		public static bool GetPosition(InputDeviceCharacteristics device, out Vector3 position)
-		{
-			position = Vector3.zero;
-			if (!IsTracked(device)) { return false; }
-			if (!UpdatePosition(device, out uint index)) { position = s_Positions[index]; return true; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
-			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						if (m_InputDevices[i].TryGetFeatureValue(CommonUsages.devicePosition, out s_Positions[index]))
-						{
-							position = s_Positions[index];
-							return true;
-						}
-					}
-				}
-			}
-
-			return false;
-		}
-		public static bool GetPosition(ControlDevice device, out Vector3 position) { return GetPosition(device.characteristic(), out position); }
-
-		private static Quaternion[] s_Rotations = new Quaternion[4] { Quaternion.identity, Quaternion.identity, Quaternion.identity, Quaternion.identity };
-		private static int[] rotationFrame = new int[4] { -1, -1, -1, -1 };
-		private static bool UpdateRotation(InputDeviceCharacteristics device, out uint index)
-		{
-			index = GetIndex((uint)device);
-			if (index == 0) { return false; }
-
-			if (rotationFrame[index] != Time.frameCount)
-			{
-				rotationFrame[index] = Time.frameCount;
-				return true;
-			}
-			return false;
-		}
-		public static bool GetRotation(InputDeviceCharacteristics device, out Quaternion rotation)
-		{
-			rotation = Quaternion.identity;
-			if (!IsTracked(device)) { return false; }
-			if (!UpdateRotation(device, out uint index)) { rotation = s_Rotations[index]; return true; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
-			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						if (m_InputDevices[i].TryGetFeatureValue(CommonUsages.deviceRotation, out s_Rotations[index]))
-						{
-							rotation = s_Rotations[index];
-							return true;
-						}
-					}
-				}
-			}
-
-			return false;
-		}
-		public static bool GetRotation(ControlDevice device, out Quaternion rotation) { return GetRotation(device.characteristic(), out rotation); }
-
-		private static Vector3[] s_Velocity = new Vector3[4] { Vector3.zero, Vector3.zero, Vector3.zero, Vector3.zero };
-		private static int[] velocityFrame = new int[4] { -1, -1, -1, -1 };
-		private static bool UpdateVelocity(InputDeviceCharacteristics device, out uint index)
-		{
-			index = GetIndex((uint)device);
-			if (index == 0) { return false; }
-
-			if (velocityFrame[index] != Time.frameCount)
-			{
-				velocityFrame[index] = Time.frameCount;
-				return true;
-			}
-			return false;
-		}
-		public static bool GetVelocity(InputDeviceCharacteristics device, out Vector3 velocity)
-		{
-			velocity = Vector3.zero;
-			if (!IsTracked(device)) { return false; }
-			if (!UpdateVelocity(device, out uint index)) { velocity = s_Velocity[index]; return true; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
-			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						if (m_InputDevices[i].TryGetFeatureValue(CommonUsages.deviceVelocity, out s_Velocity[index]))
-						{
-							velocity = s_Velocity[index];
-							return true;
-						}
-					}
-				}
-			}
-
-			return false;
-		}
-		public static bool GetVelocity(ControlDevice device, out Vector3 velocity) { return GetVelocity(device.characteristic(), out velocity); }
-
-		private static Vector3[] s_AngularVelocity = new Vector3[4] { Vector3.zero, Vector3.zero, Vector3.zero, Vector3.zero };
-		private static int[] angularVelocityFrame = new int[4] { -1, -1, -1, -1 };
-		private static bool UpdateAngularVelocity(InputDeviceCharacteristics device, out uint index)
-		{
-			index = GetIndex((uint)device);
-			if (index == 0) { return false; }
-
-			if (angularVelocityFrame[index] != Time.frameCount)
-			{
-				angularVelocityFrame[index] = Time.frameCount;
-				return true;
-			}
-			return false;
-		}
-		public static bool GetAngularVelocity(InputDeviceCharacteristics device, out Vector3 angularVelocity)
-		{
-			angularVelocity = Vector3.zero;
-			if (!IsTracked(device)) { return false; }
-			if (!UpdateAngularVelocity(device, out uint index)) { angularVelocity = s_AngularVelocity[index]; return true; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
-			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						if (m_InputDevices[i].TryGetFeatureValue(CommonUsages.deviceAngularVelocity, out s_AngularVelocity[index]))
-						{
-							angularVelocity = s_AngularVelocity[index];
-							return true;
-						}
-					}
-				}
-			}
-
-			return false;
-		}
-		public static bool GetAngularVelocity(ControlDevice device, out Vector3 angularVelocity) { return GetAngularVelocity(device.characteristic(), out angularVelocity); }
-
-		private static Vector3[] s_Acceleration = new Vector3[4] { Vector3.zero, Vector3.zero, Vector3.zero, Vector3.zero };
-		private static int[] accelerationFrame = new int[4] { -1, -1, -1, -1 };
-		private static bool UpdateAcceleration(InputDeviceCharacteristics device, out uint index)
-		{
-			index = GetIndex((uint)device);
-			if (index == 0) { return false; }
-
-			if (accelerationFrame[index] != Time.frameCount)
-			{
-				accelerationFrame[index] = Time.frameCount;
-				return true;
-			}
-			return false;
-		}
-		public static bool GetAcceleration(InputDeviceCharacteristics device, out Vector3 acceleration)
-		{
-			acceleration = Vector3.zero;
-			if (!IsTracked(device)) { return false; }
-			if (!UpdateAcceleration(device, out uint index)) { acceleration = s_Acceleration[index]; return true; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
-			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						if (m_InputDevices[i].TryGetFeatureValue(CommonUsages.deviceAcceleration, out s_Acceleration[index]))
-						{
-							acceleration = s_Acceleration[index];
-							return true;
-						}
-					}
-				}
-			}
-
-			return false;
-		}
-		public static bool GetAcceleration(ControlDevice device, out Vector3 acceleration) { return GetAcceleration(device.characteristic(), out acceleration); }
-
-		/// Battery
-		private static float[] s_BatteryLevels = new float[4] { 0, 0, 0, 0 };
-		private static int[] batteryFrame = new int[4] { -1, -1, -1, -1 };
-		private static bool UpdateBatteryLevel(InputDeviceCharacteristics device, out uint index)
-		{
-			index = GetIndex((uint)device);
-			if (index == 0) { return false; }
-
-			if (batteryFrame[index] != Time.frameCount)
-			{
-				batteryFrame[index] = Time.frameCount;
-				return true;
-			}
-			return false;
-		}
-		public static float GetBatteryLevel(InputDeviceCharacteristics device)
-		{
-			if (!UpdateBatteryLevel(device, out uint index)) { return s_BatteryLevels[index]; }
-			if (!IsConnected(device)) { return 0; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
-			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(device))
-					{
-						if (m_InputDevices[i].TryGetFeatureValue(CommonUsages.batteryLevel, out s_BatteryLevels[index]))
-							return s_BatteryLevels[index];
-					}
-				}
-			}
-
-			return 0;
-		}
-		public static float GetBatteryLevel(ControlDevice device) { return GetBatteryLevel(device.characteristic()); }
-
-		private static bool m_UserPresence = false;
-		private static int userPresenceFrame = -1;
-		private static bool UpdateUserPresence()
-		{
-			if (userPresenceFrame != Time.frameCount)
-			{
-				userPresenceFrame = Time.frameCount;
-				return true;
-			}
-			return false;
-		}
-		public static bool IsUserPresence()
-		{
-			if (!UpdateUserPresence()) { return m_UserPresence; }
-			if (!IsConnected(kHMDCharacteristics)) { return false; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
-			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					// The device is connected.
-					if (m_InputDevices[i].characteristics.HasFlag(kHMDCharacteristics))
-					{
-						if (m_InputDevices[i].TryGetFeatureValue(CommonUsages.userPresence, out m_UserPresence))
-							return m_UserPresence;
-					}
-				}
-			}
-
-			return false;
-		}
-
-		private static string[] s_Names = new string[4] { "", "", "", "" };
-		private static int[] nameFrame = new int[4] { -1, -1, -1, -1 };
-		private static bool UpdateName(InputDeviceCharacteristics device, out uint index)
-		{
-			index = GetIndex((uint)device);
-			if (index == 0) { return false; }
-
-			if (nameFrame[index] != Time.frameCount)
-			{
-				nameFrame[index] = Time.frameCount;
-				return true;
-			}
-			return false;
-		}
-		public static bool Name(ControlDevice device, out string name)
-		{
-			name = "";
-			if (!IsConnected(kHMDCharacteristics)) { return false; }
-			if (!UpdateName(device.characteristic(), out uint index)) { name = s_Names[index]; return true; }
-
-			if (m_InputDevices != null && m_InputDevices.Count > 0)
-			{
-				for (int i = 0; i < m_InputDevices.Count; i++)
-				{
-					if (m_InputDevices[i].characteristics.HasFlag(device.characteristic()))
-					{
-						s_Names[index] = m_InputDevices[i].name;
-						name = s_Names[index];
-						return true;
-					}
-				}
-			}
-
-			return false;
-		}
-	}
+	} // class Numeric
 }

@@ -7,7 +7,7 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 	{
 		[SerializeField]
 		private Handedness m_Handedness;
-		private bool isLeft => m_Handedness == Handedness.Left;
+		public bool isLeft => m_Handedness == Handedness.Left;
 		private bool keepUpdate = false;
 
 		protected override void OnEnable()
@@ -66,8 +66,8 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 				{
 					if (handData.GetJointPosition((JointType)i, ref position) && handData.GetJointRotation((JointType)i, ref rotation))
 					{
-						m_Position[i] = position;
-						m_Rotation[i] = rotation;
+						m_Position[i] = transform.position + transform.rotation * position;
+						m_Rotation[i] = transform.rotation * rotation;
 						m_LocalPosition[i] = position;
 						m_LocalRotation[i] = rotation;
 					}
