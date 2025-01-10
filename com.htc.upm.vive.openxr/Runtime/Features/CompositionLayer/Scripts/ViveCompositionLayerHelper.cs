@@ -215,6 +215,35 @@ namespace VIVE.OpenXR.CompositionLayer
 		public float aspectRatio;
 	}
 	[StructLayout(LayoutKind.Sequential)]
+	public struct XrCompositionLayerEquirectKHR
+	{
+		public XrStructureType type;
+		public IntPtr next;
+		public XrCompositionLayerFlags layerFlags;
+		public XrSpace space;
+		public XrEyeVisibility eyeVisibility;
+		public XrSwapchainSubImage subImage;
+		public XrPosef pose;
+		public float radius;
+		public XrVector2f scale;
+		public XrVector2f bias;
+	}
+	[StructLayout(LayoutKind.Sequential)]
+	public struct XrCompositionLayerEquirect2KHR
+	{
+		public XrStructureType type;
+		public IntPtr next;
+		public XrCompositionLayerFlags layerFlags;
+		public XrSpace space;
+		public XrEyeVisibility eyeVisibility;
+		public XrSwapchainSubImage subImage;
+		public XrPosef pose;
+		public float radius;
+		public float centralHorizontalAngle;
+		public float upperVerticalAngle;
+		public float lowerVerticalAngle;
+	}
+	[StructLayout(LayoutKind.Sequential)]
 	public struct XrSwapchainSubImage
 	{
 		public XrSwapchain swapchain;

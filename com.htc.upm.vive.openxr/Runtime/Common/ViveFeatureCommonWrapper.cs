@@ -10,9 +10,14 @@ namespace VIVE.OpenXR.Feature
     /// <summary>
     /// To use this wrapper, you need to call CommonWrapper.Instance.OnInstanceCreate() in your feature's OnInstanceCreate(), 
     /// and call CommonWrapper.Instance.OnInstanceDestroy() in your feature's OnInstanceDestroy().
+    /// 
+    /// Note:
+    /// In Standardalone's OpenXR MockRuntime, the CreateSwapchain and EnumerateSwapchainImages will work and return success,
+    /// but the images's native pointer will be null.
     /// </summary>
-    public class CommonWrapper : ViveFeatureWrapperBase<CommonWrapper>, IViveFeatureWrapper
+    internal class CommonWrapper : ViveFeatureWrapperBase<CommonWrapper>, IViveFeatureWrapper
     {
+        const string TAG = "CommonWrapper";
         OpenXRHelper.xrGetSystemPropertiesDelegate XrGetSystemProperties;
         OpenXRHelper.xrCreateSwapchainDelegate XrCreateSwapchain;
         OpenXRHelper.xrDestroySwapchainDelegate XrDestroySwapchain;
@@ -32,11 +37,13 @@ namespace VIVE.OpenXR.Feature
         public bool OnInstanceCreate(XrInstance xrInstance, IntPtr xrGetInstanceProcAddrPtr)
         {
             if (IsInited) return true;
+            if (TryInited) return false;
+                TryInited = true;
 
             if (xrInstance == 0)
                 throw new Exception("CommonWrapper: xrInstance is null");
 
-            Debug.Log("CommonWrapper: OnInstanceCreate()");
+            Log.D(TAG, "OnInstanceCreate()");
             SetGetInstanceProcAddrPtr(xrGetInstanceProcAddrPtr);
 
             bool ret = true;
@@ -64,9 +71,11 @@ namespace VIVE.OpenXR.Feature
         /// <returns></returns>
         public void OnInstanceDestroy()
         {
+            // Do not destroy twice
+            if (IsInited == false) return;
             IsInited = false;
             XrGetSystemProperties = null;
-            Debug.Log("CommonWrapper: OnInstanceDestroy()");
+            Log.D(TAG, "OnInstanceDestroy()");
         }
 
         public XrResult GetInstanceProcAddr(XrInstance instance, string name, out IntPtr function)
@@ -164,12 +173,12 @@ namespace VIVE.OpenXR.Feature
 
             if (formatCapacityInput == 0)
             {
-                Debug.Log("CommonWrapper: EnumerateSwapchainFormats(ci=" + formatCapacityInput + ")");
+                Log.D(TAG, "EnumerateSwapchainFormats(ci=" + formatCapacityInput + ")");
                 return XrEnumerateSwapchainFormats(session, 0, ref formatCountOutput, IntPtr.Zero);
             }
             else
             {
-                Debug.Log("CommonWrapper: EnumerateSwapchainFormats(ci=" + formatCapacityInput + ", formats=long[" + formats.Length + "])");
+                Log.D(TAG, "EnumerateSwapchainFormats(ci=" + formatCapacityInput + ", formats=long[" + formats.Length + "])");
                 IntPtr formatsPtr = MemoryTools.MakeRawMemory(formats);
                 var ret = XrEnumerateSwapchainFormats(session, formatCapacityInput, ref formatCountOutput, formatsPtr);
                 if (ret == XrResult.XR_SUCCESS)
@@ -201,7 +210,7 @@ namespace VIVE.OpenXR.Feature
                 return XrResult.XR_ERROR_HANDLE_INVALID;
             }
 
-            Profiler.BeginSample("ASW: xrAcqScImg");
+            Profiler.BeginSample("ASW:xrAcqScImg");
             var res = XrAcquireSwapchainImage(swapchain, ref acquireInfo, out index);
             Profiler.EndSample();
             return res;
@@ -217,7 +226,7 @@ namespace VIVE.OpenXR.Feature
                 return XrResult.XR_ERROR_HANDLE_INVALID;
             }
 
-            Profiler.BeginSample("ASW: xrWaitScImg");
+            Profiler.BeginSample("ASW:xrWaitScImg");
             var res = XrWaitSwapchainImage(swapchain, ref waitInfo);
             Profiler.EndSample();
             return res;
@@ -234,7 +243,7 @@ namespace VIVE.OpenXR.Feature
             }
 
             // Add Profiler
-            Profiler.BeginSample("ASW: xrRelScImg");
+            Profiler.BeginSample("ASW:xrRelScImg");
             var res = XrReleaseSwapchainImage(swapchain, ref releaseInfo);
             Profiler.EndSample();
             return res;

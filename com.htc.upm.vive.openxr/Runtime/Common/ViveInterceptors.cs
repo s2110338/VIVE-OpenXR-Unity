@@ -5,9 +5,25 @@ using UnityEngine;
 using AOT;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 
 namespace VIVE.OpenXR
 {
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
+    internal class HookHandlerAttribute : Attribute
+    {
+        public string xrFuncName { get; }
+
+        /// <summary>
+        /// Set this function to handle the hook process in <see cref="ViveInterceptors.XrGetInstanceProcAddrInterceptor" />
+        /// </summary>
+        /// <param name="xrFuncName">The hooked openxr function name</param>
+        public HookHandlerAttribute(string xrFuncName)
+        {
+            this.xrFuncName = xrFuncName;
+        }
+    }
+
     /// <summary>
     /// This class is made for all features that need to intercept OpenXR API calls.
     /// Some APIs will be called by Unity internally, and we need to intercept them in c# to get some information.
@@ -22,7 +38,16 @@ namespace VIVE.OpenXR
     ///         return ViveInterceptors.Instance.HookGetInstanceProcAddr(func);
     ///     }
     /// </summary>
-	partial class ViveInterceptors
+
+    //  For extending the ViveInterceptors class, create a new partial class and implement the required functions.
+    //  For example:
+    //  public partial class ViveInterceptors
+    //  {
+    //      [HookHandler("xrYourFunction")]
+    //      private static XrResult OnHookXrYourFunction(XrInstance instance, string name, out IntPtr function)
+    //      { ... }
+    //  }
+    partial class ViveInterceptors
 	{
 		public const string TAG = "VIVE.OpenXR.ViveInterceptors";
 		static StringBuilder m_sb = null;
@@ -32,8 +57,6 @@ namespace VIVE.OpenXR
 				return m_sb;
 			}
 		}
-		static void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", TAG, msg); }
-		static void ERROR(StringBuilder msg) { Debug.LogErrorFormat("{0} {1}", TAG, msg); }
 
         public static ViveInterceptors instance = null;
         public static ViveInterceptors Instance
@@ -48,15 +71,32 @@ namespace VIVE.OpenXR
 
         public ViveInterceptors()
         {
-            Debug.Log("ViveInterceptors");
+            Log.D("ViveInterceptors");
+            RegisterFunctions();
         }
 
-        public delegate XrResult DelegateXrGetInstanceProcAddr(XrInstance instance, string name, out IntPtr function);
-        private static readonly DelegateXrGetInstanceProcAddr hookXrGetInstanceProcAddrHandle = new DelegateXrGetInstanceProcAddr(XrGetInstanceProcAddrInterceptor);
-        private static readonly IntPtr hookGetInstanceProcAddrHandlePtr = Marshal.GetFunctionPointerForDelegate(hookXrGetInstanceProcAddrHandle);
-        static DelegateXrGetInstanceProcAddr XrGetInstanceProcAddrOriginal = null;
+        delegate XrResult HookHandler(XrInstance instance, string name, out IntPtr function);
+        static readonly Dictionary<string, HookHandler> interceptors = new Dictionary<string, HookHandler>();
 
-        [MonoPInvokeCallback(typeof(DelegateXrGetInstanceProcAddr))]
+        private static void RegisterFunctions()
+        {
+            var methods = typeof(ViveInterceptors).GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            foreach (var method in methods)
+            {
+                var attribute = method.GetCustomAttributes(typeof(HookHandlerAttribute), false).FirstOrDefault() as HookHandlerAttribute;
+                if (attribute != null)
+                {
+                    Log.I(TAG, $"Registering hook handler {attribute.xrFuncName}");
+                    interceptors.Add(attribute.xrFuncName, (HookHandler)method.CreateDelegate(typeof(HookHandler)));
+                }
+            }
+        }
+
+        private static readonly OpenXRHelper.xrGetInstanceProcAddrDelegate hookXrGetInstanceProcAddrHandle = new OpenXRHelper.xrGetInstanceProcAddrDelegate(XrGetInstanceProcAddrInterceptor);
+        private static readonly IntPtr hookGetInstanceProcAddrHandlePtr = Marshal.GetFunctionPointerForDelegate(hookXrGetInstanceProcAddrHandle);
+        static OpenXRHelper.xrGetInstanceProcAddrDelegate XrGetInstanceProcAddrOriginal = null;
+
+        [MonoPInvokeCallback(typeof(OpenXRHelper.xrGetInstanceProcAddrDelegate))]
         private static XrResult XrGetInstanceProcAddrInterceptor(XrInstance instance, string name, out IntPtr function)
         {
             // Used to check if the original function is already hooked.
@@ -66,64 +106,16 @@ namespace VIVE.OpenXR
                 return XrResult.XR_SUCCESS;
             }
 
-            // Custom interceptors
-            if (name == "xrWaitFrame" && requiredFunctions.Contains(name))
+            // Check if the function is intercepted by other features
+            if (interceptors.ContainsKey(name))
             {
-                Debug.Log($"{TAG}: XrGetInstanceProcAddrInterceptor() {name} is intercepted.");
-                var ret = XrGetInstanceProcAddrOriginal(instance, name, out function);
-                if (ret == XrResult.XR_SUCCESS)
-                {
-                    XrWaitFrameOriginal = Marshal.GetDelegateForFunctionPointer<DelegateXrWaitFrame>(function);
-                    function = xrWaitFrameInterceptorPtr;
-                }
-                return ret;
-            }
+                // If no request for this function, call the original function directly.
+                if (!requiredFunctions.Contains(name))
+                    return XrGetInstanceProcAddrOriginal(instance, name, out function);
 
-            if (name == "xrEndFrame" && requiredFunctions.Contains(name))
-            {
-                Debug.Log($"{TAG}: XrGetInstanceProcAddrInterceptor() {name} is intercepted.");
-                var ret = XrGetInstanceProcAddrOriginal(instance, name, out function);
+                var ret = interceptors[name](instance, name, out function);
                 if (ret == XrResult.XR_SUCCESS)
-                {
-                    XrEndFrameOriginal = Marshal.GetDelegateForFunctionPointer<DelegateXrEndFrame>(function);
-                    function = xrEndFrameInterceptorPtr;
-                }
-                return ret;
-            }
-
-#if PERFORMANCE_TEST
-            if (name == "xrLocateSpace" && requiredFunctions.Contains(name))
-            {
-                Debug.Log($"{TAG}: XrGetInstanceProcAddrInterceptor() {name} is intercepted.");
-                var ret = XrGetInstanceProcAddrOriginal(instance, name, out function);
-                if (ret == XrResult.XR_SUCCESS)
-                {
-                    XrLocateSpaceOriginal = Marshal.GetDelegateForFunctionPointer<DelegateXrLocateSpace>(function);
-                    function = xrLocateSpaceInterceptorPtr;
-                }
-                return ret;
-            }
-#endif
-            if (name == "xrPollEvent" && requiredFunctions.Contains(name))
-            {
-                Debug.Log($"{TAG}: XrGetInstanceProcAddrInterceptor() {name} is intercepted.");
-                var ret = XrGetInstanceProcAddrOriginal(instance, name, out function);
-                if (ret == XrResult.XR_SUCCESS)
-                {
-                    xrPollEventOrigin = Marshal.GetDelegateForFunctionPointer < xrPollEventDelegate > (function);
-                    function = xrPollEventPtr;
-                }
-                return ret;
-            }
-            if (name == "xrBeginSession" && requiredFunctions.Contains(name))
-            {
-                Debug.Log($"{TAG}: XrGetInstanceProcAddrInterceptor() {name} is intercepted.");
-                var ret = XrGetInstanceProcAddrOriginal(instance, name, out function);
-                if (ret == XrResult.XR_SUCCESS)
-                {
-                    xrBeginSessionOrigin = Marshal.GetDelegateForFunctionPointer<xrBeginSessionDelegate>(function);
-                    function = xrBeginSessionPtr;
-                }
+                    Log.I(TAG, name + " is intercepted");
                 return ret;
             }
 
@@ -132,23 +124,23 @@ namespace VIVE.OpenXR
 
         public IntPtr HookGetInstanceProcAddr(IntPtr func)
         {
-            Debug.Log($"{TAG}: HookGetInstanceProcAddr");
+            Log.D(TAG, "HookGetInstanceProcAddr");
             if (XrGetInstanceProcAddrOriginal == null)
             {
-                Debug.Log($"{TAG}: registering our own xrGetInstanceProcAddr");
-                XrGetInstanceProcAddrOriginal = Marshal.GetDelegateForFunctionPointer<DelegateXrGetInstanceProcAddr>(func);
+                Log.D(TAG, "registering our own xrGetInstanceProcAddr");
+                XrGetInstanceProcAddrOriginal = Marshal.GetDelegateForFunctionPointer<OpenXRHelper.xrGetInstanceProcAddrDelegate>(func);
 
 #if UNITY_EDITOR
                 if (Application.isEditor) {
                     // This is a trick to check if the original function is already hooked by this class.  Sometimes, the static XrGetInstanceProcAddrOriginal didn't work as expected.
-                    Debug.Log($"{TAG}: Check if duplicate hooked by this script with instance=0 and \"ViveInterceptorHooked\" name.  If following a loader error, ignore it.");
+                    Log.D(TAG, "Check if duplicate hooked by this script with instance=0 and \"ViveInterceptorHooked\" name.  If following a loader error, ignore it.");
                     // E OpenXR-Loader: Error [SPEC | xrGetInstanceProcAddr | VUID-xrGetInstanceProcAddr-instance-parameter] : XR_NULL_HANDLE for instance but query for ViveInterceptorHooked requires a valid instance
 
                     // Call XrGetInstanceProcAddrOriginal to check if the original function is already hooked by this class
                     if (XrGetInstanceProcAddrOriginal(0, "ViveInterceptorHooked", out IntPtr function) == XrResult.XR_SUCCESS)
                     {
                         // If it is called successfully, it means the original function is already hooked.  So we should return the original function.
-                        Debug.Log($"{TAG}: Already hooked");
+                        Log.D(TAG, "Already hooked");
                         return func;
                     }
                 }
@@ -173,9 +165,34 @@ namespace VIVE.OpenXR
         /// <param name="name"></param>
         public void AddRequiredFunction(string name)
         {
-            if (requiredFunctions.Contains(name)) return;
-            Debug.Log($"{TAG}: AddRequiredFunction({name})");
-            requiredFunctions.Add(name);
+            Log.D(TAG, $"AddRequiredFunction({name})");
+            if (!interceptors.ContainsKey(name))
+            {
+                Log.E(TAG, $"AddRequiredFunction({name}) failed.  No such function.");
+                return;
+            }
+
+            if (!requiredFunctions.Contains(name))
+                requiredFunctions.Add(name);
+
+            // If your function support unregister, you can add the reference count here.
+            if (name == "xrLocateViews")
+                xrLocateViewsReferenceCount++;
+        }
+
+        /// <summary>
+        /// If no need to use this hooked function, call this will remove your requirement.
+        /// If all requirements are removed, the original function will be called directly.
+        /// </summary>
+        /// <param name="name"></param>
+        public void RemoveRequiredFunction(string name)
+        {
+            // If your function support unregister, you can add the reference count here.
+            if (requiredFunctions.Contains(name))
+            {
+                if (name == "xrLocateViews")
+                    xrLocateViewsReferenceCount = Mathf.Max(xrLocateViewsReferenceCount--, 0);
+            }
         }
     }
 }

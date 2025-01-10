@@ -56,8 +56,30 @@
                 },
                 {
                     "name": "",
+                    "id": "068b86ec-3f14-4d24-9b42-7057d00ab904",
+                    "path": "<HandInteraction>{LeftHand}/isTracked",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "isTrackedL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "b605cbf6-38fb-422a-b12d-48e386a67e9a",
                     "path": "<ViveHandInteractionExt>{RightHand}/isTracked",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "isTrackedR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "fa2d2138-eb75-4cce-8088-3445f1560e97",
+                    "path": "<HandInteraction>{RightHand}/isTracked",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -78,8 +100,30 @@
                 },
                 {
                     "name": "",
+                    "id": "4331ebf5-824f-405f-8a29-a4c4049c23d9",
+                    "path": "<HandInteraction>{RightHand}/trackingState",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "trackingStateR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "1ccbb62c-6370-4507-847e-8fda100510e8",
                     "path": "<ViveHandInteractionExt>{LeftHand}/trackingState",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "trackingStateL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f4e2d931-5b80-4e10-8e95-37c99a3d9536",
+                    "path": "<HandInteraction>{LeftHand}/trackingState",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -162,8 +206,30 @@
                 },
                 {
                     "name": "",
+                    "id": "0afb0794-9c98-41f7-9f58-8a1e64bc8bdc",
+                    "path": "<HandInteraction>{LeftHand}/devicePose",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PoseL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "d41d33db-8b6c-4f21-9459-fd203551d990",
                     "path": "<ViveHandInteractionExt>{RightHand}/devicePose",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PoseR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d46b4d0f-f908-4cd0-aece-22eb2318f8e7",
+                    "path": "<HandInteraction>{RightHand}/devicePose",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -184,8 +250,30 @@
                 },
                 {
                     "name": "",
+                    "id": "005e532f-bb88-4636-8604-3c3dbf891803",
+                    "path": "<HandInteraction>{LeftHand}/graspValue",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ValueL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "e43dc5cd-3e96-4453-b6b2-818250c91436",
                     "path": "<ViveHandInteractionExt>{RightHand}/graspValue",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ValueR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "ddd425a1-b196-4a6c-bbba-69f3fa9b44b8",
+                    "path": "<HandInteraction>{RightHand}/graspValue",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -206,8 +294,30 @@
                 },
                 {
                     "name": "",
+                    "id": "9c47003b-b29e-49a8-8ee5-7700bdf3ef66",
+                    "path": "<HandInteraction>{RightHand}/graspReady",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ReadyR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "79e10ffe-7276-4a95-b380-9d244bc2b213",
                     "path": "<ViveHandInteractionExt>{LeftHand}/graspReady",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ReadyL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5f1f8ba8-8258-4293-8a1c-b7680ae212c0",
+                    "path": "<HandInteraction>{LeftHand}/graspReady",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -226,6 +336,24 @@
                     "type": "PassThrough",
                     "id": "fc753b1d-edb3-4a34-9af3-31ed9dc68ca3",
                     "expectedControlType": "Pose",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "PositionL",
+                    "type": "PassThrough",
+                    "id": "3c743437-254f-480d-ab2a-fbb7fa3a1c75",
+                    "expectedControlType": "Vector3",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "RotationL",
+                    "type": "PassThrough",
+                    "id": "a61c5a21-e370-4bd7-91cc-4939db98a735",
+                    "expectedControlType": "Quaternion",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -253,6 +381,24 @@
                     "type": "PassThrough",
                     "id": "7d766280-e032-4e9a-bb74-55ab7a57c3e6",
                     "expectedControlType": "Pose",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "PositionR",
+                    "type": "PassThrough",
+                    "id": "eb88b286-d41a-4441-8680-eae89ddd9427",
+                    "expectedControlType": "Vector3",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "RotationR",
+                    "type": "PassThrough",
+                    "id": "4b410388-aabc-4cef-944e-68d5f68bcc44",
+                    "expectedControlType": "Quaternion",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -290,8 +436,30 @@
                 },
                 {
                     "name": "",
+                    "id": "45cf0dab-fbfc-478f-aa3b-f74eafb029e9",
+                    "path": "<HandInteraction>{LeftHand}/pointer",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PoseL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "cbaae569-a034-4ce6-8cdd-eef5586aaa7e",
                     "path": "<ViveHandInteractionExt>{RightHand}/pointer",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PoseR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "bb49f848-f6b0-4a1a-b60c-1f08a8bdffcc",
+                    "path": "<HandInteraction>{RightHand}/pointer",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -312,8 +480,30 @@
                 },
                 {
                     "name": "",
+                    "id": "8e248108-0a74-421f-b2b6-0172ccf49da8",
+                    "path": "<HandInteraction>{LeftHand}/pointerActivateValue",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ValueL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "b3c9d90b-0ad0-42c6-9cda-1ac1d74719a5",
                     "path": "<ViveHandInteractionExt>{RightHand}/pointerActivateValue",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ValueR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "afb0658c-57a3-4f84-99ce-f2b5731b081a",
+                    "path": "<HandInteraction>{RightHand}/pointerActivateValue",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -334,12 +524,316 @@
                 },
                 {
                     "name": "",
+                    "id": "ff1d9683-a045-4394-95f3-8b8637109b91",
+                    "path": "<HandInteraction>{RightHand}/pointerActivateReady",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ReadyR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "0f20788a-3543-4fd0-8e4e-9ad56108877e",
                     "path": "<ViveHandInteractionExt>{LeftHand}/pointerActivateReady",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
                     "action": "ReadyL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "4df69cb3-1d60-4aab-9af4-528400022e93",
+                    "path": "<HandInteraction>{LeftHand}/pointerActivateReady",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ReadyL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "4af711ee-8f25-4a6b-900b-cce9a68655de",
+                    "path": "<ViveHandInteractionExt>{LeftHand}/pointerPosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PositionL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "056d875e-56e5-4783-b73c-7d2a83407530",
+                    "path": "<HandInteraction>{LeftHand}/pointerPosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PositionL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d47309f6-c5d1-4892-bf76-e51faa8b6137",
+                    "path": "<ViveHandInteractionExt>{LeftHand}/pointerRotation",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RotationL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f4fade07-9a27-4a3a-9145-87fc4e6fc282",
+                    "path": "<HandInteraction>{LeftHand}/pointerRotation",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RotationL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "61444e1e-91f4-45a7-8104-93317a4fcfa8",
+                    "path": "<ViveHandInteractionExt>{RightHand}/pointerPosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PositionR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d66724bb-6f33-46eb-8205-3912e3cdb72d",
+                    "path": "<HandInteraction>{RightHand}/pointerPosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PositionR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3f05dfd2-7dcb-46ee-a8c8-20c921c62793",
+                    "path": "<ViveHandInteractionExt>{RightHand}/pointerRotation",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RotationR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "c3aa63db-3ff8-4206-b62a-d1caf6ffafd5",
+                    "path": "<HandInteraction>{RightHand}/pointerRotation",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RotationR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        },
+        {
+            "name": "HandPoke",
+            "id": "a4cfc781-c114-4451-96d5-857c3a9385fa",
+            "actions": [
+                {
+                    "name": "PoseL",
+                    "type": "PassThrough",
+                    "id": "e9feeab8-c68c-47d7-8560-8f3b2c44d2bf",
+                    "expectedControlType": "Pose",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "PositionL",
+                    "type": "PassThrough",
+                    "id": "eed73641-933c-4836-9ed7-f0f28ddbf9ec",
+                    "expectedControlType": "Vector3",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "RotationL",
+                    "type": "PassThrough",
+                    "id": "5ad8d488-2973-487b-a19f-c8eb588c67d3",
+                    "expectedControlType": "Quaternion",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "PoseR",
+                    "type": "PassThrough",
+                    "id": "1bac4e9e-ce3d-4218-bbca-255ef780cf6c",
+                    "expectedControlType": "Pose",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "PositionR",
+                    "type": "PassThrough",
+                    "id": "cdd9430c-70f2-4854-b3ae-81b884e87168",
+                    "expectedControlType": "Vector3",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "RotationR",
+                    "type": "PassThrough",
+                    "id": "81746764-95ef-48ce-b2e1-e05330f97e05",
+                    "expectedControlType": "Quaternion",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "efd73d26-df7d-4b90-93c2-202a5f70c05c",
+                    "path": "<ViveHandInteractionExt>{LeftHand}/pokePose",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PoseL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "8e9539c4-4aca-471f-b843-bd282a33616b",
+                    "path": "<HandInteraction>{LeftHand}/pokePose",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PoseL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "124f3c45-0d83-4302-9f2a-cb945f7c268e",
+                    "path": "<ViveHandInteractionExt>{RightHand}/pokePose",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PoseR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d6bd90fd-f8ab-4cc7-ab90-c604788b32e8",
+                    "path": "<HandInteraction>{RightHand}/pokePose",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PoseR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "29fcebb4-1111-4c52-becf-a20a4919c8bd",
+                    "path": "<ViveHandInteractionExt>{RightHand}/pokePosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PositionR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3f1a484f-a430-4f62-9587-47944d3ceb8a",
+                    "path": "<HandInteraction>{RightHand}/pokePosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PositionR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "72bb3809-4dba-4b8c-a35a-6c2078873256",
+                    "path": "<ViveHandInteractionExt>{LeftHand}/pokeRotation",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RotationL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "c64e7c60-8e41-47d7-80b3-8f8dd7c17071",
+                    "path": "<HandInteraction>{LeftHand}/pokeRotation",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RotationL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "cae2d11b-bd7f-4fc4-b247-c21af26cf2d5",
+                    "path": "<ViveHandInteractionExt>{RightHand}/pokeRotation",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RotationR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "59f0ff0b-c894-4fb7-b775-7a8dbc56c718",
+                    "path": "<HandInteraction>{RightHand}/pokeRotation",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RotationR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "79dfac35-3c6f-45b2-8045-eeba5534cb14",
+                    "path": "<ViveHandInteractionExt>{LeftHand}/pokePosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PositionL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "6b420474-04e5-46bb-b76f-a4aef922dac4",
+                    "path": "<HandInteraction>{LeftHand}/pokePosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PositionL",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
@@ -354,6 +848,24 @@
                     "type": "PassThrough",
                     "id": "8c32c730-5a57-4777-940f-89a87509cc55",
                     "expectedControlType": "Pose",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "PositionL",
+                    "type": "PassThrough",
+                    "id": "d0f34fc0-7d91-44ad-8fcb-2be82414f6ba",
+                    "expectedControlType": "Vector3",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "RotationL",
+                    "type": "PassThrough",
+                    "id": "69f4a637-3eaf-490d-9de8-d9a08bff9fff",
+                    "expectedControlType": "Quaternion",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -381,6 +893,24 @@
                     "type": "PassThrough",
                     "id": "0cfeb9fc-a2ea-4d3a-bef2-16b09aae7701",
                     "expectedControlType": "Pose",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "PositionR",
+                    "type": "PassThrough",
+                    "id": "d46fd2f7-9611-4d4f-bc93-12999b1f862e",
+                    "expectedControlType": "Vector3",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "RotationR",
+                    "type": "PassThrough",
+                    "id": "5ea8b91a-29fb-4e5a-bb65-f61664a39b2a",
+                    "expectedControlType": "Quaternion",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -418,8 +948,30 @@
                 },
                 {
                     "name": "",
+                    "id": "e73a46a3-8913-44c6-a015-713f387ff238",
+                    "path": "<HandInteraction>{LeftHand}/pinchPose",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PoseL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "92e779f7-ba6f-417d-9f4c-9d5f81790686",
                     "path": "<ViveHandInteractionExt>{RightHand}/pinchPose",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PoseR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "8c9406c8-c451-43cc-8a39-b8ec5d841c2b",
+                    "path": "<HandInteraction>{RightHand}/pinchPose",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -440,8 +992,30 @@
                 },
                 {
                     "name": "",
+                    "id": "dbc9eb68-a3a8-4309-b690-2215efd2af77",
+                    "path": "<HandInteraction>{LeftHand}/pinchValue",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ValueL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "838dbd9a-6c54-4959-9a92-0168b20d3632",
                     "path": "<ViveHandInteractionExt>{RightHand}/pinchValue",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ValueR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "79ebe950-0644-4adb-a13d-fd1d5e109e57",
+                    "path": "<HandInteraction>{RightHand}/pinchValue",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -462,6 +1036,17 @@
                 },
                 {
                     "name": "",
+                    "id": "e50e1257-1b2b-46ab-99b2-231ccee5eeb6",
+                    "path": "<HandInteraction>{RightHand}/pinchReady",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ReadyR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "9591b4cc-cf0b-4096-91ae-848358b0f366",
                     "path": "<ViveHandInteractionExt>{LeftHand}/pinchReady",
                     "interactions": "",
@@ -470,52 +1055,103 @@
                     "action": "ReadyL",
                     "isComposite": false,
                     "isPartOfComposite": false
-                }
-            ]
-        },
-        {
-            "name": "HandPoke",
-            "id": "a4cfc781-c114-4451-96d5-857c3a9385fa",
-            "actions": [
-                {
-                    "name": "PoseL",
-                    "type": "PassThrough",
-                    "id": "e9feeab8-c68c-47d7-8560-8f3b2c44d2bf",
-                    "expectedControlType": "Pose",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
                 },
                 {
-                    "name": "PoseR",
-                    "type": "PassThrough",
-                    "id": "1bac4e9e-ce3d-4218-bbca-255ef780cf6c",
-                    "expectedControlType": "Pose",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                }
-            ],
-            "bindings": [
-                {
                     "name": "",
-                    "id": "efd73d26-df7d-4b90-93c2-202a5f70c05c",
-                    "path": "<ViveHandInteractionExt>{LeftHand}/pokePose",
+                    "id": "136c49a3-8f2b-476b-9adf-98e7ed1e6e9a",
+                    "path": "<HandInteraction>{LeftHand}/pinchReady",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "PoseL",
+                    "action": "ReadyL",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
                 {
                     "name": "",
-                    "id": "124f3c45-0d83-4302-9f2a-cb945f7c268e",
-                    "path": "<ViveHandInteractionExt>{RightHand}/pokePose",
+                    "id": "9221267c-62a0-47cb-aeba-aca47714c033",
+                    "path": "<ViveHandInteractionExt>{LeftHand}/pinchRotation",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "PoseR",
+                    "action": "RotationL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b4dcfb93-89e5-45cf-bde0-6c2adea454b3",
+                    "path": "<HandInteraction>{LeftHand}/pinchRotation",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RotationL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b841def8-addf-4eae-808f-5160a5ff3ed5",
+                    "path": "<ViveHandInteractionExt>{LeftHand}/pinchPosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PositionL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3253d57e-11aa-4449-8960-16e8911854d5",
+                    "path": "<HandInteraction>{LeftHand}/pinchPosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PositionL",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "88a63c73-43a1-469c-99b0-ef08bd0b95e7",
+                    "path": "<ViveHandInteractionExt>{RightHand}/pinchPosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PositionR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "bf69fb00-cf5a-40da-a774-437f1ea76d44",
+                    "path": "<HandInteraction>{RightHand}/pinchPosition",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PositionR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7f0a8dc7-c33a-4811-ad95-367df499cfb8",
+                    "path": "<ViveHandInteractionExt>{RightHand}/pinchRotation",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RotationR",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "ef207392-905c-4a08-9e1f-7bdf0b66069a",
+                    "path": "<HandInteraction>{RightHand}/pinchRotation",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "RotationR",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

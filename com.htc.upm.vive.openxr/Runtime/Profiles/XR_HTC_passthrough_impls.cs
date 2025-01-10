@@ -43,27 +43,6 @@ namespace VIVE.OpenXR
             return result;
         }
 
-        public override void GetOriginEndFrameLayerList(out List<IntPtr> layers)
-        {
-            ASSERT_FEATURE();
-            layers = new List<IntPtr>();
-#if UNITY_STANDALONE
-            if (feature)
-                feature.GetOriginEndFrameLayerList(out layers);
-
-            else
-                layers = new List<IntPtr>();
-#endif
-        }
-        public override void SubmitLayers(List<IntPtr> layers)
-        {
-            ASSERT_FEATURE();
-#if UNITY_STANDALONE
-            if (feature)
-                feature.SubmitLayers(layers);
-#endif
-        }
-
         public override XrSpace GetTrackingSpace()
         {
             ASSERT_FEATURE();
@@ -77,10 +56,8 @@ namespace VIVE.OpenXR
         public override XrFrameState GetFrameState()
         {
             ASSERT_FEATURE();
-#if UNITY_STANDALONE
             if (feature)
                 return feature.GetFrameState();
-#endif
             return new XrFrameState();
         }
     }

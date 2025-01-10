@@ -24,6 +24,11 @@
     "defineConstraints": [],
     "versionDefines": [
         {
+            "name": "com.unity.textmeshpro",
+            "expression": "3.2.0-pre.10",
+            "define": "UNITY_TEXT_MESH_PRO_3_2_0_PRE_10_OR_NEWER"
+        },
+        {
             "name": "com.unity.xr.openxr",
             "expression": "1.6.0",
             "define": "UNITY_XR_OPENXR_1_6_0"
@@ -32,11 +37,6 @@
             "name": "com.unity.xr.openxr",
             "expression": "1.9.1",
             "define": "UNITY_XR_OPENXR_1_9_1"
-        },
-        {
-            "name": "com.unity.textmeshpro",
-            "expression": "3.2.0-pre.10",
-            "define": "UNITY_TEXT_MESH_PRO_3_2_0_PRE_10_OR_NEWER"
         }
     ],
     "noEngineReferences": false

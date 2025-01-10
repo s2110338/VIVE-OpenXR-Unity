@@ -172,10 +172,10 @@ namespace VIVE.OpenXR.Passthrough
         /// The alpha value of the passthrough in the range [0, 1].
         /// </summary>
         public float alpha;
-        public XrPassthroughColorHTC(XrStructureType in_type, IntPtr in_next, float in_alpha)
+        public XrPassthroughColorHTC(float in_alpha)
         {
-            type = in_type;
-            next = in_next;
+            type = XrStructureType.XR_TYPE_PASSTHROUGH_COLOR_HTC;
+            next = IntPtr.Zero;
             alpha = in_alpha;
         }
     };
@@ -201,7 +201,7 @@ namespace VIVE.OpenXR.Passthrough
         /// <summary>
         /// An array of XrVector3f. The size of the array must be equal to vertexCount.
         /// </summary>
-        public XrVector3f[] vertices;
+        public IntPtr vertices;  // XrVector3f
         /// <summary>
         /// The count of indices array in the mesh.
         /// </summary>
@@ -209,7 +209,7 @@ namespace VIVE.OpenXR.Passthrough
         /// <summary>
         /// An array of triangle indices. The size of the array must be equal to indexCount.
         /// </summary>
-        public UInt32[] indices;
+        public IntPtr indices; // UInt32[]
         /// <summary>
         /// The XrSpace that defines the projected passthrough's base space for transformations.
         /// </summary>
@@ -226,21 +226,6 @@ namespace VIVE.OpenXR.Passthrough
         /// The XrVector3f that defines the scale of the mesh
         /// </summary>
         public XrVector3f scale;
-        public XrPassthroughMeshTransformInfoHTC(XrStructureType in_type, IntPtr in_next, UInt32 in_vertexCount,
-            XrVector3f[] in_vertices, UInt32 in_indexCount, UInt32[] in_indices, XrSpace in_baseSpace, XrTime in_time,
-            XrPosef in_pose, XrVector3f in_scale)
-        {
-            type = in_type;
-            next = in_next;
-            vertexCount = in_vertexCount;
-            vertices = in_vertices;
-            indexCount = in_indexCount;
-            indices = in_indices;
-            baseSpace = in_baseSpace;
-            time = in_time;
-            pose = in_pose;
-            scale = in_scale;
-        }
     };
 
     /// <summary>
@@ -273,11 +258,12 @@ namespace VIVE.OpenXR.Passthrough
         /// The XrPassthroughColorHTC describing the color information with the alpha value of the passthrough layer.
         /// </summary>
         public XrPassthroughColorHTC color;
-        public XrCompositionLayerPassthroughHTC(XrStructureType in_type, IntPtr in_next, XrCompositionLayerFlags in_layerFlags,
+
+        public XrCompositionLayerPassthroughHTC(XrCompositionLayerFlags in_layerFlags,
             XrSpace in_space, XrPassthroughHTC in_passthrough, XrPassthroughColorHTC in_color)
         {
-            type = in_type;
-            next = in_next;
+            type = XrStructureType.XR_TYPE_COMPOSITION_LAYER_PASSTHROUGH_HTC;
+            next = IntPtr.Zero;
             layerFlags = in_layerFlags;
             space = in_space;
             passthrough = in_passthrough;

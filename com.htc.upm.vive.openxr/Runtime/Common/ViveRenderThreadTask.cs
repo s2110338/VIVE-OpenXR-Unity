@@ -58,7 +58,8 @@ namespace VIVE.OpenXR.Common.RenderThread
 				isFree = true
 			};
 			pool.Insert(index, newItem);
-			Debug.Log("RT.MessagePool.Obtain()  pool count=" + pool.Count);
+			//Log.d("RT.MessagePool.Obtain<" + typeof(T) + ">()  pool count=" + pool.Count);  // Not to expose developer's type.
+			Log.D("RT.MessagePool.Obtain()  pool count=" + pool.Count);
 			return newItem;
 		}
 
@@ -101,12 +102,13 @@ namespace VIVE.OpenXR.Common.RenderThread
 		/// The queueSize should be the double count of message you want to pass to render thread in one frame.
 		/// </summary>
 		/// <param name="queueSize"></param>
-		public PreAllocatedQueue(int queueSize = 2) : base() {
-         	for (int i = 0; i < queueSize; i++)
+		public PreAllocatedQueue(int queueSize = 2) : base()
+		{
+			for (int i = 0; i < queueSize; i++)
 			{
-                list.Add(null);
-            }
-        }
+				list.Add(null);
+			}
+		}
 
 		private int Next(int value)
 		{
@@ -154,7 +156,7 @@ namespace VIVE.OpenXR.Common.RenderThread
 		/// After use the Message, call Release() to the message.
 		/// </summary>
 		/// <returns></returns>
-		 public Message Dequeue()
+		public Message Dequeue()
 		{
 			// No lock protection here.  If list is not change size, it is safe.
 			// However if list changed size, it is safe in most case.
@@ -163,12 +165,12 @@ namespace VIVE.OpenXR.Common.RenderThread
 		}
 	}
 
-    /// <summary>
-    /// RenderThreadTask class is used to execute specified tasks on the rendering thread.
-    /// You don't need to develop a native function to run your task on the rendering thread.
-    /// And you don't need to design how to pass data to render thread.
-    /// This class can be run in Unity Editor since Unity 2021.  Test your code in Unity Editor can save your time.
-    ///
+	/// <summary>
+	/// RenderThreadTask class is used to execute specified tasks on the rendering thread.
+	/// You don't need to develop a native function to run your task on the rendering thread.
+	/// And you don't need to design how to pass data to render thread.
+	/// This class can be run in Unity Editor since Unity 2021.  Test your code in Unity Editor can save your time.
+	///
 	/// You should only create RenderThreadTask as static readonly.  Do not create RenderThreadTask in dynamic.
 	/// 
 	/// You should not run Unity.Engine code in RenderThread.  It will cause the Unity.Engine to hang.
@@ -177,8 +179,8 @@ namespace VIVE.OpenXR.Common.RenderThread
 	/// 
 	/// The 'lock' expression is not used here.  Because I believe the lock is not necessary in this case.
 	/// And the lock will cause the performance issue.  All the design here help you not to use 'lock'.
-    /// </summary>
-    public class RenderThreadTask
+	/// </summary>
+	public class RenderThreadTask
 	{
 		private static IntPtr GetFunctionPointerForDelegate(Delegate del)
 		{
@@ -208,20 +210,21 @@ namespace VIVE.OpenXR.Common.RenderThread
 		/// <param name="render">The callback in render thread.</param>
 		/// <param name="queueSize">If issue this event once in a frame, set queueSize as 2.</param>
 		/// <exception cref="ArgumentNullException"></exception>
-        public RenderThreadTask(Receiver render, int queueSize = 2)
-        {
-			queue = new PreAllocatedQueue(queueSize);
-            receiver = render;
-            if (receiver == null)
-                throw new ArgumentNullException("receiver should not be null");
-
-            CommandList.Add(this);
-            id = CommandList.IndexOf(this);
-        }
-
-        ~RenderThreadTask()
+		public RenderThreadTask(Receiver render, int queueSize = 2)
 		{
-			try { CommandList.RemoveAt(id); } finally { }
+			queue = new PreAllocatedQueue(queueSize);
+			receiver = render;
+			if (receiver == null)
+				throw new ArgumentNullException("receiver should not be null");
+
+			CommandList.Add(this);
+			id = CommandList.IndexOf(this);
+		}
+
+		~RenderThreadTask()
+		{
+			// Remove could be in a random order, and will cause orderId change. DO not remove any of them.
+			//try { CommandList.Remove(this); } finally { }
 		}
 
 		void IssuePluginEvent(IntPtr callback, int eventID)
@@ -282,30 +285,36 @@ namespace VIVE.OpenXR.Common.RenderThread
 		// Use static readonly to create RenderThreadTask.  Keep internal to avoid miss use by other developers.
 		internal static readonly RenderThreadTask sampleRenderThreadTask1 = new RenderThreadTask(SampleReceiver1);
 		// Different task use different RenderThreadTask and different recevier.
-        internal static readonly RenderThreadTask sampleRenderThreadTask2 = new RenderThreadTask(SampleReceiver2);
+		internal static readonly RenderThreadTask sampleRenderThreadTask2 = new RenderThreadTask(SampleReceiver2);
 
-        private static void SampleReceiver1(PreAllocatedQueue dataQueue)
+		private static void SampleReceiver1(PreAllocatedQueue dataQueue)
 		{
 			var msg = dataQueue.Dequeue() as SampleMessage;
-			// no need to check msg if it is null because your design should avoid it.
-			// Keep data before release.  Use local variable to keep data and release msg early.  Should not keep the msg instance itself.
-			var data = msg.dataPassedToRenderThread;
-			// Make sure release the msg if finished.  Other wise the memory will keep increasing when Obtain.
-			MessagePool.Release(msg);
-
-			Debug.Log("Task1, the data passed to render thread: " + data);
+			if (msg != null)
+			{
+				// Keep data before release.  Use local variable to keep data and release msg early.  Should not keep the msg instance itself.
+				var data = msg.dataPassedToRenderThread;
+				// Make sure release the msg if finished.  Other wise the memory will keep increasing when Obtain.
+				MessagePool.Release(msg);
+				Debug.Log("Task1, the data passed to render thread: " + data);
+			}
 		}
 
-        private static void SampleReceiver2(PreAllocatedQueue dataQueue)
-        {
-            var msg = dataQueue.Dequeue() as SampleMessage;
-            var data = msg.dataPassedToRenderThread;
-            MessagePool.Release(msg);
-            Debug.Log("Task2, the data passed to render thread: " + data);
-        }
+		private static void SampleReceiver2(PreAllocatedQueue dataQueue)
+		{
+			var msg = dataQueue.Dequeue() as SampleMessage;
+			if (msg != null)
+			{
+				// Keep data before release.  Use local variable to keep data and release msg early.  Should not keep the msg instance itself.
+				var data = msg.dataPassedToRenderThread;
+				// Make sure release the msg if finished.  Other wise the memory will keep increasing when Obtain.
+				MessagePool.Release(msg);
+				Debug.Log("Task2, the data passed to render thread: " + data);
+			}
+		}
 
-        // Send a message to the render thread every frame.
-        private void Update()
+		// Send a message to the render thread every frame.
+		private void Update()
 		{
 			// Make sure only one kind of message object is used in the queue.
 			var msg = sampleRenderThreadTask1.Queue.Obtain<SampleMessage>();
@@ -318,12 +327,12 @@ namespace VIVE.OpenXR.Common.RenderThread
 		public void OnClicked()
 		{
 			// Reuse the same message type is ok.
-            var msg = sampleRenderThreadTask2.Queue.Obtain<SampleMessage>();
-            msg.dataPassedToRenderThread = 234;
-            sampleRenderThreadTask2.Queue.Enqueue(msg);
-            sampleRenderThreadTask2.IssueEvent();
-        }
-    }
+			var msg = sampleRenderThreadTask2.Queue.Obtain<SampleMessage>();
+			msg.dataPassedToRenderThread = 234;
+			sampleRenderThreadTask2.Queue.Enqueue(msg);
+			sampleRenderThreadTask2.IssueEvent();
+		}
+	}
 #endif
 	#endregion
 }

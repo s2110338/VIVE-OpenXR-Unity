@@ -7,7 +7,7 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 	{
 		[SerializeField]
 		private HandMeshManager m_HandMesh;
-		
+
 		private bool keepUpdate = false;
 
 		protected override void OnEnable()
@@ -18,11 +18,7 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		protected override void OnDisable()
 		{
 			base.OnDisable();
-			if (keepUpdate)
-			{
-				keepUpdate = false;
-				StopCoroutine(UpdatePose());
-			}
+			keepUpdate = false;
 		}
 
 		public void SetHandMeshRenderer(HandMeshManager handMeshRenderer)
@@ -44,39 +40,32 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		{
 			yield return new WaitUntil(() => m_Initialized);
 			base.OnEnable();
-			if (!keepUpdate)
-			{
-				keepUpdate = true;
-				StartCoroutine(UpdatePose());
-			}
+			keepUpdate = true;
 		}
 
-		private IEnumerator UpdatePose()
+		private void Update()
 		{
-			while (keepUpdate)
+			if (!keepUpdate) { return; }
+			HandPose handPose = HandPoseProvider.GetHandPose(m_HandMesh.isLeft ? HandPoseType.HAND_LEFT : HandPoseType.HAND_RIGHT);
+			m_IsTracked = handPose.IsTracked();
+			if (!m_IsTracked) { return; }
+
+			for (int i = 0; i < poseCount; i++)
 			{
-				yield return new WaitForFixedUpdate();
-
-				HandPose handPose = HandPoseProvider.GetHandPose(m_HandMesh.isLeft ? HandPoseType.HAND_LEFT : HandPoseType.HAND_RIGHT);
-				m_IsTracked = handPose.IsTracked();
-
-				for (int i = 0; i < poseCount; i++)
+				if (m_HandMesh.GetJointPositionAndRotation((JointType)i, out Vector3 position, out Quaternion rotation) &&
+					m_HandMesh.GetJointPositionAndRotation((JointType)i, out Vector3 localPosition, out Quaternion localRotation, local: true))
 				{
-					if (m_HandMesh.GetJointPositionAndRotation((JointType)i, out Vector3 position, out Quaternion rotation) &&
-						m_HandMesh.GetJointPositionAndRotation((JointType)i, out Vector3 localPosition, out Quaternion localRotation, local: true))
-					{
-						m_Position[i] = position;
-						m_Rotation[i] = rotation;
-						m_LocalPosition[i] = localPosition;
-						m_LocalRotation[i] = localRotation;
-					}
-					else
-					{
-						m_Position[i] = Vector3.zero;
-						m_Rotation[i] = Quaternion.identity;
-						m_LocalPosition[i] = Vector3.zero;
-						m_LocalRotation[i] = Quaternion.identity;
-					}
+					m_Position[i] = position;
+					m_Rotation[i] = rotation;
+					m_LocalPosition[i] = localPosition;
+					m_LocalRotation[i] = localRotation;
+				}
+				else
+				{
+					m_Position[i] = Vector3.zero;
+					m_Rotation[i] = Quaternion.identity;
+					m_LocalPosition[i] = Vector3.zero;
+					m_LocalRotation[i] = Quaternion.identity;
 				}
 			}
 		}

@@ -111,7 +111,14 @@ namespace VIVE.OpenXR.Samples
             rotationTracked = ((uint)trackingState & (uint)InputTrackingState.Rotation) != 0;
 
             bool tracked = isActive /*&& positionTracked */&& rotationTracked; // Show the object with 3DoF.
+// Temporary workaround for PC platform: The isTracked value for HandInteractionEXT always returns false. 
+// For now, forcing it to true using a macro. This will be properly fixed in the next patch.
+#if UNITY_STANDALONE
+            if (IsActive.action.ToString() == "Hand/isTrackedR" || IsActive.action.ToString() == "Hand/isTrackedL")
+                m_ObjectToHide.SetActive(true); 
+#else
             m_ObjectToHide.SetActive(tracked);
+#endif
         }
     }
 }

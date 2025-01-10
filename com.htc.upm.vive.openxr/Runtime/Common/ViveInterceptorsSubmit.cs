@@ -8,6 +8,20 @@ namespace VIVE.OpenXR
 {
     partial class ViveInterceptors
     {
+        [HookHandler("xrEndFrame")]
+        private static XrResult OnHookXrEndFrame(XrInstance instance, string name, out IntPtr function)
+        {
+            if (XrEndFrameOriginal == null)
+            {
+                var ret = XrGetInstanceProcAddrOriginal(instance, name, out function);
+                if (ret != XrResult.XR_SUCCESS)
+                    return ret;
+                XrEndFrameOriginal = Marshal.GetDelegateForFunctionPointer<DelegateXrEndFrame>(function);
+            }
+            function = xrEndFrameInterceptorPtr;
+            return XrResult.XR_SUCCESS;
+        }
+
         public struct XrCompositionLayerBaseHeader
         {
             public XrStructureType type;  // This base structure itself has no associated XrStructureType value.
@@ -37,15 +51,16 @@ namespace VIVE.OpenXR
             // instance must not null
             //if (instance == null)
             //	return XrEndFrameOriginal(session, ref frameEndInfo);
-            Profiler.BeginSample("VI:EndFrame");
+            Profiler.BeginSample("VI:EndFrameB");
             XrResult result = XrResult.XR_SUCCESS;
-            if (instance.BeforeOriginalEndFrame != null &&
-                !instance.BeforeOriginalEndFrame(session, ref frameEndInfo, ref result))
-            {
-                Profiler.EndSample();
+            bool ret = true;
+            if (instance.BeforeOriginalEndFrame != null)
+                ret = instance.BeforeOriginalEndFrame(session, ref frameEndInfo, ref result);
+            Profiler.EndSample();
+            if (!ret)
                 return result;
-            }
             result = XrEndFrameOriginal(session, ref frameEndInfo);
+            Profiler.BeginSample("VI:EndFrameA");
             instance.AfterOriginalEndFrame?.Invoke(session, ref frameEndInfo, ref result);
             Profiler.EndSample();
             return result;

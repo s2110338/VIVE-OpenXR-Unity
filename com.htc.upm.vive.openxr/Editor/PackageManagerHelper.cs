@@ -93,9 +93,9 @@ public static class PackageManagerHelper
 				case StatusCode.Failure:
 					if (!s_wasRemoved)
 					{
+						if (m_removeRequest != null) { Debug.LogError("Something wrong when removing package from list. error:" + m_removeRequest.Error.errorCode + "(" + m_removeRequest.Error.message + ")"); }
 						var request = m_removeRequest;
 						m_removeRequest = null;
-						Debug.LogError("Something wrong when removing package from list. error:" + m_removeRequest.Error.errorCode + "(" + m_removeRequest.Error.message + ")");
 					}
 					break;
 				case StatusCode.Success:

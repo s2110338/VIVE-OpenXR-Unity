@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
-using AOT;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
 
@@ -63,48 +62,74 @@ namespace VIVE.OpenXR.Hand
         private bool m_XrInstanceCreated = false;
         private XrInstance m_XrInstance = 0;
         private static IntPtr xrGetInstanceProcAddr_prev;
-        private static IntPtr WaitFrame_prev;
-        private static XrFrameWaitInfo m_frameWaitInfo;
-        private static XrFrameState m_frameState;
+        private static XrTime m_predictedDisplayTime;
+        private static XrDuration m_predictedDisplayDuration;
+
+        private static int sizeOfXrHandJointLocationEXT = Marshal.SizeOf(typeof(XrHandJointLocationEXT));
+        private static IntPtr handJointLocationsNativeBuffer = IntPtr.Zero;
+        private static byte[] handJointLocationsByteBuffer = null;
+        private static int handJointLocationsNativeBufferLength = 0;  // Not byte size, it is the number of XrHandJointLocationEXT.
+
         protected override IntPtr HookGetInstanceProcAddr(IntPtr func)
         {
-            UnityEngine.Debug.Log("EXT: registering our own xrGetInstanceProcAddr");
-            xrGetInstanceProcAddr_prev = func;
-            return Marshal.GetFunctionPointerForDelegate(m_intercept_xrWaitFrame_xrGetInstanceProcAddr);
-        }
-        [MonoPInvokeCallback(typeof(OpenXRHelper.xrGetInstanceProcAddrDelegate))]
-        private static XrResult intercept_xrWaitFrame_xrGetInstanceProcAddr(XrInstance instance, string name, out IntPtr function)
-        {
-            if (xrGetInstanceProcAddr_prev == null || xrGetInstanceProcAddr_prev == IntPtr.Zero)
+            ViveInterceptors.Instance.AddRequiredFunction("xrWaitFrame");
+            if (ViveInterceptors.Instance.BeforeOriginalWaitFrame == null)
             {
-                UnityEngine.Debug.LogError("xrGetInstanceProcAddr_prev is null");
-                function = IntPtr.Zero;
-                return XrResult.XR_ERROR_VALIDATION_FAILURE;
+                ViveInterceptors.Instance.BeforeOriginalWaitFrame = new ViveInterceptors.DelegateXrWaitFrameInterceptor(BeforeWaitFrame);
+            }
+            else
+            {
+                ViveInterceptors.Instance.BeforeOriginalWaitFrame += BeforeWaitFrame;
             }
 
-            // Get delegate of old xrGetInstanceProcAddr.
-            var xrGetProc = Marshal.GetDelegateForFunctionPointer<OpenXRHelper.xrGetInstanceProcAddrDelegate>(xrGetInstanceProcAddr_prev);
-            XrResult result = xrGetProc(instance, name, out function);
-            if (name == "xrWaitFrame")
+            if (ViveInterceptors.Instance.AfterOriginalWaitFrame == null)
             {
-                WaitFrame_prev = function;
-                m_intercept_xrWaitFrame = intercepted_xrWaitFrame;
-                function = Marshal.GetFunctionPointerForDelegate(m_intercept_xrWaitFrame); ;
-                UnityEngine.Debug.Log("Getting xrWaitFrame func");
+                ViveInterceptors.Instance.AfterOriginalWaitFrame = new ViveInterceptors.DelegateXrWaitFrameInterceptor(AfterWaitFrame);
             }
-
-            return result;
-
+            else
+            {
+                ViveInterceptors.Instance.AfterOriginalWaitFrame += AfterWaitFrame;
+            }
+            return ViveInterceptors.Instance.HookGetInstanceProcAddr(func);
         }
-        [MonoPInvokeCallback(typeof(OpenXRHelper.xrWaitFrameDelegate))]
-        private static int intercepted_xrWaitFrame(ulong session, ref XrFrameWaitInfo frameWaitInfo, ref XrFrameState frameState)
+
+        private bool BeforeWaitFrame(XrSession session, ref ViveInterceptors.XrFrameWaitInfo frameWaitInfo, ref ViveInterceptors.XrFrameState frameState, ref XrResult result)
         {
-            // Get delegate of prev xrWaitFrame.
-            var xrWaitFrame = Marshal.GetDelegateForFunctionPointer<OpenXRHelper.xrWaitFrameDelegate>(WaitFrame_prev);
-            int res = xrWaitFrame(session, ref frameWaitInfo, ref frameState);
-            m_frameWaitInfo = frameWaitInfo;
-            m_frameState = frameState;
-            return res;
+            ViveInterceptors.XrFrameState nextFrameState = new ViveInterceptors.XrFrameState
+            {
+                type = XrStructureType.XR_TYPE_PASSTHROUGH_HAND_TRACKER_FRAME_STATE_HTC,
+                next = frameState.next,
+                predictedDisplayPeriod = 0,
+                predictedDisplayTime = 0,
+                shouldRender = false
+            };
+            frameState.next = MemoryTools.ToIntPtr(nextFrameState);
+            return true;
+        }
+
+        private bool AfterWaitFrame(XrSession session, ref ViveInterceptors.XrFrameWaitInfo frameWaitInfo, ref ViveInterceptors.XrFrameState frameState, ref XrResult result)
+        {
+            m_predictedDisplayTime = frameState.predictedDisplayTime;
+            m_predictedDisplayDuration = frameState.predictedDisplayPeriod;
+
+            IntPtr next = frameState.next;
+            HashSet<IntPtr> visited = new HashSet<IntPtr>();
+            int iterationCount = 0;
+            int maxIterations = 10;
+            while (next != IntPtr.Zero && !visited.Contains(next))
+            {
+                if (iterationCount++ > maxIterations) { break; }
+                visited.Add(next);
+                ViveInterceptors.XrFrameState nextFrameState = Marshal.PtrToStructure<ViveInterceptors.XrFrameState>(next);
+                if (nextFrameState.type == XrStructureType.XR_TYPE_PASSTHROUGH_HAND_TRACKER_FRAME_STATE_HTC &&
+                    nextFrameState.predictedDisplayTime != 0)
+                {
+                    m_predictedDisplayTime = nextFrameState.predictedDisplayTime;
+                    break;
+                }
+                next = nextFrameState.next;
+            }
+            return true;
         }
 
         /// <summary>
@@ -140,6 +165,14 @@ namespace VIVE.OpenXR.Hand
                 InputSystem.onAfterUpdate -= UpdateCallback;
             }
             sb.Clear().Append(LOG_TAG).Append("OnInstanceDestroy() ").Append(xrInstance); DEBUG(sb);
+            // release buffer
+            if (handJointLocationsNativeBuffer != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(handJointLocationsNativeBuffer);
+                handJointLocationsNativeBuffer = IntPtr.Zero;
+                handJointLocationsByteBuffer = null;
+                handJointLocationsNativeBufferLength = 0;
+            }
         }
 
         private XrSystemId m_XrSystemId = 0;
@@ -343,9 +376,6 @@ namespace VIVE.OpenXR.Hand
         #endregion
 
         #region OpenXR function delegates
-        private static readonly OpenXRHelper.xrGetInstanceProcAddrDelegate m_intercept_xrWaitFrame_xrGetInstanceProcAddr
-            = new OpenXRHelper.xrGetInstanceProcAddrDelegate(intercept_xrWaitFrame_xrGetInstanceProcAddr);
-        private static OpenXRHelper.xrWaitFrameDelegate m_intercept_xrWaitFrame;
         /// xrGetInstanceProcAddr
         OpenXRHelper.xrGetInstanceProcAddrDelegate XrGetInstanceProcAddr;
 
@@ -681,7 +711,7 @@ namespace VIVE.OpenXR.Hand
         {
             XRInputSubsystem subsystem = null;
 
-            SubsystemManager.GetInstances(s_InputSubsystems);
+            SubsystemManager.GetSubsystems(s_InputSubsystems);
             if (s_InputSubsystems.Count > 0)
             {
                 subsystem = s_InputSubsystems[0];
@@ -795,7 +825,7 @@ namespace VIVE.OpenXR.Hand
             return true;
         }
 
-        private int lastUpdateFrameL = -1, lastUpdateFrameR = -1;
+        private int lastUpdateFrameL = -1, lastUpdateFrameR = -1, updateFrame = -1;
         private void UpdateCallback()
         {
             // Only allow updating poses once at BeforeRender & Dynamic per frame.
@@ -804,6 +834,10 @@ namespace VIVE.OpenXR.Hand
             {
                 lastUpdateFrameL = -1;
                 lastUpdateFrameR = -1;
+            }
+            if (InputState.currentUpdateType == InputUpdateType.BeforeRender)
+            {
+                updateFrame = Time.frameCount;
             }
         }
         private bool AllowUpdate(bool isLeft)
@@ -832,90 +866,69 @@ namespace VIVE.OpenXR.Hand
         public bool GetJointLocations(bool isLeft, out XrHandJointLocationEXT[] handJointLocation, out XrTime timestamp)
         {
             handJointLocation = isLeft ? jointLocationsL : jointLocationsR;
-            timestamp = m_frameState.predictedDisplayTime;
+            long displayTime = m_predictedDisplayTime;
+            if (Time.frameCount > updateFrame)
+            {
+                displayTime += m_predictedDisplayDuration;
+            }
+            timestamp = displayTime;
             if (!AllowUpdate(isLeft)) { return true; }
 
             bool ret = false;
             if (isLeft && !hasLeftHandTracker) { return ret; }
             if (!isLeft && !hasRightHandTracker) { return ret; }
 
-            OpenXRHelper.Trace.Begin("GetJointLocations");
-
-            TrackingOriginModeFlags origin = GetTrackingOriginMode();
-            if (origin == TrackingOriginModeFlags.Unknown || origin == TrackingOriginModeFlags.Unbounded) { return ret; }
-            XrSpace baseSpace = (origin == TrackingOriginModeFlags.Device ? m_ReferenceSpaceLocal : m_ReferenceSpaceStage);
-
             /// Configures XrHandJointsLocateInfoEXT
             XrHandJointsLocateInfoEXT locateInfo = new XrHandJointsLocateInfoEXT(
                 in_type: XrStructureType.XR_TYPE_HAND_JOINTS_LOCATE_INFO_EXT,
                 in_next: IntPtr.Zero,
-                in_baseSpace: baseSpace,
-                in_time: m_frameState.predictedDisplayTime);
+                in_baseSpace: GetCurrentAppSpace(),
+                in_time: displayTime);
 
             /// Configures XrHandJointLocationsEXT
             locations.type = XrStructureType.XR_TYPE_HAND_JOINT_LOCATIONS_EXT;
             locations.next = IntPtr.Zero;
             locations.isActive = false;
-            locations.jointCount = (uint)(isLeft ? jointLocationsL.Length : jointLocationsR.Length);
+            locations.jointCount = (uint)(handJointLocation.Length);
 
-            XrHandJointLocationEXT joint_location_ext_type = default(XrHandJointLocationEXT);
-            int jointLocationsLength = isLeft ? jointLocationsL.Length : jointLocationsR.Length;
-            locations.jointLocations = Marshal.AllocHGlobal(Marshal.SizeOf(joint_location_ext_type) * jointLocationsLength);
+            int jointLocationsLength = handJointLocation.Length;
 
-            long offset = 0;
-            /*if (IntPtr.Size == 4)
-                offset = locations.jointLocations.ToInt32();
-            else
-                offset = locations.jointLocations.ToInt64();
-
-            for (int i = 0; i < jointLocationsLength; i++)
+            if (handJointLocationsNativeBuffer == null || handJointLocationsNativeBuffer == IntPtr.Zero)
             {
-                IntPtr joint_location_ext_ptr = new IntPtr(offset);
+                int N = sizeOfXrHandJointLocationEXT * jointLocationsLength;
+                handJointLocationsNativeBuffer = Marshal.AllocHGlobal(N);
+                handJointLocationsByteBuffer = new byte[N];
+                handJointLocationsNativeBufferLength = jointLocationsLength;
+                DEBUG($"GetJointLocations() handJointLocationsNativeBuffer[{N}] is allocated.");
+            }
+            else if (handJointLocationsNativeBufferLength < jointLocationsLength)
+            {
+                Marshal.FreeHGlobal(handJointLocationsNativeBuffer);
+                int N = sizeOfXrHandJointLocationEXT * jointLocationsLength;
+                handJointLocationsNativeBuffer = Marshal.AllocHGlobal(N);
+                handJointLocationsByteBuffer = new byte[N];
+                handJointLocationsNativeBufferLength = jointLocationsLength;
+                DEBUG($"GetJointLocations() handJointLocationsNativeBuffer[{N}] is allocated.");
+            }
 
-                if (isLeft)
-                    Marshal.StructureToPtr(jointLocationsL[i], joint_location_ext_ptr, false);
-                else
-                    Marshal.StructureToPtr(jointLocationsR[i], joint_location_ext_ptr, false);
+            locations.jointLocations = handJointLocationsNativeBuffer;
 
-                offset += Marshal.SizeOf(joint_location_ext_type);
-            }*/
-
-            if (LocateHandJointsEXT(
+            var retX = LocateHandJointsEXT(
                 handTracker: (isLeft ? leftHandTracker : rightHandTracker),
                 locateInfo: locateInfo,
-                locations: ref locations) == XrResult.XR_SUCCESS)
+                locations: ref locations);
+
+            if (retX == XrResult.XR_SUCCESS)
             {
                 timestamp = locateInfo.time;
 
                 if (locations.isActive)
                 {
-                    if (IntPtr.Size == 4)
-                        offset = locations.jointLocations.ToInt32();
-                    else
-                        offset = locations.jointLocations.ToInt64();
-
-                    for (int i = 0; i < locations.jointCount; i++)
-                    {
-                        IntPtr joint_location_ext_ptr = new IntPtr(offset);
-
-                        if (isLeft)
-                            jointLocationsL[i] = (XrHandJointLocationEXT)Marshal.PtrToStructure(joint_location_ext_ptr, typeof(XrHandJointLocationEXT));
-                        else
-                            jointLocationsR[i] = (XrHandJointLocationEXT)Marshal.PtrToStructure(joint_location_ext_ptr, typeof(XrHandJointLocationEXT));
-
-                        offset += Marshal.SizeOf(joint_location_ext_type);
-                    }
-
-                    // ToDo: locationFlags?
-                    handJointLocation = isLeft ? jointLocationsL : jointLocationsR;
-
+                    MemoryTools.CopyAllFromRawMemory(handJointLocation, handJointLocationsNativeBuffer);
                     ret = true;
                 }
             }
 
-            Marshal.FreeHGlobal(locations.jointLocations);
-
-            OpenXRHelper.Trace.End();
             return ret;
         }
         /// <summary>

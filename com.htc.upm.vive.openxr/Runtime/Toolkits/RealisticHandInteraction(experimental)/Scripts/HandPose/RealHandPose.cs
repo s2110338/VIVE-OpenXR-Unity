@@ -18,11 +18,7 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		protected override void OnDisable()
 		{
 			base.OnDisable();
-			if (keepUpdate)
-			{
-				keepUpdate = false;
-				StopCoroutine(UpdatePose());
-			}
+			keepUpdate = false;
 		}
 
 		public override void SetType(HandPoseType poseType)
@@ -43,41 +39,33 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		{
 			yield return new WaitUntil(() => m_Initialized);
 			base.OnEnable();
-			if (!keepUpdate)
-			{
-				keepUpdate = true;
-				StartCoroutine(UpdatePose());
-			}
+			keepUpdate = true;
 		}
 
-		private IEnumerator UpdatePose()
+		private void Update()
 		{
+			if (!keepUpdate) { return; }
+			HandData handData = CachedHand.Get(isLeft);
+			m_IsTracked = handData.isTracked;
+			if (!m_IsTracked) { return; }
+
 			Vector3 position = Vector3.zero;
 			Quaternion rotation = Quaternion.identity;
-			while (keepUpdate)
+			for (int i = 0; i < poseCount; i++)
 			{
-				yield return new WaitForEndOfFrame();
-
-				HandData handData = CachedHand.Get(isLeft);
-				m_IsTracked = handData.isTracked;
-				if (!m_IsTracked) { continue; }
-
-				for (int i = 0; i < poseCount; i++)
+				if (handData.GetJointPosition((JointType)i, ref position) && handData.GetJointRotation((JointType)i, ref rotation))
 				{
-					if (handData.GetJointPosition((JointType)i, ref position) && handData.GetJointRotation((JointType)i, ref rotation))
-					{
-						m_Position[i] = transform.position + transform.rotation * position;
-						m_Rotation[i] = transform.rotation * rotation;
-						m_LocalPosition[i] = position;
-						m_LocalRotation[i] = rotation;
-					}
-					else
-					{
-						m_Position[i] = Vector3.zero;
-						m_Rotation[i] = Quaternion.identity;
-						m_LocalPosition[i] = Vector3.zero;
-						m_LocalRotation[i] = Quaternion.identity;
-					}
+					m_Position[i] = transform.position + transform.rotation * position;
+					m_Rotation[i] = transform.rotation * rotation;
+					m_LocalPosition[i] = position;
+					m_LocalRotation[i] = rotation;
+				}
+				else
+				{
+					m_Position[i] = Vector3.zero;
+					m_Rotation[i] = Quaternion.identity;
+					m_LocalPosition[i] = Vector3.zero;
+					m_LocalRotation[i] = Quaternion.identity;
 				}
 			}
 		}

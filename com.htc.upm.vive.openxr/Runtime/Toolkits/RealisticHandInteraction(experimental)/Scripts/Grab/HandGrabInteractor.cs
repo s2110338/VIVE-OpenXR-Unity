@@ -8,7 +8,6 @@
 // conditions signed by you and all SDK and API requirements,
 // specifications, and documentation provided by HTC to You."
 
-using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -78,6 +77,13 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		private GrabState m_State = GrabState.None;
 		private Pose wristPose = Pose.identity;
 		private Vector3[] fingerTipPosition = new Vector3[(int)FingerId.Count];
+
+		private const int kMaxCacheSize = 100;
+		private int lastBufferCount = 0;
+		private Collider[] colliderBuffer = new Collider[50];
+		private HandGrabInteractable[] grabbableBuffer = new HandGrabInteractable[50];
+		private LinkedList<Collider> lruList = new LinkedList<Collider>();
+		private Dictionary<Collider, LinkedListNode<Collider>> unusedColliders = new Dictionary<Collider, LinkedListNode<Collider>>();
 
 		#region MonoBehaviour
 		private void Awake()
@@ -159,7 +165,6 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		/// </summary>
 		private void FindCandidate()
 		{
-			currentCandidate = null;
 			float distanceScore = float.MinValue;
 			if (GetClosestGrabbable(m_GrabDistance, out HandGrabInteractable grabbable, out float score) && score > distanceScore)
 			{
@@ -189,28 +194,47 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 			grabbable = null;
 			maxScore = 0f;
 
-			Collider[] nearColliders = Physics.OverlapSphere(wristPose.position, 0.5f);
-			List<HandGrabInteractable> nearHandGrabInteractables = new List<HandGrabInteractable>();
-			for (int i = 0; i < nearColliders.Length; i++)
+			for (int i = 0; i < lastBufferCount; i++)
 			{
-				HandGrabInteractable interactable = nearColliders[i].GetComponentInParent<HandGrabInteractable>();
-				if (interactable && !nearHandGrabInteractables.Contains(interactable))
-				{
-					nearHandGrabInteractables.Add(interactable);
-					continue;
-				}
-				interactable = nearColliders[i].GetComponentInChildren<HandGrabInteractable>();
-				if (interactable && !nearHandGrabInteractables.Contains(interactable))
-				{
-					nearHandGrabInteractables.Add(interactable);
-					continue;
-				}
+				HandGrabInteractable interactable = grabbableBuffer[i];
+				interactable.ShowIndicator(false, this);
 			}
 
-			for (int i = 0; i < nearHandGrabInteractables.Count; i++)
+			int colliderCount = Physics.OverlapSphereNonAlloc(wristPose.position, grabDistance * 5, colliderBuffer);
+			int interactableCount = 0;
+			for (int i = 0; i < colliderCount; i++)
 			{
-				HandGrabInteractable interactable = nearHandGrabInteractables[i];
-				interactable.ShowIndicator(false, this);
+				Collider collider = colliderBuffer[i];
+				if (unusedColliders.TryGetValue(collider, out _)) { continue; }
+
+				HandGrabInteractable interactable = collider.GetComponentInParent<HandGrabInteractable>()
+													?? collider.GetComponentInChildren<HandGrabInteractable>();
+				if (interactable != null)
+				{
+					bool isUnique = true;
+					for (int j = 0; j < interactableCount; j++)
+					{
+						if (grabbableBuffer[j] == interactable)
+						{
+							isUnique = false;
+							break;
+						}
+					}
+					if (isUnique)
+					{
+						grabbableBuffer[interactableCount++] = interactable;
+					}
+				}
+				else
+				{
+					AddUnusedColliders(collider);
+				}
+			}
+			lastBufferCount = interactableCount;
+
+			for (int i = 0; i < interactableCount; i++)
+			{
+				HandGrabInteractable interactable = grabbableBuffer[i];
 				for (int j = 0; j < fingerTipPosition.Length; j++)
 				{
 					float distanceScore = interactable.CalculateDistanceScore(fingerTipPosition[j], grabDistance);
@@ -278,6 +302,19 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 				return;
 			}
 			m_Grabbable.UpdatePositionAndRotation(wristPose);
+		}
+
+		private void AddUnusedColliders(Collider collider)
+		{
+			if (lruList.Count >= kMaxCacheSize)
+			{
+				var oldest = lruList.First;
+				unusedColliders.Remove(oldest.Value);
+				lruList.RemoveFirst();
+			}
+
+			var node = lruList.AddLast(collider);
+			unusedColliders[collider] = node;
 		}
 	}
 }

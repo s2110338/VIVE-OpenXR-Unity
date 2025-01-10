@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -9,13 +10,15 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		[SerializeField]
 		private float forceMultiplier = 1.0f;
 
-		private readonly int MIN_POSE_SAMPLES = 2;
-		private readonly int MAX_POSE_SAMPLES = 10;
+		private const int MIN_POSE_SAMPLES = 2;
+		private const int MAX_POSE_SAMPLES = 10;
 		private readonly float MIN_VELOCITY = 0.5f;
 
 		private Rigidbody interactableRigidbody;
-		private List<Pose> movementPoses = new List<Pose>();
-		private List<float> timestamps = new List<float>();
+		private Pose[] movementPoses = new Pose[MAX_POSE_SAMPLES];
+		private float[] timestamps = new float[MAX_POSE_SAMPLES];
+		private int currentPoseIndex = 0;
+		private int poseCount = 0;
 		private bool isBegin = false;
 		private bool isEnd = false;
 		private object lockVel = new object();
@@ -36,7 +39,11 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 
 			if (isEnd)
 			{
+#if UNITY_6000_0_OR_NEWER
+				interactableRigidbody.linearVelocity = Vector3.zero;
+#else
 				interactableRigidbody.velocity = Vector3.zero;
+#endif
 				interactableRigidbody.angularVelocity = Vector3.zero;
 
 				Vector3 velocity = CalculateVelocity();
@@ -46,8 +53,10 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 				}
 				interactableRigidbody = null;
 
-				movementPoses.Clear();
-				timestamps.Clear();
+				Array.Clear(movementPoses, 0, MAX_POSE_SAMPLES);
+				Array.Clear(timestamps, 0, MAX_POSE_SAMPLES);
+				currentPoseIndex = 0;
+				poseCount = 0;
 				isEnd = false;
 			}
 		}
@@ -55,28 +64,29 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 		private void RecordMovement()
 		{
 			float time = Time.time;
-			if (movementPoses.Count == 0 ||
-				timestamps[movementPoses.Count - 1] != time)
-			{
-				movementPoses.Add(new Pose(interactableRigidbody.position, interactableRigidbody.rotation));
-				timestamps.Add(time);
-			}
 
-			if (movementPoses.Count > MAX_POSE_SAMPLES)
+			int lastIndex = (currentPoseIndex + poseCount - 1) % MAX_POSE_SAMPLES;
+			if (poseCount == 0 || timestamps[lastIndex] != time)
 			{
-				movementPoses.RemoveAt(0);
-				timestamps.RemoveAt(0);
+				movementPoses[currentPoseIndex] = new Pose(interactableRigidbody.position, interactableRigidbody.rotation);
+				timestamps[currentPoseIndex] = time;
+
+				if (poseCount < MAX_POSE_SAMPLES)
+				{
+					poseCount++;
+				}
+				currentPoseIndex = (currentPoseIndex + 1) % MAX_POSE_SAMPLES;
 			}
 		}
 
 		private Vector3 CalculateVelocity()
 		{
-			if (movementPoses.Count >= MIN_POSE_SAMPLES)
+			if (poseCount >= MIN_POSE_SAMPLES)
 			{
 				List<Vector3> velocities = new List<Vector3>();
-				for (int i = 0; i < movementPoses.Count - 1; i++)
+				for (int i = 0; i < poseCount - 1; i++)
 				{
-					for (int j = i + 1; j < movementPoses.Count; j++)
+					for (int j = i + 1; j < poseCount; j++)
 					{
 						velocities.Add(GetVelocity(i, j));
 					}
@@ -89,9 +99,9 @@ namespace VIVE.OpenXR.Toolkits.RealisticHandInteraction
 
 		private Vector3 GetVelocity(int idx1, int idx2)
 		{
-			if (idx1 < 0 || idx1 >= movementPoses.Count
-				|| idx2 < 0 || idx2 >= movementPoses.Count
-				|| movementPoses.Count < MIN_POSE_SAMPLES)
+			if (idx1 < 0 || idx1 >= poseCount
+				|| idx2 < 0 || idx2 >= poseCount
+				|| poseCount < MIN_POSE_SAMPLES)
 			{
 				return Vector3.zero;
 			}

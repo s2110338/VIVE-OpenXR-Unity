@@ -124,7 +124,7 @@ namespace VIVE.OpenXR.Samples.Anchor
         void GetXRInputSubsystem()
         {
             List<XRInputSubsystem> xrSubsystemList = new List<XRInputSubsystem>();
-            SubsystemManager.GetInstances(xrSubsystemList);
+            SubsystemManager.GetSubsystems(xrSubsystemList);
             foreach (var xrSubsystem in xrSubsystemList)
             {
                 if (xrSubsystem.running)
@@ -675,6 +675,12 @@ namespace VIVE.OpenXR.Samples.Anchor
                     if (task.IsCompleted)
                     {
                         Task<(XrResult, string, byte[])> t = task as Task<(XrResult, string, byte[])>;
+                        if (t == null)
+                        {
+                            tasks.Remove(task);
+                            break;
+                        }
+
                         if (t.Result.Item1 == XrResult.XR_SUCCESS)
                         {
                             // write to file

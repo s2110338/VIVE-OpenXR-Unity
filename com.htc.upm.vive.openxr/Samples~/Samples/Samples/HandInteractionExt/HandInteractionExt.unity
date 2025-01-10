@@ -1768,6 +1768,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -1808,6 +1809,18 @@ MonoBehaviour:
         m_Flags: 0
       m_Flags: 0
     m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 5c275b7c-6878-407c-acb9-66806a61261b
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: 
     m_Type: 0
@@ -1826,7 +1839,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &672225543
 GameObject:
   m_ObjectHideFlags: 0
@@ -2227,6 +2239,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -2240,6 +2253,14 @@ MonoBehaviour:
       - m_Name: 
         m_Id: 82e7705c-fd46-4e2a-a1e9-571bbc131536
         m_Path: <ViveHandInteractionExt>{RightHand}/pinchPosition
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Position Input
+        m_Flags: 0
+      - m_Name: 
+        m_Id: 226fcfb5-99d1-4280-be7d-6cab3c65b50e
+        m_Path: <HandInteraction>{RightHand}/pinchPosition
         m_Interactions: 
         m_Processors: 
         m_Groups: 
@@ -2265,6 +2286,26 @@ MonoBehaviour:
         m_Groups: 
         m_Action: Rotation Input
         m_Flags: 0
+      - m_Name: 
+        m_Id: bcafb8fd-f86e-42bf-90ac-af906ad3c602
+        m_Path: <HandInteraction>{RightHand}/pinchRotation
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Rotation Input
+        m_Flags: 0
+      m_Flags: 0
+    m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: de44ecc7-66b7-4528-a659-367b18da0fbc
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
       m_Flags: 0
     m_Reference: {fileID: 0}
   m_PositionAction:
@@ -2285,7 +2326,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1001 &743277234
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2939,6 +2979,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -2952,6 +2993,14 @@ MonoBehaviour:
       - m_Name: 
         m_Id: e37e15da-50d1-4071-a6ab-0b85be8c0c14
         m_Path: <ViveHandInteractionExt>{LeftHand}/pinchPosition
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Position Input
+        m_Flags: 0
+      - m_Name: 
+        m_Id: 4364030c-a105-4d8e-a293-2110f00c6bd2
+        m_Path: <HandInteraction>{LeftHand}/pinchPosition
         m_Interactions: 
         m_Processors: 
         m_Groups: 
@@ -2977,6 +3026,26 @@ MonoBehaviour:
         m_Groups: 
         m_Action: Rotation Input
         m_Flags: 0
+      - m_Name: 
+        m_Id: a3e41bb8-f7e1-4d78-982f-efb634541fad
+        m_Path: <HandInteraction>{LeftHand}/pinchRotation
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Rotation Input
+        m_Flags: 0
+      m_Flags: 0
+    m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: c406c9d0-8b04-4a9b-8176-c2f2ecb97e6d
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
       m_Flags: 0
     m_Reference: {fileID: 0}
   m_PositionAction:
@@ -2997,7 +3066,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &1007103283
 GameObject:
   m_ObjectHideFlags: 0
@@ -3361,6 +3429,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -3401,6 +3470,18 @@ MonoBehaviour:
         m_Flags: 0
       m_Flags: 0
     m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 03a60622-a192-4d59-b71c-846ad1399680
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: 
     m_Type: 0
@@ -3419,7 +3500,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1001 &1226082257
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3736,6 +3816,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -3749,6 +3830,14 @@ MonoBehaviour:
       - m_Name: 
         m_Id: f4da5114-86b2-4fc3-8e4a-e9c77e4af95c
         m_Path: <ViveHandInteractionExt>{LeftHand}/pointerPosition
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Position Input
+        m_Flags: 0
+      - m_Name: 
+        m_Id: 34a62fdc-c1b6-4cf1-a7de-b7024d3ca2cf
+        m_Path: <HandInteraction>{LeftHand}/pointerPosition
         m_Interactions: 
         m_Processors: 
         m_Groups: 
@@ -3774,6 +3863,26 @@ MonoBehaviour:
         m_Groups: 
         m_Action: Rotation Input
         m_Flags: 0
+      - m_Name: 
+        m_Id: 6e74078d-e467-4dc6-8023-a29a8e78d576
+        m_Path: <HandInteraction>{LeftHand}/pointerRotation
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Rotation Input
+        m_Flags: 0
+      m_Flags: 0
+    m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 6a3020fa-bbda-4b50-adfe-31d7c651a205
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
       m_Flags: 0
     m_Reference: {fileID: 0}
   m_PositionAction:
@@ -3794,7 +3903,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &1414890483
 GameObject:
   m_ObjectHideFlags: 0
@@ -4053,6 +4161,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -4066,6 +4175,14 @@ MonoBehaviour:
       - m_Name: 
         m_Id: 21cf3f01-8b58-4f9e-af5d-ceac34530491
         m_Path: <ViveHandInteractionExt>{RightHand}/devicePosition
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Position Input
+        m_Flags: 0
+      - m_Name: 
+        m_Id: 449e07f6-b6de-4297-8c24-68fa0c54203b
+        m_Path: <HandInteraction>{RightHand}/devicePosition
         m_Interactions: 
         m_Processors: 
         m_Groups: 
@@ -4091,6 +4208,26 @@ MonoBehaviour:
         m_Groups: 
         m_Action: Rotation Input
         m_Flags: 0
+      - m_Name: 
+        m_Id: 2d2d7513-e9e2-44fe-a2f3-8519275ddf39
+        m_Path: <HandInteraction>{RightHand}/deviceRotation
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Rotation Input
+        m_Flags: 0
+      m_Flags: 0
+    m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: f109a673-1db0-4c0a-90b3-7d2f485e71e1
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
       m_Flags: 0
     m_Reference: {fileID: 0}
   m_PositionAction:
@@ -4111,7 +4248,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1001 &1495351303
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4760,6 +4896,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -4773,6 +4910,14 @@ MonoBehaviour:
       - m_Name: 
         m_Id: e300897c-ce37-447a-8d0a-550b0b75f7a7
         m_Path: <ViveHandInteractionExt>{RightHand}/pokePosition
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Position Input
+        m_Flags: 0
+      - m_Name: 
+        m_Id: a98522ae-3d15-4f68-8b52-3e0b07bac073
+        m_Path: <HandInteraction>{RightHand}/pokePosition
         m_Interactions: 
         m_Processors: 
         m_Groups: 
@@ -4798,6 +4943,26 @@ MonoBehaviour:
         m_Groups: 
         m_Action: Rotation Input
         m_Flags: 0
+      - m_Name: 
+        m_Id: a5a97017-b5d5-497d-b9e8-a4c31f49c490
+        m_Path: <HandInteraction>{RightHand}/pokeRotation
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Rotation Input
+        m_Flags: 0
+      m_Flags: 0
+    m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 1105b297-66c4-46e5-a497-8c5fada26fca
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
       m_Flags: 0
     m_Reference: {fileID: 0}
   m_PositionAction:
@@ -4818,7 +4983,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &1708107229
 GameObject:
   m_ObjectHideFlags: 0
@@ -5771,6 +5935,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -5811,6 +5976,18 @@ MonoBehaviour:
         m_Flags: 0
       m_Flags: 0
     m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: dbd06a1e-0881-4702-b7ef-a4bb81c023fd
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: 
     m_Type: 0
@@ -5829,7 +6006,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &1947228662
 GameObject:
   m_ObjectHideFlags: 0
@@ -5893,6 +6069,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -5906,6 +6083,14 @@ MonoBehaviour:
       - m_Name: 
         m_Id: 3242684a-c8c9-4a15-8c00-2ab032a53032
         m_Path: <ViveHandInteractionExt>{LeftHand}/pokePosition
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Position Input
+        m_Flags: 0
+      - m_Name: 
+        m_Id: b51f75c3-0d11-4a26-b603-185a4f559861
+        m_Path: <HandInteraction>{LeftHand}/pokePosition
         m_Interactions: 
         m_Processors: 
         m_Groups: 
@@ -5931,6 +6116,26 @@ MonoBehaviour:
         m_Groups: 
         m_Action: Rotation Input
         m_Flags: 0
+      - m_Name: 
+        m_Id: 59e61b20-ab73-411d-8b56-ac6f0e182f9d
+        m_Path: <HandInteraction>{LeftHand}/pokeRotation
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Rotation Input
+        m_Flags: 0
+      m_Flags: 0
+    m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 52fe8957-1665-4732-a1a1-f95cc70a1c78
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
       m_Flags: 0
     m_Reference: {fileID: 0}
   m_PositionAction:
@@ -5951,7 +6156,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &1962967395
 GameObject:
   m_ObjectHideFlags: 0
@@ -6093,6 +6297,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -6106,6 +6311,14 @@ MonoBehaviour:
       - m_Name: 
         m_Id: e083b99d-8082-4be7-bcb9-71e8efad9cc0
         m_Path: <ViveHandInteractionExt>{LeftHand}/devicePosition
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Position Input
+        m_Flags: 0
+      - m_Name: 
+        m_Id: 2b53a195-ce43-4708-a385-e61a8c6ec293
+        m_Path: <HandInteraction>{LeftHand}/devicePosition
         m_Interactions: 
         m_Processors: 
         m_Groups: 
@@ -6131,6 +6344,26 @@ MonoBehaviour:
         m_Groups: 
         m_Action: Rotation Input
         m_Flags: 0
+      - m_Name: 
+        m_Id: 5717e88d-f9be-4c5d-a42b-a82e179bc64d
+        m_Path: <HandInteraction>{LeftHand}/deviceRotation
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Rotation Input
+        m_Flags: 0
+      m_Flags: 0
+    m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: ec3ea843-1c14-4b82-a1ca-3e61d0da8985
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
       m_Flags: 0
     m_Reference: {fileID: 0}
   m_PositionAction:
@@ -6151,7 +6384,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &2064717940
 GameObject:
   m_ObjectHideFlags: 0
@@ -6215,6 +6447,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -6255,6 +6488,18 @@ MonoBehaviour:
         m_Flags: 0
       m_Flags: 0
     m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: eb274547-769d-45f6-890b-abda078e5899
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: 
     m_Type: 0
@@ -6273,7 +6518,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &2073298331
 GameObject:
   m_ObjectHideFlags: 0
@@ -6504,6 +6748,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -6517,6 +6762,14 @@ MonoBehaviour:
       - m_Name: 
         m_Id: 0334b4b2-d82b-4e22-beb0-343a3e27465f
         m_Path: <ViveHandInteractionExt>{RightHand}/pointerPosition
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Position Input
+        m_Flags: 0
+      - m_Name: 
+        m_Id: b9726b6c-9ecb-4694-982a-9099c7c1df5e
+        m_Path: <HandInteraction>{RightHand}/pointerPosition
         m_Interactions: 
         m_Processors: 
         m_Groups: 
@@ -6542,6 +6795,26 @@ MonoBehaviour:
         m_Groups: 
         m_Action: Rotation Input
         m_Flags: 0
+      - m_Name: 
+        m_Id: fdb8ffda-f0d5-4c9b-b785-6afb920dafa8
+        m_Path: <HandInteraction>{RightHand}/pointerRotation
+        m_Interactions: 
+        m_Processors: 
+        m_Groups: 
+        m_Action: Rotation Input
+        m_Flags: 0
+      m_Flags: 0
+    m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 0b86eacc-f773-400d-98a7-92e950a58b04
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
       m_Flags: 0
     m_Reference: {fileID: 0}
   m_PositionAction:
@@ -6562,7 +6835,6 @@ MonoBehaviour:
     m_Interactions: 
     m_SingletonActionBindings: []
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!4 &543450651583740275 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5562507940235781211, guid: a6579de606ad5b54893722f363b5371d, type: 3}
@@ -7983,6 +8255,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -8023,6 +8296,18 @@ MonoBehaviour:
         m_Flags: 0
       m_Flags: 0
     m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 8d1a2e5f-8b6f-4fa9-a4d9-b17c00a26569
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: Position
     m_Type: 0
@@ -8057,7 +8342,6 @@ MonoBehaviour:
       m_Action: Rotation
       m_Flags: 0
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &6088718223833369450
 GameObject:
   m_ObjectHideFlags: 0
@@ -8172,6 +8456,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -8212,6 +8497,18 @@ MonoBehaviour:
         m_Flags: 0
       m_Flags: 0
     m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 7b3328e4-c5ac-4bf5-86d8-e72901205f35
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: Position
     m_Type: 0
@@ -8246,7 +8543,6 @@ MonoBehaviour:
       m_Action: Rotation
       m_Flags: 0
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1 &6088718223950534255
 GameObject:
   m_ObjectHideFlags: 0
@@ -8736,6 +9032,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_TrackingType: 0
   m_UpdateType: 0
+  m_IgnoreTrackingState: 0
   m_PositionInput:
     m_UseReference: 0
     m_Action:
@@ -8776,6 +9073,18 @@ MonoBehaviour:
         m_Flags: 0
       m_Flags: 0
     m_Reference: {fileID: 0}
+  m_TrackingStateInput:
+    m_UseReference: 0
+    m_Action:
+      m_Name: Tracking State Input
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: ae1fc38a-9c71-495c-aab6-ed33ddf01498
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 0}
   m_PositionAction:
     m_Name: Position
     m_Type: 0
@@ -8810,7 +9119,6 @@ MonoBehaviour:
       m_Action: Rotation
       m_Flags: 0
     m_Flags: 0
-  m_HasMigratedActions: 1
 --- !u!1001 &7278110509245602027
 PrefabInstance:
   m_ObjectHideFlags: 0

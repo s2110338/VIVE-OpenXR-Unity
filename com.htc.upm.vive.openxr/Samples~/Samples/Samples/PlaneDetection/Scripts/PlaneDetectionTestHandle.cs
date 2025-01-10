@@ -29,7 +29,7 @@ public class PlaneDetectionTestHandle : MonoBehaviour
     void GetXRInputSubsystem()
     {
         List<XRInputSubsystem> xrSubsystemList = new List<XRInputSubsystem>();
-        SubsystemManager.GetInstances(xrSubsystemList);
+        SubsystemManager.GetSubsystems(xrSubsystemList);
         foreach (var xrSubsystem in xrSubsystemList)
         {
             if (xrSubsystem.running)

@@ -11,6 +11,7 @@ using UnityEngine.InputSystem;
 using System.Collections.Generic;
 using UnityEngine.XR;
 using UnityEngine.XR.OpenXR.Input;
+using System;
 using System.Text;
 
 #if UNITY_EDITOR
@@ -30,7 +31,7 @@ namespace VIVE.OpenXR.Hand
     /// This <see cref="OpenXRInteractionFeature"/> enables the use of hand interaction profiles in OpenXR. It enables <see cref="ViveHandInteractionExt.kOpenxrExtensionString">XR_EXT_hand_interaction</see> in the underyling runtime.
     /// </summary>
 #if UNITY_EDITOR
-    [OpenXRFeature(UiName = "VIVE XR Hand Interaction Ext",
+    [OpenXRFeature(UiName = "VIVE XR Hand Interaction Ext (Deprecated)",
         Hidden = true,
         BuildTargetGroups = new[] { BuildTargetGroup.Android },
         Company = "HTC",
@@ -41,6 +42,7 @@ namespace VIVE.OpenXR.Hand
         Category = FeatureCategory.Interaction,
         FeatureId = featureId)]
 #endif
+    [Obsolete("This class is deprecated. Please use Unity Hand Interaction Profile instead.")]
     public class ViveHandInteractionExt : OpenXRInteractionFeature
     {
         #region Log

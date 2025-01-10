@@ -3,6 +3,7 @@
 using System;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Profiling;
 using VIVE.OpenXR.Hand;
 
 namespace VIVE.OpenXR.Models
@@ -69,16 +70,43 @@ namespace VIVE.OpenXR.Models
             skinMeshRenderer = GetComponentInChildren<SkinnedMeshRenderer>();
         }
 
+        private void OnEnable()
+        {
+            Application.onBeforeRender += BeforeRenderUpdate;
+        }
+
+        private void OnDisable()
+        {
+            Application.onBeforeRender -= BeforeRenderUpdate;
+        }
+
         private void Update()
         {
-            if (skinMeshRenderer == null) { return; }
+            UpdateHand();
+        }
 
+        private void BeforeRenderUpdate()
+        {
+            if (!skinMeshRenderer.enabled) { return; }
+            UpdateHand();
+        }
+
+        private void UpdateHand()
+        {
+            Profiler.BeginSample("HandModelActions");
+            if (skinMeshRenderer == null) { Profiler.EndSample(); return; }
+
+            Profiler.BeginSample("GetJointLocations");
             if (!XR_EXT_hand_tracking.Interop.GetJointLocations(m_IsLeft, out XrHandJointLocationEXT[] handJointLocation))
             {
                 skinMeshRenderer.enabled = false;
+                Profiler.EndSample();
+                Profiler.EndSample();
                 return;
             }
+            Profiler.EndSample();
 
+            Profiler.BeginSample("UpdateJointPose");
             skinMeshRenderer.enabled = !ForceHidden;
 
             UpdateJointPosition(handJointLocation[(int)XrHandJointEXT.XR_HAND_JOINT_WRIST_EXT], ref m_Wrist);
@@ -114,6 +142,8 @@ namespace VIVE.OpenXR.Models
             UpdateJointRotation(handJointLocation[(int)XrHandJointEXT.XR_HAND_JOINT_LITTLE_INTERMEDIATE_EXT], ref m_Little_Intermediate);
             UpdateJointRotation(handJointLocation[(int)XrHandJointEXT.XR_HAND_JOINT_LITTLE_DISTAL_EXT], ref m_Little_Distal);
             UpdateJointRotation(handJointLocation[(int)XrHandJointEXT.XR_HAND_JOINT_LITTLE_TIP_EXT], ref m_Little_Tip);
+            Profiler.EndSample();
+            Profiler.EndSample();
         }
 
         private void UpdateJointPosition(XrHandJointLocationEXT pose, ref GameObject joint)

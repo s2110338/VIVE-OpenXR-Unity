@@ -48,7 +48,7 @@ namespace VIVE.OpenXR
 	public class VIVEFocus3Profile : OpenXRInteractionFeature
 	{
 		#region Log
-		const string LOG_TAG = "VIVE.OpenXR.VIVEFocus3Profile";
+		const string LOG_TAG = "VIVE.OpenXR.VIVEFocus3Profile ";
 		StringBuilder m_sb = null;
 		StringBuilder sb {
 			get {
@@ -56,8 +56,8 @@ namespace VIVE.OpenXR
 				return m_sb;
 			}
 		}
-		void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
-		void ERROR(StringBuilder msg) { Debug.LogErrorFormat("{0} {1}", LOG_TAG, msg); }
+		void DEBUG(StringBuilder msg) { Debug.Log(LOG_TAG + msg); }
+		void ERROR(StringBuilder msg) { Debug.LogError(LOG_TAG + msg); }
 		#endregion
 
 		private static VIVEFocus3Profile m_Instance = null;
@@ -88,11 +88,13 @@ namespace VIVE.OpenXR
 					return m_sb;
 				}
 			}
-			void DEBUG(StringBuilder msg) { Debug.LogFormat("{0} {1}", LOG_TAG, msg); }
-			void ERROR(StringBuilder msg) { Debug.LogErrorFormat("{0} {1}", LOG_TAG, msg); }
+			void DEBUG(StringBuilder msg) { Debug.Log(LOG_TAG + msg); }
+			void ERROR(StringBuilder msg) { Debug.LogError(LOG_TAG + msg); }
 			#endregion
 
 			#region Action Path
+
+			#region Button
 			/// <summary>
 			/// A [Vector2Control](xref:UnityEngine.InputSystem.Controls.Vector2Control) that represents the <see cref="VIVEFocus3Profile.thumbstick"/> OpenXR binding.
 			/// </summary>
@@ -145,7 +147,7 @@ namespace VIVE.OpenXR
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="triggerClick"/> OpenXR binding.
 			/// </summary>
 			[Preserve, InputControl(aliases = new[] { "indexButton", "triggerButton" }, usage = "TriggerButton")]
-			public ButtonControl triggerPressed { get; private set; }
+			public ButtonControl triggerPressed { get; private set; } // InputControl(offset = 20)
 
 			/// <summary>
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="triggerTouch"/> OpenXR binding.
@@ -157,7 +159,7 @@ namespace VIVE.OpenXR
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="thumbstickClick"/> OpenXR binding.
 			/// </summary>
 			[Preserve, InputControl(aliases = new[] { "JoystickOrPadPressed", "thumbstickClick", "joystickClicked", "primary2DAxisClick" }, usage = "Primary2DAxisClick")]
-			public ButtonControl thumbstickClicked { get; private set; }
+			public ButtonControl thumbstickClicked { get; private set; } // InputControl(offset = 22)
 
 			/// <summary>
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="thumbstickTouch"/> OpenXR binding.
@@ -169,31 +171,31 @@ namespace VIVE.OpenXR
 			/// A [ButtonControl](xref:UnityEngine.InputSystem.Controls.ButtonControl) that represents the <see cref="thumbrest"/> OpenXR binding.
 			/// </summary>
 			[Preserve, InputControl(aliases = new[] { "ParkingTouched", "parkingTouched" })]
-			public ButtonControl thumbrestTouched { get; private set; }
+			public ButtonControl thumbrestTouched { get; private set; } // InputControl(offset = 24)
+			#endregion
 
 			/// <summary>
 			/// A <see cref="PoseControl"/> that represents the <see cref="gripPose"/> OpenXR binding. The grip pose represents the location of the user's palm or holding a motion controller.
 			/// </summary>
 			[Preserve, InputControl(offset = 0, aliases = new[] { "device", "gripPose" }, usage = "Device")]
 			public PoseControl devicePose { get; private set; }
-
 			/// <summary>
 			/// A <see cref="PoseControl"/> that represents the <see cref="VIVEFocus3Profile.aim"/> OpenXR binding. The pointer pose represents the tip of the controller pointing forward.
 			/// </summary>
 			[Preserve, InputControl(offset = 0, aliases = new[] { "aimPose", "pointerPose" }, usage = "Pointer")]
 			public PoseControl pointer { get; private set; }
-#if UNITY_ANDROID
-			/// <summary>
-			/// A <see cref="PoseControl"/> representing the <see cref="VIVEFocus3Profile.pokePose"/> OpenXR binding.
-			/// </summary>
-			[Preserve, InputControl(offset = 0, alias = "indexTip", usage = "Poke")]
-			public PoseControl pokePose { get; private set; }
 
+#if UNITY_ANDROID
 			/// <summary>
 			/// A <see cref="PoseControl"/> representing the <see cref="VIVEFocus3Profile.pinchPose"/> OpenXR binding.
 			/// </summary>
 			[Preserve, InputControl(offset = 0, usage = "Pinch")]
 			public PoseControl pinchPose { get; private set; }
+			/// <summary>
+			/// A <see cref="PoseControl"/> representing the <see cref="VIVEFocus3Profile.pokePose"/> OpenXR binding.
+			/// </summary>
+			[Preserve, InputControl(offset = 0, alias = "indexTip", usage = "Poke")]
+			public PoseControl pokePose { get; private set; }
 #endif
 
 			/// <summary>
@@ -227,28 +229,29 @@ namespace VIVE.OpenXR
 			/// </summary>
 			[Preserve, InputControl(offset = 104, noisy = true, alias = "pointerOrientation")]
 			public QuaternionControl pointerRotation { get; private set; }
-#if UNITY_ANDROID
-			/// <summary>
-			/// A [Vector3Control](xref:UnityEngine.InputSystem.Controls.Vector3Control) required for backwards compatibility with the XRSDK layouts. This is the poke position. This value is equivalent to mapping pokePose/position.
-			/// </summary>
-			[Preserve, InputControl(offset = 152, noisy = true)]
-			public Vector3Control pokePosition { get; private set; }
-			/// <summary>
-			/// A [QuaternionControl](xref:UnityEngine.InputSystem.Controls.QuaternionControl) required for backwards compatibility with the XRSDK layouts. This is the poke orientation. This value is equivalent to mapping pokePose/rotation.
-			/// </summary>
-			[Preserve, InputControl(offset = 164, noisy = true)]
-			public QuaternionControl pokeRotation { get; private set; }
 
+#if UNITY_ANDROID
 			/// <summary>
 			/// A [Vector3Control](xref:UnityEngine.InputSystem.Controls.Vector3Control) required for backwards compatibility with the XRSDK layouts. This is the pinch position. This value is equivalent to mapping pinchPose/position.
 			/// </summary>
-			[Preserve, InputControl(offset = 212, noisy = true)]
+			[Preserve, InputControl(offset = 152, noisy = true)]
 			public Vector3Control pinchPosition { get; private set; }
 			/// <summary>
 			/// A [QuaternionControl](xref:UnityEngine.InputSystem.Controls.QuaternionControl) required for backwards compatibility with the XRSDK layouts. This is the pinch orientation. This value is equivalent to mapping pinchPose/rotation.
 			/// </summary>
-			[Preserve, InputControl(offset = 224, noisy = true)]
+			[Preserve, InputControl(offset = 164, noisy = true)]
 			public QuaternionControl pinchRotation { get; private set; }
+
+			/// <summary>
+			/// A [Vector3Control](xref:UnityEngine.InputSystem.Controls.Vector3Control) required for backwards compatibility with the XRSDK layouts. This is the poke position. This value is equivalent to mapping pokePose/position.
+			/// </summary>
+			[Preserve, InputControl(offset = 212, noisy = true)]
+			public Vector3Control pokePosition { get; private set; }
+			/// <summary>
+			/// A [QuaternionControl](xref:UnityEngine.InputSystem.Controls.QuaternionControl) required for backwards compatibility with the XRSDK layouts. This is the poke orientation. This value is equivalent to mapping pokePose/rotation.
+			/// </summary>
+			[Preserve, InputControl(offset = 224, noisy = true)]
+			public QuaternionControl pokeRotation { get; private set; }
 #endif
 			/// <summary>
 			/// A <see cref="HapticControl"/> that represents the <see cref="VIVEFocus3Profile.haptic"/> binding.

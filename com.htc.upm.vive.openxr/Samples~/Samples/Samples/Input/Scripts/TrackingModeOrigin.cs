@@ -138,7 +138,7 @@ namespace UnityEngine.XR.OpenXR.Samples.ControllerSample
 
             XRInputSubsystem subsystem = null;
 
-            SubsystemManager.GetInstances(s_InputSubsystems);
+            SubsystemManager.GetSubsystems(s_InputSubsystems);
             if(s_InputSubsystems.Count > 0)
             {
                 subsystem = s_InputSubsystems[0];

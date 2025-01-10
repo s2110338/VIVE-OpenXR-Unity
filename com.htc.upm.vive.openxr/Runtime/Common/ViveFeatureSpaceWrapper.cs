@@ -1,6 +1,7 @@
 // Copyright HTC Corporation All Rights Reserved.
 
 using System;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace VIVE.OpenXR.Feature
@@ -12,9 +13,13 @@ namespace VIVE.OpenXR.Feature
     /// </summary>
     public class SpaceWrapper : ViveFeatureWrapperBase<SpaceWrapper>, IViveFeatureWrapper
     {
+        const string TAG = "ViveSpaceWrapper";
+
+        public delegate XrResult DelegateXrEnumerateReferenceSpaces(XrSession session, uint spaceCapacityInput, out uint spaceCountOutput, [Out] XrReferenceSpaceType[] spaces);
         delegate XrResult DelegateXrLocateSpace(XrSpace space, XrSpace baseSpace, XrTime time, ref XrSpaceLocation location);
         delegate XrResult DelegateXrDestroySpace(XrSpace space);
 
+        DelegateXrEnumerateReferenceSpaces XrEnumerateReferenceSpaces;
         OpenXRHelper.xrCreateReferenceSpaceDelegate XrCreateReferenceSpace;
         DelegateXrLocateSpace XrLocateSpace;
         DelegateXrDestroySpace XrDestroySpace;
@@ -29,17 +34,20 @@ namespace VIVE.OpenXR.Feature
         public bool OnInstanceCreate(XrInstance xrInstance, IntPtr GetAddr)
         {
             if (IsInited) return true;
+            if (TryInited) return false;
+                TryInited = true;
 
             if (xrInstance == null)
-                throw new Exception("ViveSpace: xrInstance is null");
+                throw new Exception("ViveSpaceWrapper: xrInstance is null");
 
             SetGetInstanceProcAddrPtr(GetAddr);
 
-            Debug.Log("ViveSpace: OnInstanceCreate()");
+            Log.D(TAG, "OnInstanceCreate()");
 
             bool ret = true;
             IntPtr funcPtr = IntPtr.Zero;
 
+            ret &= OpenXRHelper.GetXrFunctionDelegate(xrGetInstanceProcAddr, xrInstance, "xrEnumerateReferenceSpaces", out XrEnumerateReferenceSpaces);
             ret &= OpenXRHelper.GetXrFunctionDelegate(xrGetInstanceProcAddr, xrInstance, "xrCreateReferenceSpace", out XrCreateReferenceSpace);
             ret &= OpenXRHelper.GetXrFunctionDelegate(xrGetInstanceProcAddr, xrInstance, "xrLocateSpace", out XrLocateSpace);
             ret &= OpenXRHelper.GetXrFunctionDelegate(xrGetInstanceProcAddr, xrInstance, "xrDestroySpace", out XrDestroySpace);
@@ -49,10 +57,33 @@ namespace VIVE.OpenXR.Feature
 
         public void OnInstanceDestroy()
         {
+            // Do not destroy twice
+            if (IsInited == false) return;
             IsInited = false;
+            XrEnumerateReferenceSpaces = null;
             XrCreateReferenceSpace = null;
             XrLocateSpace = null;
             XrDestroySpace = null;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="session"></param>
+        /// <param name="spaceCapacityInput"></param>
+        /// <param name="spaceCountOutput"></param>
+        /// <param name="spaces"></param>
+        /// <returns></returns>
+        public XrResult EnumerateReferenceSpaces(XrSession session, int spaceCapacityInput, ref int spaceCountOutput, ref XrReferenceSpaceType[] spaces)
+        {
+            spaceCountOutput = 0;
+            if (!IsInited)
+                return XrResult.XR_ERROR_HANDLE_INVALID;
+            if (spaceCapacityInput != 0 && spaces != null && spaces.Length < spaceCapacityInput)
+                return XrResult.XR_ERROR_SIZE_INSUFFICIENT;
+            var ret = XrEnumerateReferenceSpaces(session, (uint)spaceCapacityInput, out uint spaceCountOutputXR, spaces);
+            spaceCountOutput = (int)spaceCountOutputXR;
+            return ret;
         }
 
         /// <summary>
@@ -108,7 +139,7 @@ namespace VIVE.OpenXR.Feature
         {
             if (!IsInited)
                 return XrResult.XR_ERROR_HANDLE_INVALID;
-            Debug.Log($"DestroySpace({space})");
+            Log.D(TAG, $"DestroySpace({space})");
             return XrDestroySpace(space);
         }
     }
@@ -124,7 +155,7 @@ namespace VIVE.OpenXR.Feature
 
         public Space(XrSpace space)
         {
-            Debug.Log($"Space({space})");
+            Log.D($"Space({space})");
             this.space = space;
         }
 
